@@ -1,11 +1,12 @@
 from core.registry import CommandRegistry
 from .custom_commands import (
     HelpCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
-    GotoCommand, MakeFolderCommand, MakeFileCommand, ReadCommand, OpenCommand,
-    DuplicateCommand, ShiftCommand, RenameCommand, DeleteCommand, SearchCommand,
-    FindTextCommand, NetworkCommand, ProcessesCommand, SystemCommand, MeCommand,
-    PcCommand, TodayCommand, NowCommand, CalcCommand, HistoryCommand, EnvCommand,
-    TreeCommand, VersionCommand, EchoCommand
+    CdCommand, GotoCommand, UpCommand, HomeCommand, MakeFolderCommand, MakeFileCommand,
+    ReadCommand, OpenCommand, DuplicateCommand, ShiftCommand, RenameCommand, DeleteCommand,
+    SearchCommand, FindTextCommand, NetworkCommand, ProcessesCommand, SystemCommand,
+    MeCommand, PcCommand, TodayCommand, NowCommand, CalcCommand, HistoryCommand,
+    EnvCommand, TreeCommand, VersionCommand, EchoCommand, DrivesCommand, DiskCommand,
+    IpCommand, NetstatCommand, PingCommand, PathCommand
 )
 
 
@@ -18,7 +19,10 @@ def build_registry() -> CommandRegistry:
         WhereCommand(),
         FilesCommand(),
         FoldersCommand(),
+        CdCommand(),
         GotoCommand(),
+        UpCommand(),
+        HomeCommand(),
         MakeFolderCommand(),
         MakeFileCommand(),
         ReadCommand(),
@@ -42,6 +46,12 @@ def build_registry() -> CommandRegistry:
         TreeCommand(),
         VersionCommand(),
         EchoCommand(),
+        DrivesCommand(),
+        DiskCommand(),
+        IpCommand(),
+        NetstatCommand(),
+        PingCommand(),
+        PathCommand(),
     ]:
         reg.register(cmd)
     return reg

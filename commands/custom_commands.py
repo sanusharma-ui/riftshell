@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import ast
+import ctypes
 import getpass
 import os
 import platform
+import shutil
 import socket
+import string
 import subprocess
 from datetime import datetime
 from pathlib import Path
+
 
 from core.base import BaseCommand, CommandResult
 from utils.safe_fs import (
@@ -91,7 +95,7 @@ class ClearCommand(BaseCommand):
 
 class WhereCommand(BaseCommand):
     name = "where"
-    aliases = []
+    aliases = ["pwd"]
     description = "Show current location."
     usage = "where"
 
@@ -101,7 +105,7 @@ class WhereCommand(BaseCommand):
 
 class FilesCommand(BaseCommand):
     name = "files"
-    aliases = []
+    aliases = ["dir", "ls"]
     description = "Show files and folders in current folder."
     usage = "files [path]"
 
@@ -112,13 +116,33 @@ class FilesCommand(BaseCommand):
 
 class FoldersCommand(BaseCommand):
     name = "folders"
-    aliases = []
+    aliases = ["dird", "dirfolders"]
     description = "Show only folders in current folder."
     usage = "folders [path]"
 
     def execute(self, ctx, args):
         path = resolve_path(ctx, args[0]) if args else ctx.cwd
         return CommandResult(output=list_entries(path, folders_only=True))
+
+
+class CdCommand(BaseCommand):
+    name = "cd"
+    aliases = ["goto", "chdir"]
+    description = "Change current directory."
+    usage = "cd <path>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output=str(ctx.cwd))
+
+        target = resolve_path(ctx, args[0])
+        if not target.exists():
+            return CommandResult(output=f"Not found: {target}", success=False)
+        if not target.is_dir():
+            return CommandResult(output=f"Not a folder: {target}", success=False)
+
+        ctx.set_cwd(target)
+        return CommandResult(output=str(ctx.cwd))
 
 
 class GotoCommand(BaseCommand):
@@ -138,6 +162,30 @@ class GotoCommand(BaseCommand):
             return CommandResult(output=f"Not a folder: {target}", success=False)
 
         ctx.set_cwd(target)
+        return CommandResult(output=str(ctx.cwd))
+
+
+class UpCommand(BaseCommand):
+    name = "up"
+    aliases = ["back"]
+    description = "Go to parent directory."
+    usage = "up"
+
+    def execute(self, ctx, args):
+        parent = ctx.cwd.parent.resolve()
+        ctx.set_cwd(parent)
+        return CommandResult(output=str(ctx.cwd))
+
+
+class HomeCommand(BaseCommand):
+    name = "home"
+    aliases = []
+    description = "Go to user home directory."
+    usage = "home"
+
+    def execute(self, ctx, args):
+        home = Path.home().resolve()
+        ctx.set_cwd(home)
         return CommandResult(output=str(ctx.cwd))
 
 
@@ -174,7 +222,7 @@ class MakeFileCommand(BaseCommand):
 
 class ReadCommand(BaseCommand):
     name = "read"
-    aliases = ["type"]
+    aliases = ["type", "cat"]
     description = "Read file contents."
     usage = "read <file>"
 
@@ -273,7 +321,7 @@ class RenameCommand(BaseCommand):
 
 class DeleteCommand(BaseCommand):
     name = "delete"
-    aliases = ["remove"]
+    aliases = ["remove", "del"]
     description = "Delete file or folder safely."
     usage = "delete confirm <path>"
 
@@ -341,7 +389,7 @@ class NetworkCommand(BaseCommand):
 
 class ProcessesCommand(BaseCommand):
     name = "processes"
-    aliases = []
+    aliases = ["tasklist"]
     description = "Show running processes."
     usage = "processes"
 
@@ -356,7 +404,7 @@ class ProcessesCommand(BaseCommand):
 
 class SystemCommand(BaseCommand):
     name = "system"
-    aliases = []
+    aliases = ["sysinfo"]
     description = "Show system info."
     usage = "system"
 
@@ -492,3 +540,111 @@ class EchoCommand(BaseCommand):
 
     def execute(self, ctx, args):
         return CommandResult(output=" ".join(args))
+
+
+class DrivesCommand(BaseCommand):
+    name = "drives"
+    aliases = ["volumes"]
+    description = "Show available Windows drives."
+    usage = "drives"
+
+    def execute(self, ctx, args):
+        if os.name != "nt":
+            return CommandResult(output="Windows only command.", success=False)
+
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        drives = []
+        for letter in string.ascii_uppercase:
+            if bitmask & 1:
+                drives.append(f"{letter}:\\")
+            bitmask >>= 1
+
+        return CommandResult(output="\n".join(drives) if drives else "(no drives found)")
+
+
+class DiskCommand(BaseCommand):
+    name = "disk"
+    aliases = ["space"]
+    description = "Show disk usage for a path."
+    usage = "disk [path]"
+
+    def execute(self, ctx, args):
+        target = resolve_path(ctx, args[0]) if args else ctx.cwd
+        usage = shutil.disk_usage(str(target if target.exists() else target.parent))
+
+        gb = 1024 ** 3
+        lines = [
+            f"Total : {usage.total / gb:.2f} GB",
+            f"Used  : {usage.used / gb:.2f} GB",
+            f"Free  : {usage.free / gb:.2f} GB",
+        ]
+        return CommandResult(output="\n".join(lines))
+
+
+class IpCommand(BaseCommand):
+    name = "ip"
+    aliases = ["net", "ipconfig"]
+    description = "Show IP configuration."
+    usage = "ip"
+
+    def execute(self, ctx, args):
+        try:
+            cmd = ["ipconfig"]
+            if args and args[0].lower() == "all":
+                cmd.append("/all")
+
+            out = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+            return CommandResult(output=(out.stdout.strip() or out.stderr.strip()))
+        except Exception as e:
+            return CommandResult(output=f"ip error: {e}", success=False)
+
+
+class NetstatCommand(BaseCommand):
+    name = "netstat"
+    aliases = ["ports"]
+    description = "Show active network connections."
+    usage = "netstat"
+
+    def execute(self, ctx, args):
+        try:
+            cmd = ["netstat"]
+            if args:
+                cmd.extend(args)
+
+            out = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+            return CommandResult(output=(out.stdout.strip() or out.stderr.strip()))
+        except Exception as e:
+            return CommandResult(output=f"netstat error: {e}", success=False)
+
+
+class PingCommand(BaseCommand):
+    name = "ping"
+    aliases = []
+    description = "Ping a host."
+    usage = "ping <host>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: ping <host>", success=False)
+
+        host = args[0]
+        try:
+            out = subprocess.run(
+                ["ping", host],
+                capture_output=True,
+                text=True,
+                shell=False
+            )
+            return CommandResult(output=(out.stdout.strip() or out.stderr.strip()))
+        except Exception as e:
+            return CommandResult(output=f"ping error: {e}", success=False)
+
+
+class PathCommand(BaseCommand):
+    name = "path"
+    aliases = ["envpath"]
+    description = "Show PATH environment variable."
+    usage = "path"
+
+    def execute(self, ctx, args):
+        return CommandResult(output=os.environ.get("PATH", ""))
