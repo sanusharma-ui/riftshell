@@ -26,3 +26,6 @@ class CommandRegistry:
             seen.add(name)
             result.append(self._commands[name])
         return result
+
+    def all_names(self):
+        return sorted(set(self._commands.keys()))
