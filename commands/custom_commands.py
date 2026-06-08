@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import time
 import ctypes
 import getpass
 import os
@@ -11,6 +12,10 @@ import string
 import subprocess
 from datetime import datetime
 from pathlib import Path
+import random
+import hashlib
+import base64
+import urllib.request
 
 
 from core.base import BaseCommand, CommandResult
@@ -648,3 +653,254 @@ class PathCommand(BaseCommand):
 
     def execute(self, ctx, args):
         return CommandResult(output=os.environ.get("PATH", ""))
+    
+
+class SleepCommand(BaseCommand):
+    name = "sleep"
+    aliases = ["pause", "wait"]
+    description = "Pause the shell for N seconds."
+    usage = "sleep <seconds>"
+
+    def execute(self, ctx, args):
+        if not args or not args[0].replace('.', '', 1).isdigit():
+            return CommandResult(output="Usage: sleep <seconds>", success=False)
+        sec = float(args[0])
+        time.sleep(sec)
+        return CommandResult(output=f"Slept for {sec} seconds.")
+
+
+class RandomCommand(BaseCommand):
+    name = "random"
+    aliases = ["rand", "dice"]
+    description = "Generate a random number."
+    usage = "random [min] [max]"
+
+    def execute(self, ctx, args):
+        min_val, max_val = 1, 100
+        if len(args) == 2 and args[0].isdigit() and args[1].isdigit():
+            min_val, max_val = int(args[0]), int(args[1])
+        elif len(args) == 1 and args[0].isdigit():
+            max_val = int(args[0])
+            
+        res = random.randint(min_val, max_val)
+        return CommandResult(output=f"Random number ({min_val}-{max_val}): {res}")
+
+
+class HashCommand(BaseCommand):
+    name = "hash"
+    aliases = ["md5", "sha256"]
+    description = "Generate hash for text or file."
+    usage = "hash <text|file> <target>"
+
+    def execute(self, ctx, args):
+        if len(args) < 2:
+            return CommandResult(output="Usage: hash <text|file> <target>", success=False)
+        
+        mode = args[0].lower()
+        target = " ".join(args[1:])
+        hasher = hashlib.sha256()
+
+        if mode == "file":
+            path = resolve_path(ctx, target)
+            if not path.exists() or not path.is_file():
+                return CommandResult(output=f"File not found: {path}", success=False)
+            try:
+                with open(path, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hasher.update(chunk)
+                return CommandResult(output=f"SHA-256 Hash:\n{hasher.hexdigest()}")
+            except Exception as e:
+                return CommandResult(output=f"Hash error: {e}", success=False)
+        elif mode == "text":
+            hasher.update(target.encode('utf-8'))
+            return CommandResult(output=f"SHA-256 Hash:\n{hasher.hexdigest()}")
+        else:
+            return CommandResult(output="First argument must be 'text' or 'file'.", success=False)
+
+
+class Base64Command(BaseCommand):
+    name = "base64"
+    aliases = ["b64"]
+    description = "Encode or decode Base64 strings."
+    usage = "base64 <encode|decode> <text>"
+
+    def execute(self, ctx, args):
+        if len(args) < 2:
+            return CommandResult(output="Usage: base64 <encode|decode> <text>", success=False)
+        
+        action = args[0].lower()
+        text = " ".join(args[1:])
+        
+        try:
+            if action == "encode":
+                res = base64.b64encode(text.encode('utf-8')).decode('utf-8')
+                return CommandResult(output=res)
+            elif action == "decode":
+                res = base64.b64decode(text.encode('utf-8')).decode('utf-8')
+                return CommandResult(output=res)
+            else:
+                return CommandResult(output="Action must be 'encode' or 'decode'.", success=False)
+        except Exception as e:
+            return CommandResult(output=f"Base64 error: {e}", success=False)
+
+
+class DownloadCommand(BaseCommand):
+    name = "download"
+    aliases = ["wget", "curl"]
+    description = "Download a file from a URL."
+    usage = "download <url> [filename]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(
+                output="Usage: download <url> [filename]",
+                success=False
+            )
+
+        url = args[0]
+
+        filename = (
+            args[1]
+            if len(args) > 1
+            else url.rstrip("/").split("/")[-1] or "downloaded_file"
+        )
+
+        dest = resolve_path(ctx, filename)
+
+        try:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/137.0.0.0 Safari/537.36"
+                ),
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/",
+                "Connection": "keep-alive",
+            }
+
+            req = urllib.request.Request(url, headers=headers)
+
+            with urllib.request.urlopen(req, timeout=20) as response:
+                with open(dest, "wb") as out_file:
+                    shutil.copyfileobj(response, out_file)
+
+            return CommandResult(
+                output=f"Downloaded successfully: {dest}"
+            )
+
+        except urllib.error.HTTPError as e:
+            return CommandResult(
+                output=f"HTTP Error {e.code}: {e.reason}",
+                success=False
+            )
+
+        except urllib.error.URLError as e:
+            return CommandResult(
+                output=f"URL Error: {e.reason}",
+                success=False
+            )
+
+        except Exception as e:
+            return CommandResult(
+                output=f"Download failed: {str(e)}",
+                success=False
+            )
+
+class ZipCommand(BaseCommand):
+    name = "zip"
+    aliases = ["compress"]
+    description = "Compress a folder into a zip file."
+    usage = "zip <folder_to_compress> <output_zip_name>"
+
+    def execute(self, ctx, args):
+        if len(args) < 2:
+            return CommandResult(output="Usage: zip <folder_to_compress> <output_zip_name>", success=False)
+        
+        src = resolve_path(ctx, args[0])
+        if not src.is_dir():
+            return CommandResult(output=f"Not a folder: {src}", success=False)
+            
+        out_name = resolve_path(ctx, args[1])
+        out_path_no_ext = str(out_name).removesuffix('.zip')
+        
+        try:
+            shutil.make_archive(out_path_no_ext, 'zip', str(src))
+            return CommandResult(output=f"Compressed to: {out_path_no_ext}.zip")
+        except Exception as e:
+            return CommandResult(output=f"Zip error: {e}", success=False)
+
+
+class UnzipCommand(BaseCommand):
+    name = "unzip"
+    aliases = ["extract"]
+    description = "Extract a zip file."
+    usage = "unzip <zip_file> [destination_folder]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: unzip <zip_file> [destination_folder]", success=False)
+        
+        src = resolve_path(ctx, args[0])
+        if not src.exists():
+            return CommandResult(output=f"File not found: {src}", success=False)
+            
+        dst = resolve_path(ctx, args[1]) if len(args) > 1 else resolve_path(ctx, src.stem)
+        
+        try:
+            shutil.unpack_archive(str(src), str(dst))
+            return CommandResult(output=f"Extracted to: {dst}")
+        except Exception as e:
+            return CommandResult(output=f"Unzip error: {e}", success=False)
+
+
+class HeadCommand(BaseCommand):
+    name = "head"
+    aliases = []
+    description = "Read the first N lines of a file."
+    usage = "head <file> [lines]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: head <file> [lines]", success=False)
+            
+        target = resolve_path(ctx, args[0])
+        lines_to_read = int(args[1]) if len(args) > 1 and args[1].isdigit() else 10
+        
+        if not target.is_file():
+            return CommandResult(output=f"Not a file: {target}", success=False)
+            
+        try:
+            with open(target, 'r', encoding='utf-8', errors='replace') as f:
+                lines = [next(f) for _ in range(lines_to_read)]
+            return CommandResult(output="".join(lines).strip())
+        except StopIteration:
+            return CommandResult(output="".join(lines).strip())
+        except Exception as e:
+            return CommandResult(output=f"Read error: {e}", success=False)
+
+
+class KillCommand(BaseCommand):
+    name = "kill"
+    aliases = ["taskkill"]
+    description = "Kill a process by PID or Name (Windows)."
+    usage = "kill <pid|name>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: kill <pid|name>", success=False)
+            
+        target = args[0]
+        cmd = ["taskkill", "/F"]
+        
+        if target.isdigit():
+            cmd.extend(["/PID", target])
+        else:
+            cmd.extend(["/IM", target])
+            
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+            return CommandResult(output=(out.stdout.strip() or out.stderr.strip()))
+        except Exception as e:
+            return CommandResult(output=f"Kill error: {e}", success=False)

@@ -1,6 +1,6 @@
 from html import escape
 
-from PySide6.QtCore import Qt, QStringListModel
+from PySide6.QtCore import Qt, QStringListModel, QThread, Signal
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QCompleter,
@@ -75,6 +75,23 @@ class CommandInput(QLineEdit):
             return
 
         super().keyPressEvent(event)
+
+
+# ======= NAYA BACKGROUND WORKER CLASS =======
+class CommandWorker(QThread):
+    # Jab command khatam ho jayegi toh ye signal result wapas bhejega
+    result_ready = Signal(object)
+
+    def __init__(self, shell, cmd_text, parent=None):
+        super().__init__(parent)
+        self.shell = shell
+        self.cmd_text = cmd_text
+
+    def run(self):
+        # Ye background thread me execute hoga, UI block nahi karega!
+        result = self.shell.execute_line(self.cmd_text)
+        self.result_ready.emit(result)
+# ==============================================
 
 
 class MainWindow(QMainWindow):
@@ -241,21 +258,43 @@ class MainWindow(QMainWindow):
             self.input.setCursorPosition(len(command_name))
             self.input.setFocus()
 
+    # ======= NAYA MULTI-THREADED RUN_COMMAND =======
     def run_command(self):
         cmd = self.input.text().strip()
         if not cmd:
             return
 
         self.append_user(f"{self.shell.prompt()}{cmd}")
-        result = self.shell.execute_line(cmd)
+        
+        # UI ko disable karo jab tak background command chal rahi ho
+        self.input.setEnabled(False)
+        self.run_btn.setEnabled(False)
+        self.input.setPlaceholderText("Running command, please wait...")
 
+        # Worker thread start karo
+        self.worker = CommandWorker(self.shell, cmd)
+        self.worker.result_ready.connect(self.on_command_finished)
+        self.worker.start()
+
+    def on_command_finished(self, result):
+        # Jab result aa jaye, tab usko console par print karo
         if result.output:
             if result.success:
                 self.append_output(result.output)
             else:
                 self.append_error(result.output)
 
+        # Agar `exit` command chali thi toh application close karo
+        if hasattr(result, 'exit_shell') and result.exit_shell:
+            self.close()
+
+        # UI wapas enable aur reset karo
         self.input.set_history(self.shell.ctx.history)
         self.input.clear()
         self.update_status()
+        
+        self.input.setEnabled(True)
+        self.run_btn.setEnabled(True)
+        self.input.setPlaceholderText("Type command here...  (Tab to complete)")
         self.input.setFocus()
+    # ===============================================

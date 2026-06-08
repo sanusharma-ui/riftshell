@@ -6,7 +6,11 @@ from .custom_commands import (
     SearchCommand, FindTextCommand, NetworkCommand, ProcessesCommand, SystemCommand,
     MeCommand, PcCommand, TodayCommand, NowCommand, CalcCommand, HistoryCommand,
     EnvCommand, TreeCommand, VersionCommand, EchoCommand, DrivesCommand, DiskCommand,
-    IpCommand, NetstatCommand, PingCommand, PathCommand
+    IpCommand, NetstatCommand, PingCommand, PathCommand,
+    
+    # New Custom Commands
+    SleepCommand, RandomCommand, HashCommand, Base64Command,
+    DownloadCommand, ZipCommand, UnzipCommand, HeadCommand, KillCommand
 )
 
 
@@ -52,6 +56,17 @@ def build_registry() -> CommandRegistry:
         NetstatCommand(),
         PingCommand(),
         PathCommand(),
+        
+        # New Custom Commands
+        SleepCommand(),
+        RandomCommand(),
+        HashCommand(),
+        Base64Command(),
+        DownloadCommand(),
+        ZipCommand(),
+        UnzipCommand(),
+        HeadCommand(),
+        KillCommand()
     ]:
         reg.register(cmd)
     return reg
