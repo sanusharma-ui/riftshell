@@ -10,7 +10,7 @@ from .custom_commands import (
     
     # New Custom Commands
     SleepCommand, RandomCommand, HashCommand, Base64Command,
-    DownloadCommand, ZipCommand, UnzipCommand, HeadCommand, KillCommand
+    DownloadCommand, WhichCommand, ZipCommand, UnzipCommand, HeadCommand, KillCommand, TailCommand, WcCommand, MemoryCommand, UptimeCommand
 )
 
 
@@ -66,7 +66,12 @@ def build_registry() -> CommandRegistry:
         ZipCommand(),
         UnzipCommand(),
         HeadCommand(),
-        KillCommand()
+        KillCommand(),
+        TailCommand(),
+        WcCommand(),
+        WhichCommand(),
+        MemoryCommand(),
+        UptimeCommand(),
     ]:
         reg.register(cmd)
     return reg

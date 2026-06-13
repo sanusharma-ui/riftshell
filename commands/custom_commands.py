@@ -904,3 +904,156 @@ class KillCommand(BaseCommand):
             return CommandResult(output=(out.stdout.strip() or out.stderr.strip()))
         except Exception as e:
             return CommandResult(output=f"Kill error: {e}", success=False)
+        
+
+class TailCommand(BaseCommand):
+    name = "tail"
+    aliases = []
+    description = "Read the last N lines of a file."
+    usage = "tail <file> [lines]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: tail <file> [lines]", success=False)
+
+        target = resolve_path(ctx, args[0])
+        lines_to_read = int(args[1]) if len(args) > 1 and args[1].isdigit() else 10
+
+        if not target.is_file():
+            return CommandResult(output=f"Not a file: {target}", success=False)
+
+        try:
+            with open(target, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            last_lines = lines[-lines_to_read:] if len(lines) > lines_to_read else lines
+            return CommandResult(output="".join(last_lines).rstrip())
+        except Exception as e:
+            return CommandResult(output=f"Read error: {e}", success=False)
+        
+class WcCommand(BaseCommand):
+    name = "wc"
+    aliases = []
+    description = "Count lines, words and characters in a file."
+    usage = "wc <file>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: wc <file>", success=False)
+
+        target = resolve_path(ctx, args[0])
+        if not target.is_file():
+            return CommandResult(output=f"Not a file: {target}", success=False)
+
+        try:
+            with open(target, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+
+            line_count = len(content.splitlines())
+            word_count = len(content.split())
+            char_count = len(content)
+
+            output = (
+                f"Lines : {line_count}\n"
+                f"Words : {word_count}\n"
+                f"Chars : {char_count}"
+            )
+            return CommandResult(output=output)
+        except Exception as e:
+            return CommandResult(output=f"Error: {e}", success=False)
+        
+
+class WhichCommand(BaseCommand):
+    name = "which"
+    aliases = ["whereis"]
+    description = "Find full path of a command/executable."
+    usage = "which <command>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: which <command>", success=False)
+
+        cmd_name = args[0]
+        path = shutil.which(cmd_name)
+
+        if path:
+            return CommandResult(output=path)
+        else:
+            return CommandResult(output=f"'{cmd_name}' not found in PATH", success=False)
+        
+class MemoryCommand(BaseCommand):
+    name = "memory"
+    aliases = ["ram", "free"]
+    description = "Show RAM usage information."
+    usage = "memory"
+
+    def execute(self, ctx, args):
+        if os.name != "nt":
+            return CommandResult(output="This command is for Windows only.", success=False)
+
+        try:
+            cmd = ["wmic", "OS", "get", "TotalVisibleMemorySize,FreePhysicalMemory", "/format:list"]
+            out = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+
+            total_kb = 0
+            free_kb = 0
+
+            for line in out.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("TotalVisibleMemorySize="):
+                    total_kb = int(line.split("=")[1])
+                elif line.startswith("FreePhysicalMemory="):
+                    free_kb = int(line.split("=")[1])
+
+            if total_kb == 0:
+                return CommandResult(output="Could not read memory information.", success=False)
+
+            used_kb = total_kb - free_kb
+            total_gb = total_kb / (1024 * 1024)
+            used_gb = used_kb / (1024 * 1024)
+            free_gb = free_kb / (1024 * 1024)
+            used_percent = (used_kb / total_kb) * 100
+
+            lines = [
+                f"Total RAM   : {total_gb:.2f} GB",
+                f"Used        : {used_gb:.2f} GB ({used_percent:.1f}%)",
+                f"Free        : {free_gb:.2f} GB",
+            ]
+            return CommandResult(output="\n".join(lines))
+
+        except Exception as e:
+            return CommandResult(output=f"Memory error: {e}", success=False)
+
+class UptimeCommand(BaseCommand):
+    name = "uptime"
+    aliases = []
+    description = "Show system uptime."
+    usage = "uptime"
+
+    def execute(self, ctx, args):
+        if os.name != "nt":
+            return CommandResult(output="This command is for Windows only.", success=False)
+
+        try:
+            kernel32 = ctypes.windll.kernel32
+            uptime_ms = kernel32.GetTickCount64()
+
+            total_seconds = uptime_ms // 1000
+            days = total_seconds // (24 * 3600)
+            hours = (total_seconds % (24 * 3600)) // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+
+            parts = []
+            if days > 0:
+                parts.append(f"{days} day{'s' if days > 1 else ''}")
+            if hours > 0:
+                parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+            if minutes > 0:
+                parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+            if seconds > 0 or not parts:
+                parts.append(f"{seconds} second{'s' if seconds > 1 else ''}")
+
+            return CommandResult(output="System Uptime: " + ", ".join(parts))
+
+        except Exception as e:
+            return CommandResult(output=f"Uptime error: {e}", success=False)
