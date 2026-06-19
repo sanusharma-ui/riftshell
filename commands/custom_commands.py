@@ -31,6 +31,25 @@ from utils.safe_fs import (
 )
 
 
+def text_source(ctx, args, usage: str) -> tuple[str | None, CommandResult | None]:
+    if ctx.piped_input:
+        return ctx.piped_input, None
+
+    if args:
+        target = resolve_path(ctx, args[0])
+        if not target.is_file():
+            return None, CommandResult(output=f"Not a file: {target}", success=False)
+        try:
+            return target.read_text(encoding="utf-8", errors="replace"), None
+        except Exception as e:
+            return None, CommandResult(output=f"Read error: {e}", success=False)
+
+    if ctx.last_output:
+        return ctx.last_output, None
+
+    return None, CommandResult(output=f"Usage: {usage}", success=False)
+
+
 def safe_eval(expr: str):
     import operator as op
 
@@ -873,9 +892,12 @@ class HeadCommand(BaseCommand):
             
         try:
             with open(target, 'r', encoding='utf-8', errors='replace') as f:
-                lines = [next(f) for _ in range(lines_to_read)]
-            return CommandResult(output="".join(lines).strip())
-        except StopIteration:
+                lines = []
+                for _ in range(lines_to_read):
+                    line = f.readline()
+                    if not line:
+                        break
+                    lines.append(line)
             return CommandResult(output="".join(lines).strip())
         except Exception as e:
             return CommandResult(output=f"Read error: {e}", success=False)
@@ -1057,3 +1079,299 @@ class UptimeCommand(BaseCommand):
 
         except Exception as e:
             return CommandResult(output=f"Uptime error: {e}", success=False)
+
+
+class RunCommand(BaseCommand):
+    name = "run"
+    aliases = ["exec", "native"]
+    description = "Run a native system command from the current folder."
+    usage = "run <program> [args...]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: run <program> [args...]", success=False)
+
+        cleaned_args = [arg.strip("\"'") for arg in args]
+        env = os.environ.copy()
+        env.update(ctx.variables)
+
+        try:
+            out = subprocess.run(
+                cleaned_args,
+                cwd=str(ctx.cwd),
+                env=env,
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=60,
+            )
+        except FileNotFoundError:
+            if os.name != "nt":
+                return CommandResult(output=f"Command not found: {cleaned_args[0]}", success=False)
+
+            out = subprocess.run(
+                ["cmd", "/c", " ".join(cleaned_args)],
+                cwd=str(ctx.cwd),
+                env=env,
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            return CommandResult(output="Command timed out after 60 seconds.", success=False)
+        except Exception as e:
+            return CommandResult(output=f"Run error: {e}", success=False)
+
+        text = "\n".join(part for part in [out.stdout.strip(), out.stderr.strip()] if part)
+        return CommandResult(output=text, success=out.returncode == 0)
+
+
+class SetVarCommand(BaseCommand):
+    name = "setvar"
+    aliases = ["let"]
+    description = "Create or update a shell variable."
+    usage = "setvar <name> <value>"
+
+    def execute(self, ctx, args):
+        if len(args) < 2:
+            return CommandResult(output="Usage: setvar <name> <value>", success=False)
+
+        name = args[0]
+        if not name.replace("_", "").isalnum() or name[0].isdigit():
+            return CommandResult(output="Variable name must use letters, numbers, or underscore.", success=False)
+
+        value = " ".join(args[1:])
+        ctx.variables[name] = value
+        return CommandResult(output=f"{name}={value}")
+
+
+class UnsetVarCommand(BaseCommand):
+    name = "unsetvar"
+    aliases = ["unset"]
+    description = "Remove a shell variable."
+    usage = "unsetvar <name>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: unsetvar <name>", success=False)
+
+        removed = ctx.variables.pop(args[0], None)
+        if removed is None:
+            return CommandResult(output=f"Variable not found: {args[0]}", success=False)
+        return CommandResult(output=f"Removed variable: {args[0]}")
+
+
+class VarsCommand(BaseCommand):
+    name = "vars"
+    aliases = []
+    description = "Show shell variables."
+    usage = "vars"
+
+    def execute(self, ctx, args):
+        if not ctx.variables:
+            return CommandResult(output="(no shell variables)")
+        return CommandResult(output="\n".join(f"{k}={v}" for k, v in sorted(ctx.variables.items())))
+
+
+class AliasCommand(BaseCommand):
+    name = "alias"
+    aliases = []
+    description = "Create or list command aliases."
+    usage = "alias [name command...]"
+
+    def execute(self, ctx, args):
+        if not args:
+            if not ctx.aliases:
+                return CommandResult(output="(no aliases)")
+            return CommandResult(output="\n".join(f"{k}={v}" for k, v in sorted(ctx.aliases.items())))
+
+        if "=" in args[0]:
+            name, value = args[0].split("=", 1)
+            if len(args) > 1:
+                value = " ".join([value] + args[1:])
+        else:
+            if len(args) < 2:
+                return CommandResult(output="Usage: alias <name> <command...>", success=False)
+            name = args[0]
+            value = " ".join(args[1:])
+
+        name = name.lower().strip()
+        value = value.strip()
+        if not name or not value:
+            return CommandResult(output="Usage: alias <name> <command...>", success=False)
+        if ctx.registry and ctx.registry.get(name):
+            return CommandResult(output=f"Cannot override built-in command: {name}", success=False)
+
+        ctx.aliases[name] = value
+        return CommandResult(output=f"Alias added: {name} -> {value}")
+
+
+class UnaliasCommand(BaseCommand):
+    name = "unalias"
+    aliases = []
+    description = "Remove a command alias."
+    usage = "unalias <name>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: unalias <name>", success=False)
+
+        removed = ctx.aliases.pop(args[0].lower(), None)
+        if removed is None:
+            return CommandResult(output=f"Alias not found: {args[0]}", success=False)
+        return CommandResult(output=f"Removed alias: {args[0]}")
+
+
+class FilterCommand(BaseCommand):
+    name = "filter"
+    aliases = ["contains"]
+    description = "Filter piped text or a file by matching lines."
+    usage = "filter <text> [file]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: filter <text> [file]", success=False)
+
+        case_sensitive = args[0] == "-case"
+        if case_sensitive:
+            if len(args) < 2:
+                return CommandResult(output="Usage: filter [-case] <text> [file]", success=False)
+            needle = args[1]
+            source_args = args[2:]
+        else:
+            needle = args[0]
+            source_args = args[1:]
+
+        source, error = text_source(ctx, source_args, self.usage)
+        if error:
+            return error
+
+        matches = []
+        for line in source.splitlines():
+            haystack = line if case_sensitive else line.lower()
+            target = needle if case_sensitive else needle.lower()
+            if target in haystack:
+                matches.append(line)
+        return CommandResult(output="\n".join(matches) if matches else "No matches found.")
+
+
+class SortCommand(BaseCommand):
+    name = "sort"
+    aliases = []
+    description = "Sort piped text or file lines."
+    usage = "sort [file]"
+
+    def execute(self, ctx, args):
+        source, error = text_source(ctx, args, self.usage)
+        if error:
+            return error
+
+        lines = sorted(source.splitlines(), key=str.lower)
+        return CommandResult(output="\n".join(lines))
+
+
+class UniqueCommand(BaseCommand):
+    name = "unique"
+    aliases = ["uniq"]
+    description = "Remove duplicate lines from piped text or a file."
+    usage = "unique [file]"
+
+    def execute(self, ctx, args):
+        source, error = text_source(ctx, args, self.usage)
+        if error:
+            return error
+
+        seen = set()
+        lines = []
+        for line in source.splitlines():
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            lines.append(line)
+        return CommandResult(output="\n".join(lines))
+
+
+class TakeCommand(BaseCommand):
+    name = "take"
+    aliases = ["first"]
+    description = "Show the first N lines from piped text or a file."
+    usage = "take <lines> [file]"
+
+    def execute(self, ctx, args):
+        if not args or not args[0].isdigit():
+            return CommandResult(output="Usage: take <lines> [file]", success=False)
+
+        source, error = text_source(ctx, args[1:], self.usage)
+        if error:
+            return error
+
+        return CommandResult(output="\n".join(source.splitlines()[:int(args[0])]))
+
+
+class SkipCommand(BaseCommand):
+    name = "skip"
+    aliases = []
+    description = "Skip the first N lines from piped text or a file."
+    usage = "skip <lines> [file]"
+
+    def execute(self, ctx, args):
+        if not args or not args[0].isdigit():
+            return CommandResult(output="Usage: skip <lines> [file]", success=False)
+
+        source, error = text_source(ctx, args[1:], self.usage)
+        if error:
+            return error
+
+        return CommandResult(output="\n".join(source.splitlines()[int(args[0]):]))
+
+
+class CountCommand(BaseCommand):
+    name = "count"
+    aliases = []
+    description = "Count lines, words, and characters in piped text or a file."
+    usage = "count [file]"
+
+    def execute(self, ctx, args):
+        source, error = text_source(ctx, args, self.usage)
+        if error:
+            return error
+
+        return CommandResult(
+            output=(
+                f"Lines : {len(source.splitlines())}\n"
+                f"Words : {len(source.split())}\n"
+                f"Chars : {len(source)}"
+            )
+        )
+
+
+class SaveCommand(BaseCommand):
+    name = "save"
+    aliases = []
+    description = "Save piped text or last command output to a file."
+    usage = "save <file>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: save <file>", success=False)
+
+        text = ctx.piped_input or ctx.last_output
+        if not text:
+            return CommandResult(output="Nothing to save.", success=False)
+
+        target = resolve_path(ctx, args[0])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8", errors="replace")
+        return CommandResult(output=f"Saved to: {target}")
+
+
+class LastCommand(BaseCommand):
+    name = "last"
+    aliases = ["lastout"]
+    description = "Show the previous command output."
+    usage = "last"
+
+    def execute(self, ctx, args):
+        return CommandResult(output=ctx.last_output or "(no previous output)")

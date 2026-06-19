@@ -45,7 +45,25 @@ ip
 processes
 kill notepad.exe
 calc 5 + 7 * 2
+echo hello > note.txt
+files | filter py | count
+setvar PROJECT SanuShell
+echo $PROJECT
+alias ll files
+ll
+run python --version
 exit
+```
+
+You can also combine commands:
+
+```text
+where ; files
+makefolder logs && echo created
+read missing.txt || echo fallback
+files | filter py | sort | take 5
+echo first line > notes.txt
+echo second line >> notes.txt
 ```
 
 ## How it works
@@ -61,6 +79,22 @@ The project has two major parts:
 * Multi-Threaded Performance
 * Windows support
 * Safe filesystem actions
+* command chaining with `;`, `&&`, and `||`
+* text pipelines with `|`
+* output redirection with `>` and `>>`
+* shell variables and custom aliases
+* native command execution through `run`
+
+## Advanced command syntax
+SanuShell now supports common shell-style composition while keeping existing custom commands working:
+
+* `command1 ; command2` — run commands one after another
+* `command1 && command2` — run the second command only if the first succeeds
+* `command1 || command2` — run the second command only if the first fails
+* `command1 | command2` — pass text output into a pipe-friendly command
+* `command > file.txt` — write output to a file
+* `command >> file.txt` — append output to a file
+* `$NAME` or `%NAME%` — expand shell variables or environment variables
 
 ## Commands
 Here is the complete command set currently supported:
@@ -96,6 +130,14 @@ Here is the complete command set currently supported:
 * `search <text> [path]` — search file and folder names
 * `findtext <text> [path]` — search text inside files
 * `tree [path] [depth]` — view directory tree
+* `filter <text> [file]` — filter piped text or file lines
+* `sort [file]` — sort piped text or file lines
+* `unique [file]` — remove duplicate lines
+* `take <lines> [file]` — show first N lines from piped text or a file
+* `skip <lines> [file]` — skip first N lines from piped text or a file
+* `count [file]` — count lines, words, and characters
+* `save <file>` — save piped text or last output
+* `last` — show previous command output
 
 ### System info
 * `ip` — show IP configuration
@@ -109,6 +151,7 @@ Here is the complete command set currently supported:
 * `drives` — show available drives
 * `disk [path]` — show disk usage
 * `path` — show PATH environment variable
+* `run <program> [args...]` — run a native system command from the current folder
 
 ### Utility
 * `today` — show current date
@@ -118,6 +161,11 @@ Here is the complete command set currently supported:
 * `calc <expression>` — safe calculator
 * `env` — show environment variables
 * `history` — show command history
+* `setvar <name> <value>` — create or update a shell variable
+* `unsetvar <name>` — remove a shell variable
+* `vars` — list shell variables
+* `alias [name command...]` — create or list custom aliases
+* `unalias <name>` — remove a custom alias
 * `clear` — clear the screen
 * `help` — show all available commands
 * `exit` — close the shell
