@@ -176,7 +176,7 @@ Here is the complete command set currently supported:
 
 2. Install dependencies
    ```bash
-   pip install pyside6
+   pip install -r requirements.txt
    ```
 
 3. Run the shell
@@ -185,6 +185,30 @@ Here is the complete command set currently supported:
    ```
    (If python does not work on your system, try `py main.py`)
 
+## Optional AI Telegram layer
+SanuShell also includes an optional AI layer that sits on top of the existing shell engine. It does not replace the UI or command backend.
+
+1. Copy `.env.example` values into `.env` and fill:
+   ```text
+   TELEGRAM_BOT_TOKEN=your_bot_token
+   TELEGRAM_ALLOWED_USER_IDS=your_numeric_telegram_user_id
+   GEMINI_API_KEY=your_gemini_key
+   ```
+
+2. Start the Telegram AI bot:
+   ```bash
+   python run_ai_bot.py
+   ```
+
+3. From Telegram you can send natural language such as:
+   ```text
+   files dikhao
+   current folder kya hai
+   system processes dikhao
+   screenshot bhejo
+   ```
+
+Dangerous actions such as native commands, delete, kill, move, rename, downloads, opening apps, and AI code writes are held for approval. Use `/approve <id>` or `/deny <id>` in Telegram.
 ## UI usage
 When the app opens:
 
