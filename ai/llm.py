@@ -1,9 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from ai.actions import AgentAction
 from ai.config import AIConfig
@@ -47,12 +48,12 @@ class MemoryManager:
             return
         history = self.load()
         history.append({"role": role, "content": content})
-        
+
         # Multiply limit by 2 because 1 turn = 1 user message + 1 assistant message
         max_messages = self.limit * 2
         if len(history) > max_messages:
             history = history[-max_messages:]
-            
+
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
 
@@ -68,13 +69,14 @@ class AgentPlanner:
     config: AIConfig
     command_names: list[str]
     command_catalog: list[str]
+    current_dir_provider: Callable[[], Path] | None = None
 
     def __post_init__(self) -> None:
         # 1. Memory Setup using env vars or config
         memory_enabled = str(getattr(self.config, "ai_memory_enabled", os.getenv("AI_MEMORY_ENABLED", "true"))).lower() == "true"
         memory_path = getattr(self.config, "ai_memory_path", os.getenv("AI_MEMORY_PATH", ".sanushell_ai_memory.json"))
         memory_turns = int(getattr(self.config, "ai_memory_recent_turns", os.getenv("AI_MEMORY_RECENT_TURNS", 12)))
-        
+
         self.memory = MemoryManager(path=memory_path, limit=memory_turns, enabled=memory_enabled)
 
         # 2. Gemini Setup
@@ -122,7 +124,7 @@ class AgentPlanner:
                 response = self._groq.chat.completions.create(
                     messages=[{"role": "system", "content": prompt}],
                     model=self._groq_model,
-                    temperature=0.1
+                    temperature=0.1,
                 )
                 text = response.choices[0].message.content
                 action = AgentAction.from_payload(_extract_json(text))
@@ -175,32 +177,37 @@ class AgentPlanner:
         return AgentAction(action="respond", message="")
 
     def _build_prompt(self, user_text: str) -> str:
-        commands = ", ".join(sorted(self.command_names))
         catalog = "\n".join(f"- {item}" for item in self.command_catalog)
         history = self.memory.format_for_prompt()
+        current_dir = self.current_dir_provider() if self.current_dir_provider else self.config.workspace_root
+        access_mode = "FULL_PC" if self.config.allow_outside_workspace else "WORKSPACE_ONLY"
 
         return f"""
-You are the agentic AI layer for SanuShell, a Windows-focused custom Python shell.
-Convert the user's natural language request into exactly one JSON object and nothing else.
+You are the ultra-smart agentic AI layer for SanuShell, an advanced custom Python OS shell.
+Your ONLY job is to TRANSLATE user requests into STRICT, VALID JSON based on the shell's rules.
 
 Allowed JSON shapes:
-{{"action":"shell","command":"SanuShell command here","message":"short explanation"}}
-{{"action":"screenshot","message":"short explanation"}}
-{{"action":"code_write","message":"what will be written","files":[{{"path":"relative/path.py","content":"full file content"}}]}}
-{{"action":"respond","message":"ask a short clarification or explain why not safe"}}
+{{"action":"shell","command":"STRICT_COMMAND_HERE","message":"short explanation"}}
+{{"action":"screenshot","message":"taking screenshot"}}
+{{"action":"code_write","message":"writing code","files":[{{"path":"EXACT_GIVEN_PATH","content":"full code"}}]}}
+{{"action":"respond","message":"chat or clarification"}}
 
-Rules:
-- Prefer existing SanuShell commands over native commands.
-- Existing command names are: {commands}
-- Command catalog:
+Runtime context:
+- Current directory: {current_dir}
+- AI workspace root: {self.config.workspace_root}
+- Access mode: {access_mode}
+
+UNIVERSAL RULES (READ AND OBEY):
+1. READ THE CATALOG: Never guess command syntax. Look at the "Available Commands" catalog below. Format your output EXACTLY as the catalog requires.
+2. LOCATION: Relative paths run from the Current directory above. Use `cd <path>` when the user asks to move to a location. Use absolute paths only when the user gives or clearly asks for one.
+3. FULL-PC MODE: If Access mode is FULL_PC, commands and code_write may target any user-provided location on this PC. If Access mode is WORKSPACE_ONLY, stay inside the AI workspace root.
+4. WINDOWS PROCESSES: If killing or finding a process, append `.exe` (e.g., `kill chrome.exe`).
+5. EXACT FILE PATHS (CRITICAL): Use the EXACT filename and path the user provides. Escape backslashes (e.g., `D:\\j.txt`). Do NOT change the filename.
+6. NO CHAT IN COMMAND: The "command" field MUST ONLY contain the executable syntax.
+7. PIPING: You can use `|` if the catalog supports it.
+
+Available Commands & Aliases:
 {catalog}
-- For system/native commands use the SanuShell form: run <program> [args...].
-- If the user asks to write or create code, use code_write with full file contents.
-- Use relative paths for code_write unless the user explicitly gives an absolute path.
-- Do not invent destructive commands. If the request is ambiguous, use respond.
-- Dangerous commands will be approval-gated by the controller; still return the intended action.
-- Keep the message short and in the user's Hinglish style when possible.
-- Think like an operator: identify the user's goal, choose the smallest useful command/action, and avoid unnecessary steps.
 
 Recent Conversation History:
 {history}

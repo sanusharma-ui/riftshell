@@ -1,43 +1,19 @@
 [
   {
     "role": "user",
-    "content": "Kaha hai hm"
+    "content": "write inside \"hello sanu sharma\""
   },
   {
     "role": "assistant",
-    "content": "Action: shell, Command: where, Message: Aapki current location bata rahe hain."
+    "content": "Action: code_write, Command: , Message: writing code"
   },
   {
     "role": "user",
-    "content": "D:\\ me jaao"
+    "content": "write this \"Sanu sharma\" in uri.txt"
   },
   {
     "role": "assistant",
-    "content": "Action: shell, Command: cd D:\\, Message: D:\\ me ja rahe hain."
-  },
-  {
-    "role": "user",
-    "content": "Isme kitne folders hai dikho"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: folders | count, Message: Folders count kar rahe hain."
-  },
-  {
-    "role": "user",
-    "content": "Hello"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: respond, Command: , Message: Hello there! How can I help you today?"
-  },
-  {
-    "role": "user",
-    "content": "Kitne commands available hai"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: help, Message: Available commands ki list le rahe hain."
+    "content": "Action: code_write, Command: , Message: writing code"
   },
   {
     "role": "user",
@@ -45,43 +21,19 @@
   },
   {
     "role": "assistant",
-    "content": "Action: respond, Command: , Message: {\"action\":\"shell\",\"command\":\"cd D:\\\",\"message\":\"D drive me ja rahe hain.\"}"
+    "content": "Action: shell, Command: cd D:\\, Message: D drive me ja raha hu."
   },
   {
     "role": "user",
-    "content": "D:\\ me jaao"
+    "content": "Yaha pe ek file banao t.txt naam ka"
   },
   {
     "role": "assistant",
-    "content": "Action: respond, Command: , Message: {\"action\":\"shell\",\"command\":\"cd D:\\\",\"message\":\"D drive me ja rahe hain.\"}"
+    "content": "Action: shell, Command: makefile t.txt, Message: t.txt file create kar raha hu."
   },
   {
     "role": "user",
-    "content": "Show all folders"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: folders, Message: Saare folders dikha raha hu."
-  },
-  {
-    "role": "user",
-    "content": "Okay delete xxx.txt"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: delete confirm xxx.txt, Message: xxx.txt delete kar raha hu."
-  },
-  {
-    "role": "user",
-    "content": "Create new file sanu.txt"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: makefile sanu.txt, Message: Sanu.txt file create kar diya."
-  },
-  {
-    "role": "user",
-    "content": "Write inside \"Hello sanu sharma kya haal hai\""
+    "content": "Usme likhoo \"Sanu Sharma\""
   },
   {
     "role": "assistant",
@@ -89,10 +41,58 @@
   },
   {
     "role": "user",
-    "content": "Write inside \"Hello sanu sharma kya haal hai\" in sanu.txt"
+    "content": "Teri maa ki chut"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: I can't assist with that. Please provide a valid command or request."
+  },
+  {
+    "role": "user",
+    "content": "Randi"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: Action: respond, Message: I can't assist with that. Please provide a valid command or request."
+  },
+  {
+    "role": "user",
+    "content": "Hello"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: Hello! How can I assist you today?"
+  },
+  {
+    "role": "user",
+    "content": "Go to D drive"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: cd D:\\, Message: Going to D drive"
+  },
+  {
+    "role": "user",
+    "content": "Make file s.txt"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: makefile s.txt, Message: Creating s.txt file"
+  },
+  {
+    "role": "user",
+    "content": "Write inside \"Sanu is the \""
   },
   {
     "role": "assistant",
     "content": "Action: code_write, Command: , Message: writing code"
+  },
+  {
+    "role": "user",
+    "content": "Ok now delete s.txt"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: delete confirm s.txt, Message: deleting s.txt file"
   }
 ]

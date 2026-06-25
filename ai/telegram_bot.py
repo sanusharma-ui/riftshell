@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import uuid
@@ -26,12 +26,17 @@ class PendingAction:
 class TelegramAIBot:
     def __init__(self, config: AIConfig):
         self.config = config
-        self.shell = Shell()
+        self.shell = Shell(
+            start_dir=config.workspace_root,
+            workspace_root=config.workspace_root,
+            allow_outside_workspace=config.allow_outside_workspace,
+        )
         self.safety = SafetyPolicy()
         self.planner = AgentPlanner(
             config=config,
             command_names=self.shell.registry.all_names(),
             command_catalog=self._build_command_catalog(),
+            current_dir_provider=lambda: self.shell.ctx.cwd,
         )
         self.pending: dict[str, PendingAction] = {}
         self.shell_lock = asyncio.Lock()
@@ -191,6 +196,7 @@ class TelegramAIBot:
                 action.files,
                 self.config.workspace_root,
                 self.config.allow_outside_workspace,
+                self.shell.ctx.cwd,
             )
             await update.message.reply_text(self._trim(result.output))
             return
@@ -231,6 +237,3 @@ class TelegramAIBot:
         expired = [key for key, item in self.pending.items() if item.created_at < expires_before]
         for key in expired:
             self.pending.pop(key, None)
-
-
-

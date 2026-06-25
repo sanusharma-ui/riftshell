@@ -6,13 +6,24 @@ from core.base import CommandResult
 from core.context import ShellContext
 from core.parser import CommandParser, ParsedCommand
 from commands import build_registry
-from utils.safe_fs import resolve_path
+from utils.safe_fs import ensure_path_allowed, resolve_path
 
 
 class Shell:
-    def __init__(self):
-        start_dir = Path.cwd().resolve()
-        self.ctx = ShellContext(cwd=start_dir)
+    def __init__(
+        self,
+        start_dir: Path | None = None,
+        workspace_root: Path | None = None,
+        allow_outside_workspace: bool = True,
+    ):
+        workspace_root = workspace_root.resolve(strict=False) if workspace_root else None
+        start_dir = (start_dir or workspace_root or Path.cwd()).resolve(strict=False)
+        self.ctx = ShellContext(
+            cwd=start_dir,
+            workspace_root=workspace_root,
+            allow_outside_workspace=allow_outside_workspace,
+        )
+        ensure_path_allowed(self.ctx, self.ctx.cwd)
         self.parser = CommandParser()
         self.registry = build_registry()
         self.ctx.registry = self.registry

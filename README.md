@@ -208,6 +208,8 @@ SanuShell also includes an optional AI layer that sits on top of the existing sh
    screenshot bhejo
    ```
 
+`AI_WORKSPACE_ROOT` is the AI bot's starting folder. By default, `AI_ALLOW_OUTSIDE_WORKSPACE=false` keeps AI file/navigation operations inside that workspace. Set `AI_ALLOW_OUTSIDE_WORKSPACE=true` when you want the AI to use full-PC paths such as `D:\` or `C:\Users\...`.
+
 Dangerous actions such as native commands, delete, kill, move, rename, downloads, opening apps, and AI code writes are held for approval. Use `/approve <id>` or `/deny <id>` in Telegram.
 ## UI usage
 When the app opens:
