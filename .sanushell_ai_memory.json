@@ -1,0 +1,98 @@
+[
+  {
+    "role": "user",
+    "content": "Kaha hai hm"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: where, Message: Aapki current location bata rahe hain."
+  },
+  {
+    "role": "user",
+    "content": "D:\\ me jaao"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: cd D:\\, Message: D:\\ me ja rahe hain."
+  },
+  {
+    "role": "user",
+    "content": "Isme kitne folders hai dikho"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: folders | count, Message: Folders count kar rahe hain."
+  },
+  {
+    "role": "user",
+    "content": "Hello"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: Hello there! How can I help you today?"
+  },
+  {
+    "role": "user",
+    "content": "Kitne commands available hai"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: help, Message: Available commands ki list le rahe hain."
+  },
+  {
+    "role": "user",
+    "content": "D drive me jaao"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: {\"action\":\"shell\",\"command\":\"cd D:\\\",\"message\":\"D drive me ja rahe hain.\"}"
+  },
+  {
+    "role": "user",
+    "content": "D:\\ me jaao"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: {\"action\":\"shell\",\"command\":\"cd D:\\\",\"message\":\"D drive me ja rahe hain.\"}"
+  },
+  {
+    "role": "user",
+    "content": "Show all folders"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: folders, Message: Saare folders dikha raha hu."
+  },
+  {
+    "role": "user",
+    "content": "Okay delete xxx.txt"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: delete confirm xxx.txt, Message: xxx.txt delete kar raha hu."
+  },
+  {
+    "role": "user",
+    "content": "Create new file sanu.txt"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: makefile sanu.txt, Message: Sanu.txt file create kar diya."
+  },
+  {
+    "role": "user",
+    "content": "Write inside \"Hello sanu sharma kya haal hai\""
+  },
+  {
+    "role": "assistant",
+    "content": "Action: code_write, Command: , Message: writing code"
+  },
+  {
+    "role": "user",
+    "content": "Write inside \"Hello sanu sharma kya haal hai\" in sanu.txt"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: code_write, Command: , Message: writing code"
+  }
+]

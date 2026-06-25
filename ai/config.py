@@ -92,4 +92,3 @@ class AIConfig:
         if not self.telegram_allowed_user_ids and not self.telegram_allow_unlisted_users:
             problems.append("TELEGRAM_ALLOWED_USER_IDS is missing")
         return problems
-
