@@ -1,14 +1,6 @@
 [
   {
     "role": "user",
-    "content": "write inside \"hello sanu sharma\""
-  },
-  {
-    "role": "assistant",
-    "content": "Action: code_write, Command: , Message: writing code"
-  },
-  {
-    "role": "user",
     "content": "write this \"Sanu sharma\" in uri.txt"
   },
   {
@@ -94,5 +86,13 @@
   {
     "role": "assistant",
     "content": "Action: shell, Command: delete confirm s.txt, Message: deleting s.txt file"
+  },
+  {
+    "role": "user",
+    "content": "Hello"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: Hello! How can I assist you today?"
   }
 ]

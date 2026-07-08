@@ -16,6 +16,7 @@ import random
 import hashlib
 import base64
 import urllib.request
+import json
 
 
 from core.base import BaseCommand, CommandResult
@@ -1375,3 +1376,4 @@ class LastCommand(BaseCommand):
 
     def execute(self, ctx, args):
         return CommandResult(output=ctx.last_output or "(no previous output)")
+    
