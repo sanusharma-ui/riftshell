@@ -100,14 +100,14 @@ class MainWindow(QMainWindow):
 
         self.shell = Shell()
 
-        self.setWindowTitle("SanuShell // Neon Mode")
+        self.setWindowTitle("RiftShell // Neon Mode")
         self.resize(1180, 760)
         self.setStyleSheet(STYLE)
 
         central = QWidget()
         self.setCentralWidget(central)
 
-        self.title_label = QLabel("SanuShell")
+        self.title_label = QLabel("RiftShell")
         self.title_label.setFont(QFont("Consolas", 18, QFont.Bold))
         self.title_label.setStyleSheet("color: #00ff9c; letter-spacing: 1px;")
 
@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
         self.update_suggestions("")
         self.update_status()
 
-        self.append_system("Booting SanuShell...")
+        self.append_system("Booting RiftShell...")
         self.append_system("Neon mode online.")
         self.append_system("Type help to see commands.")
         self.append_system("Tab completion is active.")

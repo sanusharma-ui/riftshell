@@ -1,23 +1,23 @@
-# SanuShell
+# RiftShell
 
-SanuShell is a **custom Windows shell replacement** built in Python. It uses a **dark neon UI** made with **PySide6** and a safe, multi-threaded command engine that runs your own custom commands instead of forcing you to remember standard CMD-style commands.
+RiftShell is a **custom Windows shell replacement** built in Python. It uses a **dark neon UI** made with **PySide6** and a safe, multi-threaded command engine that runs your own custom commands instead of forcing you to remember standard CMD-style commands.
 
 It is designed to feel like a real shell, but with your own command language and a cyberpunk hacker aesthetic.
 
 ## Screenshots
 
-![SanuShell Boot & Basic Commands](assets/basic.png)
+![RiftShell Boot & Basic Commands](assets/basic.png)
 *Boot sequence, dark neon UI, and directory navigation.*
 
-![SanuShell Process Viewer](assets/process.png)
+![RiftShell Process Viewer](assets/process.png)
 *Viewing live Windows system processes directly inside the shell.*
 
-![SanuShell Tree Command](assets/tree.png)
+![RiftShell  Tree Command](assets/tree.png)
 *Executing Git directory tree views and exploring newly added commands.*
 
-## What SanuShell does
+## What RiftShell does
 
-SanuShell gives you:
+RiftShell gives you:
 
 * a custom terminal-style window
 * your own command names such as `files`, `goto`, `zip`, `download`, `ip`, `processes`, and more
@@ -86,7 +86,7 @@ The project has two major parts:
 * native command execution through `run`
 
 ## Advanced command syntax
-SanuShell now supports common shell-style composition while keeping existing custom commands working:
+RiftShell now supports common shell-style composition while keeping existing custom commands working:
 
 * `command1 ; command2` — run commands one after another
 * `command1 && command2` — run the second command only if the first succeeds
@@ -186,7 +186,7 @@ Here is the complete command set currently supported:
    (If python does not work on your system, try `py main.py`)
 
 ## Optional AI Telegram layer
-SanuShell also includes an optional AI layer that sits on top of the existing shell engine. It does not replace the UI or command backend.
+RiftShell also includes an optional AI layer that sits on top of the existing shell engine. It does not replace the UI or command backend.
 
 1. Copy `.env.example` values into `.env` and fill:
    ```text
@@ -233,7 +233,7 @@ class MyCommand(BaseCommand):
     usage = "mycommand <args>"
 
     def execute(self, ctx, args):
-        return CommandResult(output="Hello from SanuShell!")
+        return CommandResult(output="Hello from RiftShell!")
 ```
 
 ## Future ideas
@@ -249,4 +249,4 @@ Possible next upgrades:
 MIT License.
 
 ## Author
-Sanu Sharma (sanusharma.dev) ❤️
+Sanu Sharma - (sanusharma.dev) ❤️
