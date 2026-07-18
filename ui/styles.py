@@ -1,50 +1,50 @@
 STYLE = """
 QMainWindow {
-    background-color: #050816;
+    background-color: #1a1b26;
 }
 
 QWidget {
-    background-color: #050816;
-    color: #d7e1ea;
+    background-color: #1a1b26;
+    color: #a9b1d6;
     font-family: Consolas;
 }
 
 QLabel {
-    color: #cbd5e1;
+    color: #9aa5ce;
     font-size: 10pt;
     font-family: Consolas;
 }
 
 QTextEdit {
-    background-color: #040608;
-    color: #7dffb2;
-    border: 1px solid #143244;
+    background-color: #16161e;
+    color: #c0caf5;
+    border: 1px solid #292e42;
     border-radius: 14px;
     padding: 12px;
     font-size: 12pt;
-    selection-background-color: #173a52;
-    selection-color: #d7e1ea;
+    selection-background-color: #33467c;
+    selection-color: #c0caf5;
 }
 
 QLineEdit {
-    background-color: #0c1220;
-    color: #f8fafc;
-    border: 1px solid #1f6f8b;
+    background-color: #16161e;
+    color: #c0caf5;
+    border: 1px solid #292e42;
     border-radius: 14px;
     padding: 11px;
     font-size: 12pt;
-    selection-background-color: #1f6f8b;
+    selection-background-color: #33467c;
     selection-color: #ffffff;
 }
 
 QLineEdit:focus {
-    border: 1px solid #00ff9c;
+    border: 1px solid #7aa2f7;
 }
 
 QListWidget {
-    background-color: #07101d;
-    color: #dbeafe;
-    border: 1px solid #143244;
+    background-color: #16161e;
+    color: #a9b1d6;
+    border: 1px solid #292e42;
     border-radius: 14px;
     padding: 6px;
     font-size: 10pt;
@@ -56,31 +56,32 @@ QListWidget::item {
 }
 
 QListWidget::item:selected {
-    background-color: #12324a;
-    color: #ffffff;
+    background-color: #2f354d;
+    color: #7dcfff;
 }
 
 QPushButton {
-    background-color: #0f172a;
-    color: #e2e8f0;
-    border: 1px solid #1f6f8b;
+    background-color: #24283b;
+    color: #a9b1d6;
+    border: 1px solid #292e42;
     border-radius: 12px;
     padding: 10px 14px;
     font-weight: 600;
 }
 
 QPushButton:hover {
-    background-color: #12324a;
-    border: 1px solid #00ff9c;
+    background-color: #2f354d;
+    border: 1px solid #7aa2f7;
+    color: #c0caf5;
 }
 
 QPushButton:pressed {
-    background-color: #08111f;
+    background-color: #1f2335;
 }
 
 QStatusBar {
-    background-color: #050816;
-    color: #7dd3fc;
+    background-color: #1a1b26;
+    color: #7dcfff;
 }
 """
 

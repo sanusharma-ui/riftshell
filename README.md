@@ -9,12 +9,6 @@ It is designed to feel like a real shell, but with your own command language and
 ![RiftShell Boot & Basic Commands](assets/basic.png)
 *Boot sequence, dark neon UI, and directory navigation.*
 
-![RiftShell Process Viewer](assets/process.png)
-*Viewing live Windows system processes directly inside the shell.*
-
-![RiftShell  Tree Command](assets/tree.png)
-*Executing Git directory tree views and exploring newly added commands.*
-
 ## What RiftShell does
 
 RiftShell gives you:
