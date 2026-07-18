@@ -29,7 +29,7 @@ class Shell:
         self.ctx.registry = self.registry
 
     def prompt(self) -> str:
-        return f"SanuShell {self.ctx.cwd}> "
+        return f"RiftShell {self.ctx.cwd}> "
 
     def execute_line(self, raw: str) -> CommandResult:
         raw = raw.strip()
@@ -154,7 +154,7 @@ class Shell:
         )
 
     def run(self):
-        print("SanuShell ready. Type 'help' to see commands.\n")
+        print("RiftShell ready. Type 'help' to see commands.\n")
 
         while self.ctx.running:
             try:

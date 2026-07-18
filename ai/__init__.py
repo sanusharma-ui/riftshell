@@ -1,2 +1,2 @@
-"""Optional AI and Telegram control layer for SanuShell."""
+"""Optional AI and Telegram control layer for RiftShell."""
 

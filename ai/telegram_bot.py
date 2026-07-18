@@ -87,8 +87,8 @@ class TelegramAIBot:
         if not await self._guard(update):
             return
         await update.message.reply_text(
-            "SanuShell AI bot online.\n"
-            "Send natural language, /cmd <sanushell command>, /screenshot, /pending, /approve <id>, /deny <id>."
+            "RiftShell AI bot online.\n"
+            "Send natural language, /cmd <riftshell command>, /screenshot, /pending, /approve <id>, /deny <id>."
         )
 
     async def cmd(self, update, context) -> None:
@@ -96,7 +96,7 @@ class TelegramAIBot:
             return
         command = " ".join(context.args).strip()
         if not command:
-            await update.message.reply_text("Usage: /cmd <sanushell command>")
+            await update.message.reply_text("Usage: /cmd <riftshell command>")
             return
         await self._handle_action(update, AgentAction(action="shell", command=command, message="Direct command."))
 

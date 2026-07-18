@@ -14,7 +14,7 @@ class SafetyDecision:
 class SafetyPolicy:
     """Decides whether an AI-planned action can run immediately."""
 
-    DANGEROUS_SANUSHELL_COMMANDS = {
+    DANGEROUS_RIFTSHELL_COMMANDS = {
         "delete",
         "remove",
         "del",
@@ -83,7 +83,7 @@ class SafetyPolicy:
         for part in parsed_parts:
             for parsed in part.pipeline.commands:
                 name = parsed.name.lower()
-                if name in self.DANGEROUS_SANUSHELL_COMMANDS:
+                if name in self.DANGEROUS_RIFTSHELL_COMMANDS:
                     return SafetyDecision(True, f"`{name}` can change files, launch apps, or run native commands.")
 
                 if name == "run" and parsed.args:

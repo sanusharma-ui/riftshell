@@ -1,98 +1,66 @@
 [
   {
     "role": "user",
-    "content": "write this \"Sanu sharma\" in uri.txt"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: code_write, Command: , Message: writing code"
-  },
-  {
-    "role": "user",
-    "content": "D drive me jaao"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: cd D:\\, Message: D drive me ja raha hu."
-  },
-  {
-    "role": "user",
-    "content": "Yaha pe ek file banao t.txt naam ka"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: makefile t.txt, Message: t.txt file create kar raha hu."
-  },
-  {
-    "role": "user",
-    "content": "Usme likhoo \"Sanu Sharma\""
-  },
-  {
-    "role": "assistant",
-    "content": "Action: code_write, Command: , Message: writing code"
-  },
-  {
-    "role": "user",
-    "content": "Teri maa ki chut"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: respond, Command: , Message: I can't assist with that. Please provide a valid command or request."
-  },
-  {
-    "role": "user",
-    "content": "Randi"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: respond, Command: , Message: Action: respond, Message: I can't assist with that. Please provide a valid command or request."
-  },
-  {
-    "role": "user",
     "content": "Hello"
   },
   {
     "role": "assistant",
-    "content": "Action: respond, Command: , Message: Hello! How can I assist you today?"
+    "content": "Action: respond, Command: , Message: Hello! How can I help you today?"
   },
   {
     "role": "user",
-    "content": "Go to D drive"
+    "content": "Who are you"
   },
   {
     "role": "assistant",
-    "content": "Action: shell, Command: cd D:\\, Message: Going to D drive"
+    "content": "Action: respond, Command: , Message: I am the AI agent for RiftShell, an advanced Python OS shell."
   },
   {
     "role": "user",
-    "content": "Make file s.txt"
+    "content": "Go to D:\\projects"
   },
   {
     "role": "assistant",
-    "content": "Action: shell, Command: makefile s.txt, Message: Creating s.txt file"
+    "content": "Action: shell, Command: cd D:\\projects, Message: changing directory"
   },
   {
     "role": "user",
-    "content": "Write inside \"Sanu is the \""
+    "content": "Yaha pe ek file bana demo.txt naam ka"
   },
   {
     "role": "assistant",
-    "content": "Action: code_write, Command: , Message: writing code"
+    "content": "Action: shell, Command: makefile demo.txt, Message: creating file demo.txt"
   },
   {
     "role": "user",
-    "content": "Ok now delete s.txt"
+    "content": "demo.txt me likho \"Hello world\""
   },
   {
     "role": "assistant",
-    "content": "Action: shell, Command: delete confirm s.txt, Message: deleting s.txt file"
+    "content": "Action: code_write, Command: , Message: writing content to demo.txt"
   },
   {
     "role": "user",
-    "content": "Hello"
+    "content": "kitni commands hai hamare pass"
   },
   {
     "role": "assistant",
-    "content": "Action: respond, Command: , Message: Hello! How can I assist you today?"
+    "content": "Action: shell, Command: help, Message: showing available commands"
+  },
+  {
+    "role": "user",
+    "content": "yaha pe ek file bana ... index.html ke naam se"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: makefile index.html, Message: creating file index.html"
+  },
+  {
+    "role": "user",
+    "content": "index.html me basic html code likho using better css to, bass \"hello world\" print karna chaahiye screen ke bich me"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: code_write, Command: , Message: writing basic HTML with centered 'Hello World' to index.html"
   }
 ]

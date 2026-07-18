@@ -74,7 +74,7 @@ class AgentPlanner:
     def __post_init__(self) -> None:
         # 1. Memory Setup using env vars or config
         memory_enabled = str(getattr(self.config, "ai_memory_enabled", os.getenv("AI_MEMORY_ENABLED", "true"))).lower() == "true"
-        memory_path = getattr(self.config, "ai_memory_path", os.getenv("AI_MEMORY_PATH", ".sanushell_ai_memory.json"))
+        memory_path = getattr(self.config, "ai_memory_path", os.getenv("AI_MEMORY_PATH", ".riftshell_ai_memory.json"))
         memory_turns = int(getattr(self.config, "ai_memory_recent_turns", os.getenv("AI_MEMORY_RECENT_TURNS", 12)))
 
         self.memory = MemoryManager(path=memory_path, limit=memory_turns, enabled=memory_enabled)
@@ -172,7 +172,7 @@ class AgentPlanner:
         if self._gemini is None and self._groq is None:
             return AgentAction(
                 action="respond",
-                message="Koi API key set nahi hai (Gemini/Groq), isliye direct SanuShell command bhejo ya .env set karo.",
+                message="Koi API key set nahi hai (Gemini/Groq), isliye direct RiftShell  command bhejo ya .env set karo.",
             )
         return AgentAction(action="respond", message="")
 
@@ -183,7 +183,7 @@ class AgentPlanner:
         access_mode = "FULL_PC" if self.config.allow_outside_workspace else "WORKSPACE_ONLY"
 
         return f"""
-You are the ultra-smart agentic AI layer for SanuShell, an advanced custom Python OS shell.
+You are the ultra-smart agentic AI layer for RiftShell, an advanced custom Python OS shell.
 Your ONLY job is to TRANSLATE user requests into STRICT, VALID JSON based on the shell's rules.
 
 Allowed JSON shapes:

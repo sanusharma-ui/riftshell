@@ -554,7 +554,7 @@ class VersionCommand(BaseCommand):
     usage = "version"
 
     def execute(self, ctx, args):
-        return CommandResult(output="SanuShell v1.0")
+        return CommandResult(output="RiftShell v1.0")
 
 
 class EchoCommand(BaseCommand):
