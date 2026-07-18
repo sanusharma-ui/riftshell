@@ -1,9 +1,12 @@
+import random
+import re
 from html import escape
 
-from PySide6.QtCore import Qt, QStringListModel, QThread, Signal
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtCore import Qt, QStringListModel, QThread, Signal, QTimer, QEvent
+from PySide6.QtGui import QFont, QTextCursor, QColor
 from PySide6.QtWidgets import (
     QCompleter,
+    QGraphicsColorizeEffect,
     QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
@@ -18,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.shell import Shell
-from ui.styles import STYLE
+from ui.styles import STYLE, BOOT_BANNER
 
 
 class CommandInput(QLineEdit):
@@ -94,6 +97,64 @@ class CommandWorker(QThread):
 # ==============================================
 
 
+# ======= NAYA SCANLINE OVERLAY (boot ke time console ke upar chalta hai) =======
+class ScanlineOverlay(QWidget):
+    """Translucent scanning beam that sweeps down over a widget during boot."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self._pos = 0.0
+        self._speed = 0.025
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._advance)
+
+    def start(self):
+        self._pos = -0.15
+        self.show()
+        self.raise_()
+        self._timer.start(16)
+
+    def stop(self):
+        self._timer.stop()
+        self.hide()
+
+    def _advance(self):
+        self._pos += self._speed
+        if self._pos > 1.15:
+            self._pos = -0.15
+        self.update()
+
+    def paintEvent(self, event):
+        from PySide6.QtGui import QPainter, QLinearGradient, QPen
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+
+        # faint persistent scanline texture
+        painter.setPen(QPen(QColor(0, 255, 156, 10)))
+        for y in range(0, h, 3):
+            painter.drawLine(0, y, w, y)
+
+        # the sweeping beam
+        beam_y = int(self._pos * h)
+        gradient = QLinearGradient(0, beam_y - 40, 0, beam_y + 40)
+        gradient.setColorAt(0.0, QColor(0, 255, 156, 0))
+        gradient.setColorAt(0.5, QColor(0, 255, 156, 70))
+        gradient.setColorAt(1.0, QColor(0, 255, 156, 0))
+        painter.fillRect(0, beam_y - 40, w, 80, gradient)
+
+        painter.setPen(QPen(QColor(0, 255, 156, 160), 1))
+        painter.drawLine(0, beam_y, w, beam_y)
+
+        painter.end()
+# ==============================================
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -129,11 +190,13 @@ class MainWindow(QMainWindow):
         self.console.setReadOnly(True)
         self.console.setFont(QFont("Consolas", 11))
 
-        console_glow = QGraphicsDropShadowEffect(self)
-        console_glow.setBlurRadius(30)
-        console_glow.setOffset(0, 0)
-        console_glow.setColor(Qt.black)
-        self.console.setGraphicsEffect(console_glow)
+        self._apply_console_glow()
+
+        # scanline overlay sits on top of the console, only visible during boot
+        self.scanline = ScanlineOverlay(self.console)
+        self.scanline.setGeometry(self.console.rect())
+        self.scanline.hide()
+        self.console.installEventFilter(self)
 
         self.suggest_label = QLabel("Suggestions")
         self.suggest_label.setFont(QFont("Consolas", 10))
@@ -183,12 +246,21 @@ class MainWindow(QMainWindow):
         self.update_suggestions("")
         self.update_status()
 
-        self.append_system("Booting RiftShell...")
-        self.append_system("Neon mode online.")
-        self.append_system("Type help to see commands.")
-        self.append_system("Tab completion is active.")
+        # boot ab yahin se shuru hota hai — cinematic sequence
+        self._start_boot_sequence()
 
-        self.input.setFocus()
+    def _apply_console_glow(self):
+        # Naya drop shadow banate hain kyunki glitch effect purane ko replace/delete kar deta hai
+        console_glow = QGraphicsDropShadowEffect(self)
+        console_glow.setBlurRadius(30)
+        console_glow.setOffset(0, 0)
+        console_glow.setColor(Qt.black)
+        self.console.setGraphicsEffect(console_glow)
+
+    def eventFilter(self, obj, event):
+        if obj is self.console and event.type() == QEvent.Resize:
+            self.scanline.setGeometry(self.console.rect())
+        return super().eventFilter(obj, event)
 
     def update_status(self):
         self.statusBar().showMessage(
@@ -258,14 +330,145 @@ class MainWindow(QMainWindow):
             self.input.setCursorPosition(len(command_name))
             self.input.setFocus()
 
-    # ======= NAYA MULTI-THREADED RUN_COMMAND =======
+    # ======= NAYA CINEMATIC BOOT SEQUENCE =======
+    def _start_boot_sequence(self):
+        self.input.setEnabled(False)
+        self.run_btn.setEnabled(False)
+        self.clear_btn.setEnabled(False)
+        self.input.setPlaceholderText("Booting...")
+
+        self.scanline.start()
+
+        self._boot_queue = self._boot_banner_lines()
+        self._boot_timer = QTimer(self)
+        self._boot_timer.timeout.connect(self._reveal_next_banner_line)
+        self._boot_timer.start(16)
+
+    def _boot_banner_lines(self):
+        inner = re.sub(r"</?pre[^>]*>", "", BOOT_BANNER)
+        lines = inner.split("\n")
+        # trim the blank first/last lines that come from the triple-quoted string
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return lines
+
+    def _reveal_next_banner_line(self):
+        if not self._boot_queue:
+            self._boot_timer.stop()
+            self._start_boot_messages()
+            return
+        line = self._boot_queue.pop(0)
+        self.console.moveCursor(QTextCursor.End)
+        safe = escape(line) if line.strip() else "&nbsp;"
+        self.console.append(
+            f'<div style="color:#00ff9c; white-space:pre; font-family:Consolas;">{safe}</div>'
+        )
+        self.console.moveCursor(QTextCursor.End)
+
+    def _start_boot_messages(self):
+        n = len(self.shell.registry.all_names())
+        self._msg_queue = [
+            "Initializing kernel modules...",
+            "Mounting virtual filesystem...",
+            f"Loading command registry [{n} commands]...",
+            "Calibrating neon core...",
+            "Handshaking with AI subsystem...",
+            "Tab completion armed.",
+            "Neon mode online.",
+        ]
+        self._type_next_message()
+
+    def _type_next_message(self):
+        if not self._msg_queue:
+            self._run_glitch_transition()
+            return
+        message = self._msg_queue.pop(0)
+        color = "#00ff9c" if message == "Neon mode online." else "#cbd5e1"
+        self._typewriter_line(message, color, self._type_next_message)
+
+    def _typewriter_line(self, text, color, on_done, char_delay=14):
+        fmt = self.console.currentCharFormat()
+        fmt.setForeground(QColor(color))
+
+        cursor = self.console.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertBlock()
+        cursor.setCharFormat(fmt)
+        self.console.setTextCursor(cursor)
+
+        state = {"index": 0}
+        timer = QTimer(self)
+
+        def step():
+            if state["index"] >= len(text):
+                timer.stop()
+                timer.deleteLater()
+                on_done()
+                return
+            cursor = self.console.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            cursor.insertText(text[state["index"]], fmt)
+            self.console.setTextCursor(cursor)
+            self.console.moveCursor(QTextCursor.End)
+            state["index"] += 1
+
+        timer.timeout.connect(step)
+        timer.start(char_delay)
+        self._active_typewriter_timer = timer  # reference zinda rakhne ke liye
+
+    def _run_glitch_transition(self):
+        self.scanline.stop()
+
+        self._glitch_effect = QGraphicsColorizeEffect(self.console)
+        self._glitch_effect.setStrength(0.0)
+        self.console.setGraphicsEffect(self._glitch_effect)
+
+        # color, strength frames — flicker fast then settle back to normal
+        self._glitch_frames = [
+            ("#ff2b6d", 0.85),
+            ("#00e5ff", 0.75),
+            ("#00ff9c", 0.0),
+            ("#ff2b6d", 0.6),
+            ("#00e5ff", 0.5),
+            ("#00ff9c", 0.0),
+            ("#ffffff", 0.35),
+            ("#00ff9c", 0.0),
+        ]
+        self._glitch_timer = QTimer(self)
+        self._glitch_timer.timeout.connect(self._glitch_step)
+        self._glitch_timer.start(45)
+
+    def _glitch_step(self):
+        if not self._glitch_frames:
+            self._glitch_timer.stop()
+            self._apply_console_glow()  # restore the normal drop shadow
+            self._end_boot_sequence()
+            return
+        color, strength = self._glitch_frames.pop(0)
+        self._glitch_effect.setColor(QColor(color))
+        self._glitch_effect.setStrength(strength)
+
+    def _end_boot_sequence(self):
+        self.append_system("Type help to see commands.")
+        self.append_system("Tab completion is active.")
+
+        self.input.setEnabled(True)
+        self.run_btn.setEnabled(True)
+        self.clear_btn.setEnabled(True)
+        self.input.setPlaceholderText("Type command here...  (Tab to complete)")
+        self.input.setFocus()
+    # ===============================================
+
+    # ======= MULTI-THREADED RUN_COMMAND =======
     def run_command(self):
         cmd = self.input.text().strip()
         if not cmd:
             return
 
         self.append_user(f"{self.shell.prompt()}{cmd}")
-        
+
         # UI ko disable karo jab tak background command chal rahi ho
         self.input.setEnabled(False)
         self.run_btn.setEnabled(False)
@@ -292,7 +495,7 @@ class MainWindow(QMainWindow):
         self.input.set_history(self.shell.ctx.history)
         self.input.clear()
         self.update_status()
-        
+
         self.input.setEnabled(True)
         self.run_btn.setEnabled(True)
         self.input.setPlaceholderText("Type command here...  (Tab to complete)")
