@@ -20,6 +20,7 @@ import json
 
 
 from core.base import BaseCommand, CommandResult
+from ui.themes import get_theme, list_themes
 from utils.safe_fs import (
     resolve_path,
     list_entries,
@@ -79,6 +80,43 @@ def safe_eval(expr: str):
 
     tree = ast.parse(expr, mode="eval")
     return _eval(tree)
+
+
+class ThemeCommand(BaseCommand):
+    name = "theme"
+    aliases = ["themes"]
+    description = "List, show, or switch UI themes."
+    usage = "theme [list|current|<name>]"
+
+    def execute(self, ctx, args):
+        if not args or args[0].lower() == "list":
+            lines = ["Available themes:"]
+            for theme in list_themes():
+                marker = "*" if theme.key == ctx.current_theme else " "
+                alias_text = ", ".join(theme.aliases[:4])
+                lines.append(f"{marker} {theme.display_name} ({theme.key}) - aliases: {alias_text}")
+            lines.append("Use: theme <name>")
+            return CommandResult(output="\n".join(lines))
+
+        if args[0].lower() in ("current", "show"):
+            theme = get_theme(ctx.current_theme)
+            return CommandResult(output=f"Current theme: {theme.display_name} ({theme.key})")
+
+        requested = " ".join(args)
+        try:
+            theme = get_theme(requested)
+        except KeyError:
+            names = ", ".join(theme.key for theme in list_themes())
+            return CommandResult(
+                output=f"Unknown theme: {requested}\nAvailable: {names}",
+                success=False,
+            )
+
+        ctx.current_theme = theme.key
+        return CommandResult(
+            output=f"Theme changed to: {theme.display_name}",
+            actions={"theme": theme.key},
+        )
 
 
 class HelpCommand(BaseCommand):

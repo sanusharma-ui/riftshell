@@ -14,6 +14,7 @@ class ShellContext:
     aliases: dict[str, str] = field(default_factory=dict)
     running: bool = True
     registry: object | None = None
+    current_theme: str = "vscode-dark-plus"
 
     def set_cwd(self, path: Path):
         from utils.safe_fs import ensure_path_allowed

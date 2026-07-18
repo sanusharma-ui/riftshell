@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 
@@ -8,6 +8,7 @@ class CommandResult:
     output: str = ""
     success: bool = True
     exit_shell: bool = False
+    actions: dict[str, object] = field(default_factory=dict)
 
 
 class BaseCommand(ABC):

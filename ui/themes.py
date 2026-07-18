@@ -1,0 +1,252 @@
+﻿from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Theme:
+    key: str
+    display_name: str
+    aliases: tuple[str, ...]
+    background: str
+    surface: str
+    surface_alt: str
+    border: str
+    text: str
+    muted: str
+    accent: str
+    accent_alt: str
+    output: str
+    error: str
+    selection: str
+    button: str
+    button_hover: str
+    button_pressed: str
+    console_glow: str
+
+
+THEMES: dict[str, Theme] = {
+    "vscode-dark-plus": Theme(
+        key="vscode-dark-plus",
+        display_name="VS Code Dark+ (Default)",
+        aliases=("default", "dark+", "dark-plus", "vscode", "vs-code", "vs-code-dark-plus"),
+        background="#1e1e1e",
+        surface="#252526",
+        surface_alt="#2d2d30",
+        border="#3e3e42",
+        text="#d4d4d4",
+        muted="#858585",
+        accent="#569cd6",
+        accent_alt="#4ec9b0",
+        output="#b5cea8",
+        error="#f48771",
+        selection="#264f78",
+        button="#333333",
+        button_hover="#3c3c3c",
+        button_pressed="#2a2d2e",
+        console_glow="#000000",
+    ),
+    "tokyo-night": Theme(
+        key="tokyo-night",
+        display_name="Tokyo Night",
+        aliases=("tokyo", "tokyonight", "tokyo-night"),
+        background="#1a1b26",
+        surface="#16161e",
+        surface_alt="#24283b",
+        border="#292e42",
+        text="#c0caf5",
+        muted="#9aa5ce",
+        accent="#7aa2f7",
+        accent_alt="#7dcfff",
+        output="#9ece6a",
+        error="#f7768e",
+        selection="#33467c",
+        button="#24283b",
+        button_hover="#2f354d",
+        button_pressed="#1f2335",
+        console_glow="#000000",
+    ),
+    "nord": Theme(
+        key="nord",
+        display_name="Nord",
+        aliases=("nord",),
+        background="#2e3440",
+        surface="#242933",
+        surface_alt="#3b4252",
+        border="#4c566a",
+        text="#d8dee9",
+        muted="#a7b1c2",
+        accent="#88c0d0",
+        accent_alt="#8fbcbb",
+        output="#a3be8c",
+        error="#bf616a",
+        selection="#434c5e",
+        button="#3b4252",
+        button_hover="#434c5e",
+        button_pressed="#2e3440",
+        console_glow="#1f242d",
+    ),
+    "dracula": Theme(
+        key="dracula",
+        display_name="Dracula",
+        aliases=("dracula",),
+        background="#282a36",
+        surface="#21222c",
+        surface_alt="#343746",
+        border="#44475a",
+        text="#f8f8f2",
+        muted="#b6b6c8",
+        accent="#bd93f9",
+        accent_alt="#8be9fd",
+        output="#50fa7b",
+        error="#ff5555",
+        selection="#44475a",
+        button="#343746",
+        button_hover="#44475a",
+        button_pressed="#282a36",
+        console_glow="#191a21",
+    ),
+    "github-dark": Theme(
+        key="github-dark",
+        display_name="GitHub Dark",
+        aliases=("github", "github-dark", "gh-dark"),
+        background="#0d1117",
+        surface="#010409",
+        surface_alt="#161b22",
+        border="#30363d",
+        text="#c9d1d9",
+        muted="#8b949e",
+        accent="#58a6ff",
+        accent_alt="#79c0ff",
+        output="#7ee787",
+        error="#ff7b72",
+        selection="#1f6feb",
+        button="#21262d",
+        button_hover="#30363d",
+        button_pressed="#161b22",
+        console_glow="#000000",
+    ),
+}
+
+DEFAULT_THEME_KEY = "vscode-dark-plus"
+
+_ALIAS_TO_KEY = {
+    alias.lower(): key
+    for key, theme in THEMES.items()
+    for alias in (theme.key, theme.display_name, *theme.aliases)
+}
+
+
+def normalize_theme_name(name: str) -> str:
+    return "-".join(name.strip().lower().replace("+", " plus").split())
+
+
+def get_theme(name: str | None = None) -> Theme:
+    if not name:
+        return THEMES[DEFAULT_THEME_KEY]
+
+    raw = name.strip().strip('"\'')
+    candidates = [
+        raw.lower(),
+        normalize_theme_name(raw),
+        normalize_theme_name(raw).replace("-plus", "+"),
+    ]
+    for candidate in candidates:
+        if candidate in THEMES:
+            return THEMES[candidate]
+        if candidate in _ALIAS_TO_KEY:
+            return THEMES[_ALIAS_TO_KEY[candidate]]
+    raise KeyError(name)
+
+
+def list_themes() -> list[Theme]:
+    return list(THEMES.values())
+
+
+def build_stylesheet(theme: Theme) -> str:
+    return f"""
+QMainWindow {{
+    background-color: {theme.background};
+}}
+
+QWidget {{
+    background-color: {theme.background};
+    color: {theme.text};
+    font-family: Consolas;
+}}
+
+QLabel {{
+    color: {theme.muted};
+    font-size: 10pt;
+    font-family: Consolas;
+}}
+
+QTextEdit {{
+    background-color: {theme.surface};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 12pt;
+    selection-background-color: {theme.selection};
+    selection-color: {theme.text};
+}}
+
+QLineEdit {{
+    background-color: {theme.surface};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: 14px;
+    padding: 11px;
+    font-size: 12pt;
+    selection-background-color: {theme.selection};
+    selection-color: {theme.text};
+}}
+
+QLineEdit:focus {{
+    border: 1px solid {theme.accent};
+}}
+
+QListWidget {{
+    background-color: {theme.surface};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: 14px;
+    padding: 6px;
+    font-size: 10pt;
+}}
+
+QListWidget::item {{
+    padding: 7px 8px;
+    border-radius: 10px;
+}}
+
+QListWidget::item:selected {{
+    background-color: {theme.surface_alt};
+    color: {theme.accent_alt};
+}}
+
+QPushButton {{
+    background-color: {theme.button};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 600;
+}}
+
+QPushButton:hover {{
+    background-color: {theme.button_hover};
+    border: 1px solid {theme.accent};
+    color: {theme.text};
+}}
+
+QPushButton:pressed {{
+    background-color: {theme.button_pressed};
+}}
+
+QStatusBar {{
+    background-color: {theme.background};
+    color: {theme.accent_alt};
+}}
+"""

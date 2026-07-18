@@ -1,6 +1,6 @@
 from core.registry import CommandRegistry
 from .custom_commands import (
-    HelpCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
+    ThemeCommand, HelpCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
     CdCommand, GotoCommand, UpCommand, HomeCommand, MakeFolderCommand, MakeFileCommand,
     ReadCommand, OpenCommand, DuplicateCommand, ShiftCommand, RenameCommand, DeleteCommand,
     SearchCommand, FindTextCommand, NetworkCommand, ProcessesCommand, SystemCommand,
@@ -21,6 +21,7 @@ from .custom_commands import (
 def build_registry() -> CommandRegistry:
     reg = CommandRegistry()
     for cmd in [
+        ThemeCommand(),
         HelpCommand(),
         ExitCommand(),
         ClearCommand(),

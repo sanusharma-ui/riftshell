@@ -63,6 +63,7 @@ class Shell:
             output=combined,
             success=last_result.success,
             exit_shell=last_result.exit_shell,
+            actions=last_result.actions,
         )
 
     def _execute_pipeline(self, commands: list[ParsedCommand]) -> CommandResult:
@@ -151,6 +152,7 @@ class Shell:
             output=f"{action}: {target}",
             success=result.success,
             exit_shell=result.exit_shell,
+            actions=result.actions,
         )
 
     def run(self):

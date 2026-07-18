@@ -2,7 +2,7 @@ import random
 import re
 from html import escape
 
-from PySide6.QtCore import Qt, QStringListModel, QThread, Signal, QTimer, QEvent
+from PySide6.QtCore import Qt, QStringListModel, QThread, Signal, QTimer, QEvent, QPropertyAnimation
 from PySide6.QtGui import QFont, QTextCursor, QColor
 from PySide6.QtWidgets import (
     QCompleter,
@@ -21,7 +21,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.shell import Shell
-from ui.styles import STYLE, BOOT_BANNER
+from ui.styles import BOOT_BANNER
+from ui.themes import build_stylesheet, get_theme
 
 
 class CommandInput(QLineEdit):
@@ -107,8 +108,13 @@ class ScanlineOverlay(QWidget):
         self.setAttribute(Qt.WA_NoSystemBackground)
         self._pos = 0.0
         self._speed = 0.025
+        self._accent = QColor("#00ff9c")
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance)
+
+    def set_accent(self, color: str):
+        self._accent = QColor(color)
+        self.update()
 
     def start(self):
         self._pos = -0.15
@@ -136,19 +142,27 @@ class ScanlineOverlay(QWidget):
         h = self.height()
 
         # faint persistent scanline texture
-        painter.setPen(QPen(QColor(0, 255, 156, 10)))
+        texture = QColor(self._accent)
+        texture.setAlpha(10)
+        painter.setPen(QPen(texture))
         for y in range(0, h, 3):
             painter.drawLine(0, y, w, y)
 
         # the sweeping beam
         beam_y = int(self._pos * h)
         gradient = QLinearGradient(0, beam_y - 40, 0, beam_y + 40)
-        gradient.setColorAt(0.0, QColor(0, 255, 156, 0))
-        gradient.setColorAt(0.5, QColor(0, 255, 156, 70))
-        gradient.setColorAt(1.0, QColor(0, 255, 156, 0))
+        beam_outer = QColor(self._accent)
+        beam_outer.setAlpha(0)
+        beam_mid = QColor(self._accent)
+        beam_mid.setAlpha(70)
+        gradient.setColorAt(0.0, beam_outer)
+        gradient.setColorAt(0.5, beam_mid)
+        gradient.setColorAt(1.0, beam_outer)
         painter.fillRect(0, beam_y - 40, w, 80, gradient)
 
-        painter.setPen(QPen(QColor(0, 255, 156, 160), 1))
+        beam_line = QColor(self._accent)
+        beam_line.setAlpha(160)
+        painter.setPen(QPen(beam_line, 1))
         painter.drawLine(0, beam_y, w, beam_y)
 
         painter.end()
@@ -161,30 +175,32 @@ class MainWindow(QMainWindow):
 
         self.shell = Shell()
 
-        self.setWindowTitle("RiftShell // Neon Mode")
+        self.theme = get_theme(self.shell.ctx.current_theme)
+
+        self.setWindowTitle("RiftShell // Theme Engine")
         self.resize(1180, 760)
-        self.setStyleSheet(STYLE)
+        self.setStyleSheet(build_stylesheet(self.theme))
 
         central = QWidget()
         self.setCentralWidget(central)
 
         self.title_label = QLabel("RiftShell")
         self.title_label.setFont(QFont("Consolas", 18, QFont.Bold))
-        self.title_label.setStyleSheet("color: #00ff9c; letter-spacing: 1px;")
+        self.title_label.setStyleSheet(f"color: {self.theme.accent_alt}; letter-spacing: 1px;")
 
-        title_glow = QGraphicsDropShadowEffect(self)
-        title_glow.setBlurRadius(24)
-        title_glow.setOffset(0, 0)
-        title_glow.setColor(Qt.green)
-        self.title_label.setGraphicsEffect(title_glow)
+        self.title_glow = QGraphicsDropShadowEffect(self)
+        self.title_glow.setBlurRadius(24)
+        self.title_glow.setOffset(0, 0)
+        self.title_glow.setColor(QColor(self.theme.accent_alt))
+        self.title_label.setGraphicsEffect(self.title_glow)
 
         self.tagline = QLabel("dark neon shell • tab completion enabled • custom commands")
         self.tagline.setFont(QFont("Consolas", 10))
-        self.tagline.setStyleSheet("color: #7dd3fc;")
+        self.tagline.setStyleSheet(f"color: {self.theme.accent};")
 
         self.path_label = QLabel(self.shell.prompt())
         self.path_label.setFont(QFont("Consolas", 10))
-        self.path_label.setStyleSheet("color: #94a3b8;")
+        self.path_label.setStyleSheet(f"color: {self.theme.muted};")
 
         self.console = QTextEdit()
         self.console.setReadOnly(True)
@@ -195,12 +211,13 @@ class MainWindow(QMainWindow):
         # scanline overlay sits on top of the console, only visible during boot
         self.scanline = ScanlineOverlay(self.console)
         self.scanline.setGeometry(self.console.rect())
+        self.scanline.set_accent(self.theme.accent_alt)
         self.scanline.hide()
         self.console.installEventFilter(self)
 
         self.suggest_label = QLabel("Suggestions")
         self.suggest_label.setFont(QFont("Consolas", 10))
-        self.suggest_label.setStyleSheet("color: #7dd3fc;")
+        self.suggest_label.setStyleSheet(f"color: {self.theme.accent};")
 
         self.suggestions = QListWidget()
         self.suggestions.setMaximumHeight(150)
@@ -254,8 +271,47 @@ class MainWindow(QMainWindow):
         console_glow = QGraphicsDropShadowEffect(self)
         console_glow.setBlurRadius(30)
         console_glow.setOffset(0, 0)
-        console_glow.setColor(Qt.black)
+        console_glow.setColor(QColor(self.theme.console_glow))
         self.console.setGraphicsEffect(console_glow)
+
+    def _set_theme_styles(self):
+        self.setStyleSheet(build_stylesheet(self.theme))
+        self.title_label.setStyleSheet(f"color: {self.theme.accent_alt}; letter-spacing: 1px;")
+        self.title_glow.setColor(QColor(self.theme.accent_alt))
+        self.tagline.setStyleSheet(f"color: {self.theme.accent};")
+        self.path_label.setStyleSheet(f"color: {self.theme.muted};")
+        self.suggest_label.setStyleSheet(f"color: {self.theme.accent};")
+        self.scanline.set_accent(self.theme.accent_alt)
+        self._apply_console_glow()
+
+    def apply_theme(self, theme_key: str):
+        try:
+            next_theme = get_theme(theme_key)
+        except KeyError:
+            self.append_error(f"Theme engine ignored unknown theme: {theme_key}")
+            return
+
+        if next_theme.key == self.theme.key:
+            self._set_theme_styles()
+            return
+
+        self.theme = next_theme
+        self.shell.ctx.current_theme = next_theme.key
+
+        self._theme_fade_out = QPropertyAnimation(self, b"windowOpacity", self)
+        self._theme_fade_out.setDuration(90)
+        self._theme_fade_out.setStartValue(self.windowOpacity())
+        self._theme_fade_out.setEndValue(0.92)
+        self._theme_fade_out.finished.connect(self._finish_theme_switch)
+        self._theme_fade_out.start()
+
+    def _finish_theme_switch(self):
+        self._set_theme_styles()
+        self._theme_fade_in = QPropertyAnimation(self, b"windowOpacity", self)
+        self._theme_fade_in.setDuration(160)
+        self._theme_fade_in.setStartValue(self.windowOpacity())
+        self._theme_fade_in.setEndValue(1.0)
+        self._theme_fade_in.start()
 
     def eventFilter(self, obj, event):
         if obj is self.console and event.type() == QEvent.Resize:
@@ -275,16 +331,16 @@ class MainWindow(QMainWindow):
         self.console.moveCursor(QTextCursor.End)
 
     def append_user(self, text: str):
-        self.append_html(text, "#7dd3fc")
+        self.append_html(text, self.theme.accent_alt)
 
     def append_system(self, text: str):
-        self.append_html(text, "#cbd5e1")
+        self.append_html(text, self.theme.text)
 
     def append_output(self, text: str):
-        self.append_html(text, "#7dffb2")
+        self.append_html(text, self.theme.output)
 
     def append_error(self, text: str):
-        self.append_html(text, "#ff7b7b")
+        self.append_html(text, self.theme.error)
 
     def clear_console(self):
         self.console.clear()
@@ -363,7 +419,7 @@ class MainWindow(QMainWindow):
         self.console.moveCursor(QTextCursor.End)
         safe = escape(line) if line.strip() else "&nbsp;"
         self.console.append(
-            f'<div style="color:#00ff9c; white-space:pre; font-family:Consolas;">{safe}</div>'
+            f'<div style="color:{self.theme.accent_alt}; white-space:pre; font-family:Consolas;">{safe}</div>'
         )
         self.console.moveCursor(QTextCursor.End)
 
@@ -385,7 +441,7 @@ class MainWindow(QMainWindow):
             self._run_glitch_transition()
             return
         message = self._msg_queue.pop(0)
-        color = "#00ff9c" if message == "Neon mode online." else "#cbd5e1"
+        color = self.theme.accent_alt if message == "Neon mode online." else self.theme.text
         self._typewriter_line(message, color, self._type_next_message)
 
     def _typewriter_line(self, text, color, on_done, char_delay=14):
@@ -429,12 +485,12 @@ class MainWindow(QMainWindow):
         self._glitch_frames = [
             ("#ff2b6d", 0.85),
             ("#00e5ff", 0.75),
-            ("#00ff9c", 0.0),
+            (self.theme.accent_alt, 0.0),
             ("#ff2b6d", 0.6),
             ("#00e5ff", 0.5),
-            ("#00ff9c", 0.0),
+            (self.theme.accent_alt, 0.0),
             ("#ffffff", 0.35),
-            ("#00ff9c", 0.0),
+            (self.theme.accent_alt, 0.0),
         ]
         self._glitch_timer = QTimer(self)
         self._glitch_timer.timeout.connect(self._glitch_step)
@@ -486,6 +542,9 @@ class MainWindow(QMainWindow):
                 self.append_output(result.output)
             else:
                 self.append_error(result.output)
+
+        if result.actions.get("theme"):
+            self.apply_theme(str(result.actions["theme"]))
 
         # Agar `exit` command chali thi toh application close karo
         if hasattr(result, 'exit_shell') and result.exit_shell:
