@@ -7,6 +7,12 @@ from core.plugin_base import BasePlugin
 class GitCommand(BaseCommand):
     """
     Generic RiftShell Git command.
+
+    Each RiftShell command maps to a Git subcommand.
+    Example:
+        gstatus -> git status
+        gbranch -> git branch
+        gcommit -> git commit
     """
 
     def __init__(
@@ -44,7 +50,6 @@ class GitCommand(BaseCommand):
             output = result.stdout.strip()
 
             if result.stderr.strip():
-
                 if output:
                     output += "\n"
 
@@ -56,7 +61,6 @@ class GitCommand(BaseCommand):
             )
 
         except FileNotFoundError:
-
             return CommandResult(
                 output=(
                     "Git is not installed or "
@@ -66,7 +70,6 @@ class GitCommand(BaseCommand):
             )
 
         except Exception as exc:
-
             return CommandResult(
                 output=f"Git error: {exc}",
                 success=False,
@@ -82,7 +85,7 @@ class GitPlugin(BasePlugin):
     def register(self, registry):
 
         # -------------------------
-        # Status
+        # Repository Status
         # -------------------------
 
         registry.register(
@@ -96,7 +99,7 @@ class GitPlugin(BasePlugin):
         )
 
         # -------------------------
-        # Branch
+        # Branches
         # -------------------------
 
         registry.register(
@@ -110,7 +113,7 @@ class GitPlugin(BasePlugin):
         )
 
         # -------------------------
-        # Log
+        # Commit History
         # -------------------------
 
         registry.register(
@@ -124,7 +127,7 @@ class GitPlugin(BasePlugin):
         )
 
         # -------------------------
-        # Diff
+        # Changes / Diff
         # -------------------------
 
         registry.register(
@@ -138,7 +141,7 @@ class GitPlugin(BasePlugin):
         )
 
         # -------------------------
-        # Add
+        # Stage Files
         # -------------------------
 
         registry.register(
@@ -202,7 +205,7 @@ class GitPlugin(BasePlugin):
                 name="gcheckout",
                 aliases=["gco"],
                 git_args=["checkout"],
-                description="Switch Git branches or restore files",
+                description="Switch branches or restore files",
                 usage="gcheckout <branch>",
             )
         )
