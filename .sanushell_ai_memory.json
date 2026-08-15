@@ -1,30 +1,6 @@
 [
   {
     "role": "user",
-    "content": "Hello"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: respond, Command: , Message: Hello! How can I help you today?"
-  },
-  {
-    "role": "user",
-    "content": "Who are you"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: respond, Command: , Message: I am the AI agent for RiftShell, an advanced Python OS shell."
-  },
-  {
-    "role": "user",
-    "content": "Go to D:\\projects"
-  },
-  {
-    "role": "assistant",
-    "content": "Action: shell, Command: cd D:\\projects, Message: changing directory"
-  },
-  {
-    "role": "user",
     "content": "Yaha pe ek file bana demo.txt naam ka"
   },
   {
@@ -70,5 +46,53 @@
   {
     "role": "assistant",
     "content": "Action: respond, Command: , Message: Hello! How can I help you today?"
+  },
+  {
+    "role": "user",
+    "content": "Hello"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: respond, Command: , Message: Hello! How can I help you today?"
+  },
+  {
+    "role": "user",
+    "content": "How many command are their"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: help, Message: showing available commands"
+  },
+  {
+    "role": "user",
+    "content": "create a folder name test"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: makefolder test, Message: creating folder test"
+  },
+  {
+    "role": "user",
+    "content": "inside test folder make an index.html file and write and inside index.html file write a code of calculator"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: code_write, Command: , Message: creating index.html inside the 'test' folder with calculator code"
+  },
+  {
+    "role": "user",
+    "content": "create a file name index.html"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: shell, Command: makefile index.html, Message: creating file index.html"
+  },
+  {
+    "role": "user",
+    "content": "inside this file write a code for calculator .. with internal css"
+  },
+  {
+    "role": "assistant",
+    "content": "Action: code_write, Command: , Message: writing HTML code for a calculator layout with internal CSS to index.html"
   }
 ]

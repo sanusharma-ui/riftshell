@@ -1,4 +1,7 @@
+from pathlib import Path
+from core.plugin_loader import PluginLoader
 from core.registry import CommandRegistry
+
 from .custom_commands import (
     ThemeCommand, HelpCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
     CdCommand, GotoCommand, UpCommand, HomeCommand, MakeFolderCommand, MakeFileCommand,
@@ -17,9 +20,9 @@ from .custom_commands import (
     LastCommand,
 )
 
-
 def build_registry() -> CommandRegistry:
     reg = CommandRegistry()
+    
     for cmd in [
         ThemeCommand(),
         HelpCommand(),
@@ -93,4 +96,11 @@ def build_registry() -> CommandRegistry:
         LastCommand(),
     ]:
         reg.register(cmd)
+
+    # Load external plugins
+    plugin_loader = PluginLoader(
+        Path(__file__).resolve().parent.parent / "plugins"
+    )
+    plugin_loader.load_plugins(reg)
+
     return reg

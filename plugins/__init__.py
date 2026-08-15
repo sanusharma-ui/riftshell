@@ -1,0 +1,3 @@
+"""
+RiftShell external plugins.
+"""
