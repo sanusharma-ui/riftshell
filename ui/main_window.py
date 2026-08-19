@@ -319,8 +319,11 @@ class MainWindow(QMainWindow):
         return super().eventFilter(obj, event)
 
     def update_status(self):
+        plugins = getattr(self.shell.ctx, "plugins", None)
+        loaded_plugins = len(plugins.loaded) if plugins else 0
+        failed_plugins = len(plugins.failed) if plugins else 0
         self.statusBar().showMessage(
-            f"cwd: {self.shell.ctx.cwd} | commands: {len(self.shell.registry.all_names())} | history: {len(self.shell.ctx.history)}"
+            f"cwd: {self.shell.ctx.cwd} | commands: {len(self.shell.registry.all_names())} | plugins: {loaded_plugins} loaded/{failed_plugins} failed | history: {len(self.shell.ctx.history)}"
         )
         self.path_label.setText(self.shell.prompt())
 

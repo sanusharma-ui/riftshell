@@ -216,10 +216,16 @@ When the app opens:
 * click Clear to clear the console output
 
 ## Extending the shell
-You can add new commands by creating a new class in `commands/custom_commands.py` and registering it in `commands/__init__.py`.
+Core commands still live in `commands/custom_commands.py`, but new features should usually be added as plugins so the shell, UI completion, help output, and AI layer adopt them automatically.
+
+Create a folder under `plugins/<plugin_name>/` with a `plugin.py` file. The file must expose one `plugin` object that inherits from `BasePlugin`.
 
 Example shape:
 ```python
+from core.base import BaseCommand, CommandResult
+from core.plugin_base import BasePlugin
+
+
 class MyCommand(BaseCommand):
     name = "mycommand"
     aliases = []
@@ -228,15 +234,29 @@ class MyCommand(BaseCommand):
 
     def execute(self, ctx, args):
         return CommandResult(output="Hello from RiftShell!")
+
+
+class MyPlugin(BasePlugin):
+    name = "myplugin"
+    version = "1.0.0"
+    description = "Adds my custom command"
+
+    def register(self, registry):
+        registry.register(MyCommand())
+
+
+plugin = MyPlugin()
 ```
+
+Run `plugins` inside RiftShell to see loaded and failed plugins. The AI Telegram layer reads the same registry catalog, so plugin commands become available to natural-language planning after restart.
 
 ## Future ideas
 Possible next upgrades:
 * autocomplete dropdown refinement
 * command palette
 * multi-tab terminal sessions
-* plugin support
-* AI assistant mode integration
+* plugin settings and enable/disable switches
+* richer AI assistant workflows
 * sound effects and typing animation
 
 ## License

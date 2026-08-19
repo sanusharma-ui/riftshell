@@ -3,7 +3,7 @@ from core.plugin_loader import PluginLoader
 from core.registry import CommandRegistry
 
 from .custom_commands import (
-    ThemeCommand, HelpCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
+    ThemeCommand, HelpCommand, PluginsCommand, ExitCommand, ClearCommand, WhereCommand, FilesCommand, FoldersCommand,
     CdCommand, GotoCommand, UpCommand, HomeCommand, MakeFolderCommand, MakeFileCommand,
     ReadCommand, OpenCommand, DuplicateCommand, ShiftCommand, RenameCommand, DeleteCommand,
     SearchCommand, FindTextCommand, NetworkCommand, ProcessesCommand, SystemCommand,
@@ -26,6 +26,7 @@ def build_registry() -> CommandRegistry:
     for cmd in [
         ThemeCommand(),
         HelpCommand(),
+        PluginsCommand(),
         ExitCommand(),
         ClearCommand(),
         WhereCommand(),
@@ -101,6 +102,6 @@ def build_registry() -> CommandRegistry:
     plugin_loader = PluginLoader(
         Path(__file__).resolve().parent.parent / "plugins"
     )
-    plugin_loader.load_plugins(reg)
+    reg.plugin_report = plugin_loader.load_plugins(reg)
 
     return reg

@@ -131,7 +131,36 @@ class HelpCommand(BaseCommand):
         for cmd in reg.list_commands():
             alias_text = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
             usage_text = f" | usage: {cmd.usage}" if cmd.usage else ""
-            lines.append(f"- {cmd.name}{alias_text}{usage_text} :: {cmd.description}")
+            meta = reg.metadata_for(cmd.name) if hasattr(reg, "metadata_for") else None
+            source_text = f" | plugin: {meta.plugin}" if meta and meta.plugin else ""
+            lines.append(f"- {cmd.name}{alias_text}{usage_text}{source_text} :: {cmd.description}")
+        return CommandResult(output="\n".join(lines))
+
+
+class PluginsCommand(BaseCommand):
+    name = "plugins"
+    aliases = ["pluginlist"]
+    description = "Show plugin load status."
+    usage = "plugins"
+
+    def execute(self, ctx, args):
+        report = getattr(ctx, "plugins", None)
+        if report is None:
+            return CommandResult(output="Plugin system is not attached.", success=False)
+
+        lines = ["Plugins:"]
+        if report.loaded:
+            lines.append("Loaded:")
+            for item in report.loaded:
+                lines.append(f"- {item.name} v{item.version} :: {item.description}")
+        else:
+            lines.append("Loaded: none")
+
+        if report.failed:
+            lines.append("Failed:")
+            for item in report.failed:
+                lines.append(f"- {item.name} :: {item.error}")
+
         return CommandResult(output="\n".join(lines))
 
 

@@ -35,7 +35,7 @@ class TelegramAIBot:
         self.planner = AgentPlanner(
             config=config,
             command_names=self.shell.registry.all_names(),
-            command_catalog=self._build_command_catalog(),
+            command_catalog=self.shell.registry.catalog_entries(),
             current_dir_provider=lambda: self.shell.ctx.cwd,
         )
         self.pending: dict[str, PendingAction] = {}
@@ -65,16 +65,6 @@ class TelegramAIBot:
         if self.config.telegram_allow_unlisted_users:
             return True
         return user_id in self.config.telegram_allowed_user_ids
-
-    def _build_command_catalog(self) -> list[str]:
-        items = []
-        for command in self.shell.registry.list_commands():
-            usage = getattr(command, "usage", "") or command.name
-            description = getattr(command, "description", "") or ""
-            aliases = ", ".join(getattr(command, "aliases", []) or [])
-            alias_text = f" aliases: {aliases};" if aliases else ""
-            items.append(f"{usage};{alias_text} {description}".strip())
-        return items
 
     async def _guard(self, update) -> bool:
         user_id = update.effective_user.id if update.effective_user else None

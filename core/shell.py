@@ -27,6 +27,7 @@ class Shell:
         self.parser = CommandParser()
         self.registry = build_registry()
         self.ctx.registry = self.registry
+        self.ctx.plugins = getattr(self.registry, "plugin_report", None)
 
     def prompt(self) -> str:
         return f"RiftShell {self.ctx.cwd}> "
