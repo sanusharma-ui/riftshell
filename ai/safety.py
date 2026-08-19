@@ -32,6 +32,16 @@ class SafetyPolicy:
         "copy",
         "zip",
         "unzip",
+        "gadd",
+        "ga",
+        "gcommit",
+        "gc",
+        "gpull",
+        "gpl",
+        "gpush",
+        "gps",
+        "gcheckout",
+        "gco",
     }
 
     DANGEROUS_NATIVE_WORDS = {

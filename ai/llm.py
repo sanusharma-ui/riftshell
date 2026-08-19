@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -102,7 +103,7 @@ class AgentPlanner:
 
     def plan(self, user_text: str) -> AgentAction:
         direct = self._fallback_plan(user_text)
-        if direct.action != "respond" or (self._gemini is None and self._groq is None):
+        if direct.action != "respond" or direct.message or (self._gemini is None and self._groq is None):
             return direct
 
         prompt = self._build_prompt(user_text)
@@ -133,7 +134,10 @@ class AgentPlanner:
 
         # If both fail
         if action is None:
-            return AgentAction(action="respond", message=f"Dono models fail ho gaye bhai.\nDetails: {error_msg}")
+            return AgentAction(
+                action="respond",
+                message=f"I could not reach the AI model right now.\nDetails: {error_msg}",
+            )
 
         # Save to Memory
         self.memory.add("user", user_text)
@@ -147,34 +151,107 @@ class AgentPlanner:
         text = user_text.strip()
         lowered = text.lower()
         first_word = lowered.split(maxsplit=1)[0] if lowered else ""
+        command_names = {name.lower() for name in self.command_names}
 
         if not text:
-            return AgentAction(action="respond", message="Kya karna hai?")
-        if "screenshot" in lowered or "screen shot" in lowered or "screen" in lowered and "photo" in lowered:
-            return AgentAction(action="screenshot", message="Taking screenshot.")
-        if lowered in {"help", "commands", "command list"} or "help" in lowered:
+            return AgentAction(
+                action="respond",
+                message="Tell me what you need. I can answer questions, explain things, or run RiftShell commands when you ask for computer work.",
+            )
+
+        if self._is_greeting(lowered):
+            return AgentAction(
+                action="respond",
+                message="Hello. I am your RiftShell copilot. Ask me a question, or tell me what you want done on the system.",
+            )
+
+        if self._is_simple_general_question(lowered):
+            return AgentAction(action="respond", message=self._answer_simple_general_question(lowered))
+
+        if "screenshot" in lowered or "screen shot" in lowered or ("screen" in lowered and "photo" in lowered):
+            return AgentAction(action="screenshot", message="Taking a screenshot.")
+        if lowered in {"help", "commands", "command list", "show commands", "list commands"}:
             return AgentAction(action="shell", command="help")
-        if any(word in lowered for word in ["file dikhao", "files dikhao", "folder dikhao", "list files", "ls"]):
+        if any(phrase in lowered for phrase in ["file dikhao", "files dikhao", "folder dikhao", "list files"]) or lowered in {"ls", "dir", "files"}:
             return AgentAction(action="shell", command="files")
-        if any(word in lowered for word in ["kaha ho", "where am i", "current folder", "pwd"]):
+        if any(phrase in lowered for phrase in ["kaha ho", "where am i", "current folder"]) or lowered in {"pwd", "where"}:
             return AgentAction(action="shell", command="where")
-        if "process" in lowered:
+        if re.search(r"\b(process|processes|tasklist|running tasks)\b", lowered):
             return AgentAction(action="shell", command="processes")
-        if "ip" in lowered:
+        if re.search(r"\b(ip|network config|ipconfig)\b", lowered):
             return AgentAction(action="shell", command="ip")
-        if "time" in lowered or "samay" in lowered:
+        if lowered in {"time", "current time", "what time is it", "show time"}:
             return AgentAction(action="shell", command="now")
-        if "date" in lowered or "tarikh" in lowered:
+        if lowered in {"date", "today", "current date", "show date"}:
             return AgentAction(action="shell", command="today")
-        if first_word in {name.lower() for name in self.command_names}:
+
+        if first_word in command_names and not self._looks_like_chat(lowered):
             return AgentAction(action="shell", command=text)
 
         if self._gemini is None and self._groq is None:
-            return AgentAction(
-                action="respond",
-                message="Koi API key set nahi hai (Gemini/Groq), isliye direct RiftShell  command bhejo ya .env set karo.",
-            )
+            return self._offline_response(text)
         return AgentAction(action="respond", message="")
+
+    def _is_greeting(self, lowered: str) -> bool:
+        cleaned = re.sub(r"[^a-z0-9\s]", "", lowered).strip()
+        words = cleaned.split()
+        if not words:
+            return False
+        greetings = {
+            "hello",
+            "hi",
+            "hey",
+            "hii",
+            "helo",
+            "namaste",
+            "namaskar",
+            "salam",
+            "yo",
+        }
+        if cleaned in greetings:
+            return True
+        return words[0] in greetings and len(words) <= 3
+
+    def _looks_like_chat(self, lowered: str) -> bool:
+        if lowered.endswith("?"):
+            return True
+        chat_starters = (
+            "how ",
+            "what ",
+            "why ",
+            "when ",
+            "who ",
+            "which ",
+            "can you explain",
+            "tell me",
+            "explain ",
+            "kya ",
+            "kaise ",
+            "kyu ",
+            "batao ",
+        )
+        return lowered.startswith(chat_starters)
+
+    def _is_simple_general_question(self, lowered: str) -> bool:
+        return bool(
+            re.search(r"\bhow\s+many\s+continents\b", lowered)
+            or re.search(r"\bcontinents\s+(are|in)\b", lowered)
+        )
+
+    def _answer_simple_general_question(self, lowered: str) -> str:
+        if "continent" in lowered:
+            return "There are 7 continents: Asia, Africa, North America, South America, Antarctica, Europe, and Australia/Oceania."
+        return "I can answer that, but I need the question to be a little clearer."
+
+    def _offline_response(self, text: str) -> AgentAction:
+        return AgentAction(
+            action="respond",
+            message=(
+                "I can handle basic conversation and direct RiftShell commands locally. "
+                "For broader AI answers, configure a Gemini or Groq API key. "
+                "To run a command directly, send something like `files`, `where`, `ip`, or `/cmd files`."
+            ),
+        )
 
     def _build_prompt(self, user_text: str) -> str:
         catalog = "\n".join(f"- {item}" for item in self.command_catalog)
@@ -183,8 +260,9 @@ class AgentPlanner:
         access_mode = "FULL_PC" if self.config.allow_outside_workspace else "WORKSPACE_ONLY"
 
         return f"""
-You are the ultra-smart agentic AI layer for RiftShell, an advanced custom Python OS shell.
-Your ONLY job is to TRANSLATE user requests into STRICT, VALID JSON based on the shell's rules.
+You are RiftShell Copilot: a friendly, practical AI assistant inside a Telegram-controlled Python shell.
+You can chat naturally, answer general questions, clarify intent, and execute safe shell actions when the user clearly wants computer work.
+Your output must always be STRICT, VALID JSON.
 
 Allowed JSON shapes:
 {{"action":"shell","command":"STRICT_COMMAND_HERE","message":"short explanation"}}
@@ -198,13 +276,26 @@ Runtime context:
 - Access mode: {access_mode}
 
 UNIVERSAL RULES (READ AND OBEY):
-1. READ THE CATALOG: Never guess command syntax. Look at the "Available Commands" catalog below. Format your output EXACTLY as the catalog requires.
-2. LOCATION: Relative paths run from the Current directory above. Use `cd <path>` when the user asks to move to a location. Use absolute paths only when the user gives or clearly asks for one.
-3. FULL-PC MODE: If Access mode is FULL_PC, commands and code_write may target any user-provided location on this PC. If Access mode is WORKSPACE_ONLY, stay inside the AI workspace root.
-4. WINDOWS PROCESSES: If killing or finding a process, append `.exe` (e.g., `kill chrome.exe`).
-5. EXACT FILE PATHS (CRITICAL): Use the EXACT filename and path the user provides. Escape backslashes (e.g., `D:\\j.txt`). Do NOT change the filename.
-6. NO CHAT IN COMMAND: The "command" field MUST ONLY contain the executable syntax.
-7. PIPING: You can use `|` if the catalog supports it.
+1. GENERAL CHAT IS ALLOWED: If the user greets you, asks a general knowledge question, asks for advice, or is just talking, return {{"action":"respond","message":"..."}} with a warm concise answer. Do not force a shell command.
+2. COMMAND INTENT: Use "shell" only when the user clearly asks to inspect or change the computer, run a listed command, navigate files, show system info, capture screenshot, or execute a specific task.
+3. READ THE CATALOG: Never guess command syntax. Look at the "Available Commands" catalog below. Format shell commands EXACTLY as the catalog requires.
+4. UNKNOWN COMMANDS: If the user asks for something that is not supported by the catalog, respond conversationally and explain what you can do instead. Never say "No such commands" for general chat.
+5. LOCATION: Relative paths run from the Current directory above. Use `cd <path>` when the user asks to move to a location. Use absolute paths only when the user gives or clearly asks for one.
+6. FULL-PC MODE: If Access mode is FULL_PC, commands and code_write may target any user-provided location on this PC. If Access mode is WORKSPACE_ONLY, stay inside the AI workspace root.
+7. WINDOWS PROCESSES: If killing or finding a process, append `.exe` (e.g., `kill chrome.exe`).
+8. EXACT FILE PATHS (CRITICAL): Use the EXACT filename and path the user provides. Escape backslashes (e.g., `D:\\j.txt`). Do NOT change the filename.
+9. NO CHAT IN COMMAND: The "command" field MUST ONLY contain executable RiftShell syntax. Put explanation in "message".
+10. PIPING: You can use `|` if the catalog supports it.
+11. CODE WRITES: Use "code_write" only when the user explicitly asks you to create or rewrite files with code/content. Keep file paths exact and content complete.
+12. TONE: Use clear, professional English. Be helpful like a copilot, but do not pretend a command ran unless the action is "shell", "screenshot", or "code_write".
+
+Routing examples:
+- User: "hello" -> {{"action":"respond","message":"Hello. How can I help?"}}
+- User: "How many continents are there?" -> {{"action":"respond","message":"There are 7 continents: Asia, Africa, North America, South America, Antarctica, Europe, and Australia/Oceania."}}
+- User: "list files" -> {{"action":"shell","command":"files","message":"Listing files."}}
+- User: "show my current folder" -> {{"action":"shell","command":"where","message":"Showing the current folder."}}
+- User: "take a screenshot" -> {{"action":"screenshot","message":"Taking a screenshot."}}
+- User: "write a Python script at hello.py that prints hello" -> {{"action":"code_write","message":"Preparing hello.py.","files":[{{"path":"hello.py","content":"print('hello')\n"}}]}}
 
 Available Commands & Aliases:
 {catalog}

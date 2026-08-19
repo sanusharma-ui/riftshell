@@ -99,7 +99,22 @@ class TelegramAIBot:
         if not await self._guard(update):
             return
         text = update.message.text or ""
-        action = await asyncio.to_thread(self.planner.plan, text)
+        progress_task = asyncio.create_task(
+            self._delayed_progress(update, "Thinking... I will run a command only if your request needs system action.")
+        )
+        try:
+            action = await asyncio.to_thread(self.planner.plan, text)
+        except Exception as exc:
+            progress_task.cancel()
+            await update.message.reply_text(f"I hit an internal planning error: {exc}")
+            return
+        progress_task.cancel()
+        try:
+            await progress_task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
         await self._handle_action(update, action)
 
     async def approve(self, update, context) -> None:
@@ -178,9 +193,13 @@ class TelegramAIBot:
             await self._execute_shell(update, action.command)
             return
         if action.action == "screenshot":
+            await update.message.reply_text("Taking a screenshot...")
             await self._send_screenshot(update)
             return
         if action.action == "code_write":
+            await update.message.reply_text(
+                "Code in progress... preparing files and writing them with backups where needed."
+            )
             result = await asyncio.to_thread(
                 apply_file_writes,
                 action.files,
@@ -193,6 +212,7 @@ class TelegramAIBot:
         await update.message.reply_text(action.message or "Done.")
 
     async def _execute_shell(self, update, command: str) -> None:
+        await update.message.reply_text(f"Running command: {command}")
         async with self.shell_lock:
             result = await asyncio.to_thread(self.shell.execute_line, command)
 
@@ -207,6 +227,10 @@ class TelegramAIBot:
                 await update.message.reply_photo(photo=image, caption="Screenshot")
         except Exception as exc:
             await update.message.reply_text(f"Screenshot failed: {exc}")
+
+    async def _delayed_progress(self, update, message: str, delay: float = 1.2) -> None:
+        await asyncio.sleep(delay)
+        await update.message.reply_text(message)
 
     def _describe_action(self, action: AgentAction) -> str:
         if action.action == "shell":
