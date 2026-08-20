@@ -1,226 +1,168 @@
 # RiftShell
 
-RiftShell is a **custom Windows shell replacement** built in Python. It uses a **dark neon UI** made with **PySide6** and a safe, multi-threaded command engine that runs your own custom commands instead of forcing you to remember standard CMD-style commands.
+RiftShell is a Python-based custom shell and desktop-style command environment for Windows. It combines a dark cyberpunk UI with a flexible command system, plugin architecture, and optional AI-powered workflow layer.
 
-It is designed to feel like a real shell, but with your own command language and a cyberpunk hacker aesthetic.
+The goal is simple: keep the shell familiar enough to use, but make it extensible enough for developers to add their own commands, tools, and automation without fighting the core app.
 
-## Screenshots
+## What this project is
 
-![RiftShell Boot & Basic Commands](assets/basic.png)
-*Boot sequence, dark neon UI, and directory navigation.*
+RiftShell is made of a few simple layers:
 
-## What RiftShell does
+- Shell runtime: parses user input and executes commands
+- Command registry: stores built-in and plugin commands
+- UI layer: PySide6-based terminal window with suggestions/history
+- Plugin system: lets you add new features without editing the core code
+- AI layer: optional Telegram bot that converts plain language requests into shell actions
 
-RiftShell gives you:
+This is not a traditional Windows terminal clone. It is a developer-friendly command shell designed to be extended and customized.
 
-* a custom terminal-style window
-* your own command names such as `files`, `goto`, `zip`, `download`, `ip`, `processes`, and more
-* Windows system access through safe command wrappers
-* **Multi-threaded background execution** (UI never freezes during heavy tasks!)
-* command history with Up/Down arrow support
-* tab completion for command names
-* live command suggestions
-* a dark neon hacker-style theme
-* a backend that can later support autocomplete, plugins, AI commands, and more
+## Quick start
 
-## Example command style
+### 1) Install dependencies
 
-Instead of remembering traditional shell commands, you can type your own:
+```bash
+pip install -r requirements.txt
+```
+
+### 2) Run the shell
+
+```bash
+python main.py
+```
+
+If `python` is not found on your system, try:
+
+```bash
+py main.py
+```
+
+## Core architecture
+
+### Shell engine
+The main runtime starts from `main.py` and creates the PySide6 window. The shell reads command text, routes it through a parser, matches a command in the registry, and executes it in a controlled way.
+
+### Plugin system
+Plugins live under the `plugins/` folder. Each plugin exposes a `plugin` object that can register commands into the shell. The loader dynamically imports plugin files and wires them into the command registry.
+
+This keeps the project modular and easy to expand.
+
+### UI layer
+The interface is built with PySide6 and provides:
+
+- terminal output area
+- command input box
+- history navigation
+- tab completion
+- live suggestions
+- dark neon theme
+- non-blocking execution for heavier commands
+
+### AI layer
+The AI layer is optional and sits on top of the shell rather than replacing it.
+
+- Entry point: `run_ai_bot.py`
+- Config: `ai/config.py`
+- Telegram bot logic: `ai/telegram_bot.py`
+- Model integration: `ai/llm.py`
+
+This layer allows natural-language commands such as:
+
+```text
+show files
+what is the current folder
+list processes
+capture screenshot
+```
+
+The AI can trigger shell actions, but dangerous actions are gated by approval flows and workspace restrictions.
+
+## Example commands
 
 ```text
 files
 where
 goto C:\Users
 makefolder demo
-download https://example.com/file.zip
-unzip file.zip
 zip demo backup.zip
 ip
 processes
-kill notepad.exe
 calc 5 + 7 * 2
 echo hello > note.txt
 files | filter py | count
-setvar PROJECT SanuShell
+setvar PROJECT RiftShell
 echo $PROJECT
-alias ll files
-ll
 run python --version
 exit
 ```
 
-You can also combine commands:
+You can also chain commands:
 
 ```text
 where ; files
 makefolder logs && echo created
 read missing.txt || echo fallback
-files | filter py | sort | take 5
-echo first line > notes.txt
-echo second line >> notes.txt
+files | sort | take 5
 ```
 
-## How it works
-The project has two major parts:
-1. **Command backend**  
-   This is the brain of the shell. It reads your input, parses the command, finds the matching custom command in the registry, executes it via a background thread, and returns the output back to the UI.
+## Project layout
 
-2. **PySide6 UI**  
-   This is the shell window. It shows the output console, accepts commands from the input box, displays live suggestions, supports tab completion, and uses QThread to ensure the terminal remains buttery smooth even when downloading files or compressing large projects.
+```text
+RiftShell/
+├── main.py                  # App entry point
+├── run_ai_bot.py            # Optional AI bot runner
+├── core/                    # Shell core, parser, registry, plugin loader
+├── commands/                # Default command definitions
+├── plugins/                 # Plugin modules
+├── ai/                      # AI layer and Telegram integration
+├── ui/                      # PySide6 UI components
+├── utils/                   # Helper utilities
+├── assets/                  # UI images/resources
+├── requirements.txt         # Python dependencies
+├── README.md                # Project documentation
+└── LICENSE
+```
 
-## Main features
-* Custom commands
-* Multi-Threaded Performance
-* Windows support
-* Safe filesystem actions
-* command chaining with `;`, `&&`, and `||`
-* text pipelines with `|`
-* output redirection with `>` and `>>`
-* shell variables and custom aliases
-* native command execution through `run`
+## Developer-friendly notes
 
-## Advanced command syntax
-RiftShell now supports common shell-style composition while keeping existing custom commands working:
+- The shell is built to be modular, not monolithic.
+- New features are usually added as plugins instead of modifying the main shell logic.
+- The command system is centralized so commands can be reused across the UI and AI layer.
+- The AI layer is intentionally separate, so the shell remains useful even without the bot enabled.
+- Safety checks are important for file actions, process operations, and external commands.
 
-* `command1 ; command2` — run commands one after another
-* `command1 && command2` — run the second command only if the first succeeds
-* `command1 || command2` — run the second command only if the first fails
-* `command1 | command2` — pass text output into a pipe-friendly command
-* `command > file.txt` — write output to a file
-* `command >> file.txt` — append output to a file
-* `$NAME` or `%NAME%` — expand shell variables or environment variables
+## AI setup
 
-## Commands
-Here is the complete command set currently supported:
+Create a `.env` file in the project root with values like:
 
-### Navigation
-* `where` — show current directory
-* `cd <path>` — change directory
-* `goto <path>` — alias for change directory
-* `up` — go to parent folder
-* `home` — go to home folder
+```env
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_ALLOWED_USER_IDS=your_numeric_telegram_user_id
+GEMINI_API_KEY=your_gemini_key
+AI_WORKSPACE_ROOT=D:\riftshell
+AI_ALLOW_OUTSIDE_WORKSPACE=false
+```
 
-### Files and folders
-* `files [path]` — list files and folders
-* `folders [path]` — list only folders
-* `makefolder <name>` — create a folder
-* `makefile <file>` — create an empty file
-* `read <file>` — read full file contents
-* `head <file> [lines]` — read the first N lines of a file
-* `open <path>` — open file or folder with Windows default app
-* `duplicate <src> <dst>` — copy file or folder
-* `shift <src> <dst>` — move file or folder
-* `rename <src> <new_name>` — rename file or folder
-* `zip <folder> <zip_name>` — compress a folder into a zip file
-* `unzip <zip_file> [dst]` — extract a zip archive
-* `delete confirm <path>` — delete file or folder after confirmation
+Then run:
 
-### Web & Security
-* `download <url> [filename]` — download a file directly from the web
-* `hash <text|file> <target>` — generate secure SHA-256 hashes
-* `base64 <encode|decode> <text>` — encode or decode base64 strings
+```bash
+python run_ai_bot.py
+```
 
-### Search and view
-* `search <text> [path]` — search file and folder names
-* `findtext <text> [path]` — search text inside files
-* `tree [path] [depth]` — view directory tree
-* `filter <text> [file]` — filter piped text or file lines
-* `sort [file]` — sort piped text or file lines
-* `unique [file]` — remove duplicate lines
-* `take <lines> [file]` — show first N lines from piped text or a file
-* `skip <lines> [file]` — skip first N lines from piped text or a file
-* `count [file]` — count lines, words, and characters
-* `save <file>` — save piped text or last output
-* `last` — show previous command output
+### AI behavior
 
-### System info
-* `ip` — show IP configuration
-* `netstat` — show active network connections
-* `ping <host>` — ping a host
-* `processes` — show running tasks
-* `kill <pid|name>` — forcefully terminate a running Windows process
-* `system` — show system information
-* `me` — show current user
-* `pc` — show computer name
-* `drives` — show available drives
-* `disk [path]` — show disk usage
-* `path` — show PATH environment variable
-* `run <program> [args...]` — run a native system command from the current folder
+The AI layer is designed to help with shell tasks using plain language, while still respecting safety rules:
 
-### Utility
-* `today` — show current date
-* `now` — show current time
-* `sleep <seconds>` — pause the shell for N seconds
-* `random [min] [max]` — generate a random number
-* `calc <expression>` — safe calculator
-* `env` — show environment variables
-* `history` — show command history
-* `setvar <name> <value>` — create or update a shell variable
-* `unsetvar <name>` — remove a shell variable
-* `vars` — list shell variables
-* `alias [name command...]` — create or list custom aliases
-* `unalias <name>` — remove a custom alias
-* `clear` — clear the screen
-* `help` — show all available commands
-* `exit` — close the shell
+- file and folder access can be limited to a workspace
+- dangerous commands require approval
+- system-level actions are checked before execution
+- the bot acts as an assistant layer, not as a replacement for the core shell
 
-## Installation
-1. Install Python  
-   Make sure Python is installed on your system.
+## Extending the project
 
-2. Install dependencies
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Run the shell
-   ```bash
-   python main.py
-   ```
-   (If python does not work on your system, try `py main.py`)
-
-## Optional AI Telegram layer
-RiftShell also includes an optional AI layer that sits on top of the existing shell engine. It does not replace the UI or command backend.
-
-1. Copy `.env.example` values into `.env` and fill:
-   ```text
-   TELEGRAM_BOT_TOKEN=your_bot_token
-   TELEGRAM_ALLOWED_USER_IDS=your_numeric_telegram_user_id
-   GEMINI_API_KEY=your_gemini_key
-   ```
-
-2. Start the Telegram AI bot:
-   ```bash
-   python run_ai_bot.py
-   ```
-
-3. From Telegram you can send natural language such as:
-   ```text
-   files dikhao
-   current folder kya hai
-   system processes dikhao
-   screenshot bhejo
-   ```
-
-`AI_WORKSPACE_ROOT` is the AI bot's starting folder. By default, `AI_ALLOW_OUTSIDE_WORKSPACE=false` keeps AI file/navigation operations inside that workspace. Set `AI_ALLOW_OUTSIDE_WORKSPACE=true` when you want the AI to use full-PC paths such as `D:\` or `C:\Users\...`.
-
-Dangerous actions such as native commands, delete, kill, move, rename, downloads, opening apps, and AI code writes are held for approval. Use `/approve <id>` or `/deny <id>` in Telegram.
-## UI usage
-When the app opens:
-
-* type a command in the input box
-* press Enter or click Run
-* use Up / Down arrows for command history
-* press Tab to complete a command name
-* double-click on a live suggestion to auto-fill
-* click Clear to clear the console output
-
-## Extending the shell
-Core commands still live in `commands/custom_commands.py`, but new features should usually be added as plugins so the shell, UI completion, help output, and AI layer adopt them automatically.
-
-Create a folder under `plugins/<plugin_name>/` with a `plugin.py` file. The file must expose one `plugin` object that inherits from `BasePlugin`.
+If you want to add a new command, create a plugin under `plugins/<plugin_name>/plugin.py` and expose a `plugin` instance.
 
 Example shape:
+
 ```python
 from core.base import BaseCommand, CommandResult
 from core.plugin_base import BasePlugin
@@ -247,6 +189,20 @@ class MyPlugin(BasePlugin):
 
 plugin = MyPlugin()
 ```
+
+This keeps the code organized and allows the shell, help system, and AI integration to recognize the command automatically.
+
+## Notes
+
+RiftShell is meant to be practical and extensible. It is especially useful for developers who want:
+
+- a custom desktop-style shell
+- Windows-friendly system commands
+- safe command wrappers
+- a plugin-based architecture
+- a simple AI assistant layer on top of their shell
+
+The project is intentionally easy to understand and extend, while still being powerful enough for real workflows.
 
 Run `plugins` inside RiftShell to see loaded and failed plugins. The AI Telegram layer reads the same registry catalog, so plugin commands become available to natural-language planning after restart.
 
