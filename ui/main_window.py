@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.shell import Shell
+from core.base import CommandResult
+from ai.agent_run import AgentRun
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
 from ui.themes import build_stylesheet, get_theme, list_themes
@@ -131,18 +133,25 @@ class CommandWorker(QThread):
 
     def run(self):
         self.shell.clear_cancel()
-        if not self.isInterruptionRequested():
-            self.result_ready.emit(self.shell.execute_line(self.command))
+        if self.isInterruptionRequested():
+            self.result_ready.emit(CommandResult(output="Command cancelled before execution.", success=False))
+            return
+        try:
+            result = self.shell.execute_line(self.command)
+        except Exception as exc:
+            result = CommandResult(output=f"Command failed: {exc}", success=False)
+        self.result_ready.emit(result)
 
 
 class OrbitWorker(QThread):
     planned = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, shell: Shell, prompt: str, parent=None):
+    def __init__(self, shell: Shell, prompt: str, parent=None, task=None):
         super().__init__(parent)
         self.shell = shell
         self.prompt = prompt
+        self.task = task
 
     def run(self):
         try:
@@ -150,14 +159,19 @@ class OrbitWorker(QThread):
             from ai.llm import AgentPlanner
 
             config = AIConfig.from_env()
-            planner = AgentPlanner(
+            planner = self.task.planner if self.task and self.task.planner else AgentPlanner(
                 config=config,
                 command_names=self.shell.registry.all_names(),
                 command_catalog=self.shell.registry.catalog_entries(),
                 current_dir_provider=lambda: self.shell.ctx.cwd,
                 last_output_provider=lambda: self.shell.ctx.last_output,
+                cancelled=lambda task=self.task: bool(task and task.stopped),
             )
-            self.planned.emit(planner.plan(self.prompt))
+            if self.task:
+                self.task.planner = planner
+            action = (planner.continue_task(self.prompt, self.task.observations)
+                      if self.task and self.task.observations else planner.plan(self.prompt))
+            self.planned.emit(action)
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -492,6 +506,13 @@ class OrbitPanel(QFrame):
         self.worker: OrbitWorker | None = None
         self.pending_action = None
         self.pending_snapshots = None
+        self.task = None
+        self.task_session = None
+        self.task_cwd = None
+        self.executing = False
+        self.continue_timer = QTimer(self)
+        self.continue_timer.setSingleShot(True)
+        self.continue_timer.timeout.connect(self._continue_task)
         heading = QLabel("ORBIT")
         heading.setObjectName("sectionTitle")
         self.thinking_indicator = QLabel("")
@@ -519,10 +540,13 @@ class OrbitPanel(QFrame):
         self.approve_button.setEnabled(False)
         self.reject_button = QPushButton("Dismiss")
         self.reject_button.setEnabled(False)
+        self.stop_button = QPushButton("Stop task")
+        self.stop_button.setEnabled(False)
         actions = QHBoxLayout()
         actions.addWidget(self.plan_button)
         actions.addWidget(self.approve_button)
         actions.addWidget(self.reject_button)
+        actions.addWidget(self.stop_button)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
         header = QHBoxLayout()
@@ -538,6 +562,7 @@ class OrbitPanel(QFrame):
         self.input.returnPressed.connect(self.create_plan)
         self.approve_button.clicked.connect(self.approve)
         self.reject_button.clicked.connect(self.dismiss)
+        self.stop_button.clicked.connect(self.stop_task)
 
     def _set_thinking(self, thinking: bool):
         if thinking:
@@ -549,8 +574,9 @@ class OrbitPanel(QFrame):
             return
         self.thinking_timer.stop()
         self.thinking_indicator.setText("")
-        self.input.setEnabled(True)
-        self.plan_button.setEnabled(True)
+        available = not self.executing and not self.continue_timer.isActive()
+        self.input.setEnabled(available)
+        self.plan_button.setEnabled(available)
 
     def _advance_thinking_indicator(self):
         frames = ("|", "/", "-", "\\")
@@ -559,7 +585,7 @@ class OrbitPanel(QFrame):
 
     def create_plan(self):
         prompt, session = self.input.text().strip(), self.session_provider()
-        if not prompt or session is None or self.worker and self.worker.isRunning():
+        if not prompt or session is None or self.executing or self.continue_timer.isActive() or self.worker and self.worker.isRunning():
             return
 
         # A confirmation typed into the chat box approves the exact proposal
@@ -582,17 +608,39 @@ class OrbitPanel(QFrame):
 
         self._append("You", prompt)
         self.input.clear()
+        self.dismiss()
+        self.task = AgentRun(prompt)
+        self.task_session = session
+        self.task_cwd = session.shell.ctx.cwd
+        self.stop_button.setEnabled(True)
+        self._start_planning()
+
+    def _start_planning(self):
         self.status.setText("Thinking with conversation and workspace context…")
         self.approve_button.setEnabled(False)
         self.reject_button.setEnabled(False)
         self._set_thinking(True)
-        self.worker = OrbitWorker(session.shell, prompt, self)
+        self.worker = OrbitWorker(self.task_session.shell, self.task.objective, self, task=self.task)
         self.worker.planned.connect(self._show_plan)
         self.worker.failed.connect(self._show_failure)
-        self.worker.finished.connect(lambda: self._set_thinking(False))
+        worker = self.worker
+        worker.finished.connect(lambda: self._planning_finished(worker))
         self.worker.start()
 
+    def _planning_finished(self, worker):
+        if self.worker is worker:
+            self.worker = None
+            self._set_thinking(False)
+        worker.deleteLater()
+
     def _show_plan(self, action):
+        if not self.task or self.task.stopped:
+            return
+        if self.task_session.shell.ctx.cwd != self.task_cwd:
+            self.stop_task()
+            self._append("Orbit", "The task directory changed while I was planning. Start a fresh request in the intended directory.")
+            return
+        action = self.task.accept(action)
         self.pending_action = None
         self.pending_snapshots = None
         self.approve_button.setText("Approve & run")
@@ -614,9 +662,10 @@ class OrbitPanel(QFrame):
             else:
                 self._stream("Orbit", f"{message}\n\nRunning in the active terminal:\n{action.command}")
                 self.status.setText("Executing in the active terminal. Output will appear there shortly.")
+                self.executing = True
                 self.action_requested.emit(action, False, None)
         elif action.action == "code_write":
-            session = self.session_provider()
+            session = self.task_session
             if session is None:
                 self._stream("Orbit", "The active workspace session is no longer available.")
                 self.status.setText("Open a workspace session and try again.")
@@ -631,6 +680,8 @@ class OrbitPanel(QFrame):
                 session.shell.ctx.cwd,
             )
             if not preview.success:
+                self.task.stop()
+                self.stop_button.setEnabled(False)
                 self._stream("Orbit", f"{message}\n\nI could not prepare a safe file preview:\n\n{preview.output}")
                 self.status.setText("The proposed file change was blocked.")
                 return
@@ -646,10 +697,19 @@ class OrbitPanel(QFrame):
             self.approve_button.setEnabled(True)
             self.reject_button.setEnabled(True)
         else:
+            self.task.stop()
+            self.stop_button.setEnabled(False)
+            if action.action != "respond":
+                message = "This action is not available in the desktop task runner. No action was executed."
             self._stream("Orbit", message)
-            self.status.setText("No command will run for this response.")
+            self.status.setText("Ready for your next question or task.")
 
     def _show_failure(self, error: str):
+        if self.task and self.task.stopped:
+            return
+        if self.task:
+            self.task.stop()
+        self.stop_button.setEnabled(False)
         self._append("Orbit", f"Planning failed: {error}")
         self.status.setText("Could not reach the configured AI provider.")
 
@@ -715,6 +775,13 @@ class OrbitPanel(QFrame):
         if self.pending_action:
             action = self.pending_action
             snapshots = self.pending_snapshots
+            if self.task_session.shell.ctx.cwd != self.task_cwd:
+                self.stop_task()
+                self._append("Orbit", "The task directory changed after review. Please request a fresh proposal.")
+                return
+            self.executing = True
+            self.input.setEnabled(False)
+            self.plan_button.setEnabled(False)
             self.action_requested.emit(action, True, snapshots)
             if action.action == "code_write":
                 self._append("Orbit", "Approved. Applying the reviewed file changes with backups.")
@@ -729,6 +796,9 @@ class OrbitPanel(QFrame):
         self.reject_button.setEnabled(False)
 
     def dismiss(self):
+        if self.task:
+            self.task.stop()
+        self.stop_button.setEnabled(False)
         self.pending_action = None
         self.pending_snapshots = None
         self.approve_button.setText("Approve & run")
@@ -736,7 +806,42 @@ class OrbitPanel(QFrame):
         self.reject_button.setEnabled(False)
         self.status.setText("Ask anything, or request a workspace action.")
 
+    def stop_task(self):
+        self.continue_timer.stop()
+        self.dismiss()
+        if self.executing and self.task_session and self.task_session.is_busy:
+            self.task_session.request_cancel()
+        self.status.setText("Stopped. An in-flight request or approved write may finish; no further step will run.")
+        self._set_thinking(bool(self.worker and self.worker.isRunning()))
+
+    def _continue_task(self):
+        if not self.task or self.task.stopped:
+            self._set_thinking(False)
+            return
+        if self.worker and self.worker.isRunning() or self.task_session.is_busy:
+            self.continue_timer.start(50)
+            return
+        if self.task_session.shell.ctx.cwd != self.task_cwd:
+            self.stop_task()
+            self._append("Orbit", "The task directory changed before the next step. Please start a fresh request.")
+            return
+        self._start_planning()
+
+    def _observe_result(self, result):
+        self.executing = False
+        if self.task and self.task.observe(result):
+            self.task_cwd = self.task_session.shell.ctx.cwd
+            self.status.setText(f"Step {self.task.steps}: reviewing the result…")
+            self.continue_timer.start(50)
+            self.input.setEnabled(False)
+            self.plan_button.setEnabled(False)
+            return True
+        self._set_thinking(False)
+        return False
+
     def show_execution_result(self, command: str, result):
+        if self._observe_result(result):
+            return
         if result.success:
             self._stream("Orbit", f"Completed: {command}\nThe command output is now available in the active terminal.")
             self.status.setText("Completed. Review the terminal output for the full result.")
@@ -746,6 +851,9 @@ class OrbitPanel(QFrame):
         self.status.setText("Command failed. Full diagnostics are in the terminal.")
 
     def show_write_result(self, result):
+        self._append("Orbit", result.output)
+        if self._observe_result(result):
+            return
         if result.success:
             self._stream("Orbit", f"The approved file changes were applied successfully.\n\n{result.output}")
             self.status.setText("File changes applied. Backups are available for overwritten files.")
@@ -891,6 +999,11 @@ class MainWindow(QMainWindow):
             self.close_session(session)
 
     def close_session(self, session: TerminalSession):
+        if session is self.orbit.task_session:
+            if self.orbit.executing or self.orbit.worker and self.orbit.worker.isRunning():
+                QMessageBox.warning(self, "Orbit task in progress", "Stop Orbit and wait for the current step before closing this session.")
+                return
+            self.orbit.stop_task()
         if not session.can_close():
             return
         index = self.tabs.indexOf(session)
@@ -1102,16 +1215,22 @@ class MainWindow(QMainWindow):
     def _run_orbit_action(
         self, action, approval_granted: bool = False, expected_snapshots=None
     ):
-        if session := self.current_session():
+        if session := self.orbit.task_session:
             if session.is_busy:
+                self.orbit.executing = False
+                self.orbit.stop_task()
                 self.orbit._append("Orbit", "The active terminal is busy. Wait for the current command to finish, then try again.")
                 self.orbit.status.setText("Waiting for the active terminal to become available.")
                 return
             if action.action == "code_write":
                 if not approval_granted:
+                    self.orbit.executing = False
+                    self.orbit.stop_task()
                     self.orbit._append("Orbit", "File changes require review and approval before they can be applied.")
                     return
                 if self._orbit_write_worker and self._orbit_write_worker.isRunning():
+                    self.orbit.executing = False
+                    self.orbit.stop_task()
                     self.orbit._append("Orbit", "Another file update is already in progress.")
                     return
                 from ai.config import AIConfig
@@ -1130,12 +1249,19 @@ class MainWindow(QMainWindow):
                 self._orbit_write_worker.start()
                 return
             if action.action != "shell":
+                self.orbit.executing = False
+                self.orbit.stop_task()
                 return
             command = action.command
             self._orbit_execution = (session, command)
             session.input.setText(command)
             if not session.run_command(approval_granted=approval_granted):
                 self._orbit_execution = None
+                self.orbit.executing = False
+                self.orbit.stop_task()
+            elif command.lower().strip() in {"clear", "cls"}:
+                self._orbit_execution = None
+                self.orbit.show_execution_result(command, WriteResult("Terminal cleared.", True))
 
     def _clear_orbit_write_worker(self):
         worker = self._orbit_write_worker
@@ -1150,6 +1276,11 @@ class MainWindow(QMainWindow):
         self.orbit.show_execution_result(command, result)
 
     def closeEvent(self, event):
+        if self.orbit.worker and self.orbit.worker.isRunning():
+            QMessageBox.warning(self, "Orbit is thinking", "Stop the task and wait for the current model request to return before closing.")
+            event.ignore()
+            return
+        self.orbit.stop_task()
         if self._orbit_write_worker and self._orbit_write_worker.isRunning():
             QMessageBox.warning(self, "File changes in progress", "Wait for Orbit to finish applying the approved file changes.")
             event.ignore()

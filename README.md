@@ -104,6 +104,19 @@ Inspected file content is treated as untrusted data, not as instructions. When O
 
 ## Desktop experience
 
+Orbit desktop tasks now follow a bounded plan/action/result loop. After a command
+or approved file write, the model receives the actual result and chooses the next
+necessary step or explains the outcome. Natural-language conversation uses the
+configured model; explicit commands and offline shortcuts remain available.
+
+Each task allows up to eight execution steps and blocks identical repeated
+actions. Related-file analysis permits up to three inspection passes. Every new
+risky command and every file change still requires its own approval. Tasks stay
+attached to their original terminal tab. **Stop task** prevents further steps;
+an in-flight provider request or an already approved atomic file write may finish.
+Task state is currently in memory and does not resume after restarting the app.
+This execution loop is desktop-only; the optional Telegram flow is unchanged.
+
 The PySide6 workspace includes:
 
 - multiple terminal sessions
