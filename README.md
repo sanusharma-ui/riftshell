@@ -378,7 +378,7 @@ Current coverage includes AI provider selection, response envelopes, smart appro
 
 ## License
 
-Released under the [MIT License](LICENSE).
+PolyForm Noncommercial License 1.0.0 — free for personal, educational, and noncommercial use. Commercial use requires permission. See LICENSE for full terms.
 
 ## Author
 
