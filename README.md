@@ -9,7 +9,7 @@
 ![Windows](https://img.shields.io/badge/Windows-native-0078D4?style=for-the-badge&logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-powered-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?style=for-the-badge&logo=qt&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-00E5A8?style=for-the-badge)
+![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-00E5A8?style=for-the-badge)
 
 *The terminal learned to think. You still hold the keys.*
 
