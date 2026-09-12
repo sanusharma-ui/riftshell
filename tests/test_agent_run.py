@@ -160,6 +160,17 @@ class OrbitLoopUITests(unittest.TestCase):
         self.session.run_command.assert_called_once_with(approval_granted=False, from_orbit=True)
         other.run_command.assert_not_called()
 
+    def test_orbit_output_is_published_once_to_the_original_terminal(self):
+        outputs = []
+        self.panel.output_ready.connect(lambda session, text: outputs.append((session, text)))
+        other = Mock()
+        self.panel.session_provider = lambda: other
+        self.panel._stream("Orbit", "Requested result")
+        self.panel._stream_next_chunk()
+        self.panel._finish_stream()
+        self.panel._append("You", "follow up")
+        self.assertEqual(outputs, [(self.session, "Requested result")])
+
     def test_result_schedules_continuation_without_unlocking_input(self):
         self.panel._show_plan(AgentAction("shell", command="files"))
         self.panel.show_execution_result("files", SimpleNamespace(success=True, output="main.py"))

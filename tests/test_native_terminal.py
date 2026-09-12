@@ -295,6 +295,69 @@ class TerminalSurfaceTests(unittest.TestCase):
         from PySide6.QtWidgets import QApplication
         cls.app = QApplication.instance() or QApplication(["rift-tests", "-platform", "offscreen"])
 
+    def test_completed_output_survives_splitter_resize_and_native_repaint(self):
+        from core.shell import Shell
+        from ui.main_window import TerminalSession, OrbitPanel, MainWindow
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QSplitter
+        preferences = dict(font_family="Consolas", font_size=11, theme="vscode-dark-plus", confirm_risky=False)
+        with patch("ui.main_window.native_dependency_error", return_value=""), patch("ui.native_session.NativeTerminal", FakeTransport):
+            session = TerminalSession(Shell(), "Test", preferences)
+        splitter = QSplitter(Qt.Horizontal)
+        orbit = OrbitPanel(lambda: session)
+        splitter.addWidget(session)
+        splitter.addWidget(orbit)
+        window = SimpleNamespace(tabs=SimpleNamespace(indexOf=lambda target: 0 if target is session else -1))
+        orbit.output_ready.connect(lambda target, text: MainWindow._show_orbit_output(window, target, text))
+        try:
+            splitter.resize(1200, 700)
+            splitter.show()
+            self.app.processEvents()
+            state = dict(sequence=1, exit_code=0, cwd=str(session.shell.ctx.cwd), filesystem=True)
+            session.native._prompt(state)
+            session.append_output("builtin output " + "long text " * 40)
+            orbit._stream("Orbit", "Here is the requested explanation.")
+            session.input.setText("python --version")
+            self.assertTrue(session.run_command())
+            session.native_console.feed("Python 3.12\r\n")
+            session.native._prompt(dict(state, sequence=2))
+            before = session.console.toPlainText()
+            self.assertIn("builtin output", before)
+            self.assertEqual(before.count("Here is the requested explanation."), 1)
+            self.assertIn("Python 3.12", before)
+            for sizes in ([950, 250], [450, 750], [900, 300]):
+                splitter.setSizes(sizes)
+                self.app.processEvents()
+                session.native_console._resize_screen()
+                session.native_console.feed("\x1b[2J\x1b[HPS D:\\riftshell>")
+                self.assertEqual(session.console.toPlainText(), before)
+                self.assertIs(session.console_stack.currentWidget(), session.console)
+            session.copy_output()
+            self.assertEqual(self.app.clipboard().text(), before)
+            session.clear_console()
+            self.assertNotIn("builtin output", session.console.toPlainText())
+        finally:
+            orbit.stream_timer.stop()
+            session.shutdown()
+            splitter.close()
+            splitter.deleteLater()
+
+    def test_native_capture_keeps_more_than_ai_excerpt_and_resets_between_commands(self):
+        from ui.terminal_widget import TerminalWidget
+        terminal = TerminalWidget()
+        try:
+            terminal.start_capture()
+            terminal.feed("first output\r\n" + "a complete line of output\r\n" * 1000 + "last output")
+            captured = terminal.finish_capture()
+            self.assertGreater(len(captured), 16000)
+            self.assertIn("first output", captured)
+            self.assertIn("last output", captured)
+            terminal.start_capture()
+            terminal.feed("\r\nsecond command")
+            self.assertNotIn("first output", terminal.finish_capture())
+        finally:
+            terminal.deleteLater()
+
     def test_cursor_only_blinks_during_focused_interactive_input(self):
         from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit
         from ui.terminal_widget import TerminalWidget
@@ -413,8 +476,8 @@ class TerminalSurfaceTests(unittest.TestCase):
             self.assertFalse(session.worker.isRunning())
             while session.native_console.output_pending:
                 session.native_console._drain_messages()
-            self.assertIn("plugin result", session.native_console.toPlainText())
-            self.assertIs(session.console_stack.currentWidget(), session.native_console)
+            self.assertIn("plugin result", session.console.toPlainText())
+            self.assertIs(session.console_stack.currentWidget(), session.console)
             session.input.setText("Get-ChildItem | Select-Object -First 2")
             self.assertTrue(session.run_command())
             self.assertEqual(session.native.transport.writes[-1], "Get-ChildItem | Select-Object -First 2\r")

@@ -345,6 +345,7 @@ class TerminalSession(QWidget):
         self.console = QTextEdit()
         self.console.setReadOnly(True)
         self.console.setObjectName("terminalOutput")
+        self.console.setLineWrapMode(QTextEdit.WidgetWidth)
         self.console.document().setMaximumBlockCount(5000)
         self.console_stack = QStackedWidget()
         self.console_stack.addWidget(self.console)
@@ -434,13 +435,23 @@ class TerminalSession(QWidget):
             self.state_label.setText("EXITED")
         elif not self.native.ready:
             self.state_label.setText("STARTING")
+        if self.native.ready and not self.native.busy:
+            self.console_stack.setCurrentWidget(self.console)
 
     def _native_failed(self, message):
         self.append_error(message)
         self.state_label.setText("ERROR")
+        if not self._active_native:
+            self.console_stack.setCurrentWidget(self.console)
 
     def _native_completed(self, command, result):
         self._active_native = False
+        output = self.native_console.finish_capture()
+        if output:
+            (self.append_output if result.success else self.append_error)(output)
+        elif result.output:
+            (self.append_output if result.success else self.append_error)(result.output)
+        self.console_stack.setCurrentWidget(self.console)
         self._on_finished(result, display_output=False)
         self._native_changed()
 
@@ -471,14 +482,14 @@ class TerminalSession(QWidget):
         return get_theme(self.preferences["theme"])
 
     def append_html(self, text: str, color: str, label: str = ""):
-        if self.native:
-            self.native_console.append_message(f"{label} {text}" if label else text, color)
-            return
+        # Completed output belongs to the document, outside the PTY repaint buffer.
+        bar = self.console.verticalScrollBar()
+        at_bottom = bar.value() == bar.maximum()
+        position = bar.value()
         safe = escape(text).replace("\n", "<br>")
         prefix = f'<span style="color:{self._theme().accent}; font-weight:700;">{escape(label)}</span> ' if label else ""
-        self.console.moveCursor(QTextCursor.End)
         self.console.append(f'<div style="color:{color}; line-height:140%; white-space:pre-wrap; font-family:\'Cascadia Code\', \'JetBrains Mono\', Consolas, monospace;">{prefix}{safe}</div>')
-        self.console.moveCursor(QTextCursor.End)
+        bar.setValue(bar.maximum() if at_bottom else position)
 
     def append_system(self, text: str):
         self.append_html(text, self._theme().muted, "•")
@@ -490,15 +501,18 @@ class TerminalSession(QWidget):
         self.append_html(text, self._theme().error, "!")
 
     def clear_console(self):
-        if self.native and self.console_stack.currentWidget() is self.native_console:
+        self.console.clear()
+        if self.native:
             self.native_console.clear()
             self.native.transport.write("\x0c")
-            return
-        self.console.clear()
         self.append_system("Console cleared.")
 
     def copy_output(self):
         widget = self.console_stack.currentWidget()
+        if isinstance(widget, QTextEdit) and widget.textCursor().hasSelection():
+            widget.copy()
+            self.state_label.setText("COPIED")
+            return
         if hasattr(widget, "copy_selection") and widget.copy_selection():
             self.state_label.setText("COPIED")
             return
@@ -538,9 +552,15 @@ class TerminalSession(QWidget):
                 self.append_system("Command cancelled before execution.")
                 return False
         if use_native:
+            self.console_stack.setCurrentWidget(self.native_console)
+            self.native_console._resize_screen()
+            self.native_console.start_capture()
             if not self.native.submit(command):
+                self.native_console.finish_capture()
+                self.console_stack.setCurrentWidget(self.console)
                 self.append_error("PowerShell is unavailable. Open a new tab to restart it.")
                 return False
+            self.append_html(f"{self.shell.prompt()}{command}", self._theme().accent_alt, "$")
             self.active_command = command
             self._active_native = True
             self.shell.ctx.history.append(command)
@@ -617,6 +637,7 @@ class TerminalSession(QWidget):
 
 class OrbitPanel(QFrame):
     action_requested = Signal(object, bool, object)
+    output_ready = Signal(object, str)
 
     def __init__(self, session_provider, parent=None):
         super().__init__(parent)
@@ -838,6 +859,13 @@ class OrbitPanel(QFrame):
         self._finish_stream()
         self.messages.append((label, text))
         self._render_conversation()
+        self._publish_output(label, text)
+
+    def _publish_output(self, label: str, text: str):
+        if label == "Orbit" and text:
+            session = self.task_session or self.session_provider()
+            if session is not None:
+                self.output_ready.emit(session, text)
 
     @staticmethod
     def _escape_user_markdown(text: str) -> str:
@@ -870,6 +898,7 @@ class OrbitPanel(QFrame):
     def _stream(self, label: str, text: str, on_done=None):
         """Reveal a response while continuously rendering its Markdown structure."""
         self._finish_stream()
+        self._publish_output(label, text)
         self.stream_text = text
         self.stream_index = 0
         self.stream_done = on_done
@@ -1031,6 +1060,7 @@ class MainWindow(QMainWindow):
         self.orbit = OrbitPanel(self.current_session)
         self.orbit.setMinimumWidth(320)
         self.orbit.action_requested.connect(self._run_orbit_action)
+        self.orbit.output_ready.connect(self._show_orbit_output)
         root.addWidget(self.orbit)
         root.setSizes([260, 880, 300])
         self.root_splitter = root
@@ -1342,6 +1372,10 @@ class MainWindow(QMainWindow):
 
     def toggle_orbit(self):
         self.orbit.setVisible(not self.orbit.isVisible())
+
+    def _show_orbit_output(self, session, text):
+        if self.tabs.indexOf(session) >= 0:
+            session.append_html(text, session._theme().text, "Orbit")
 
     def _run_orbit_action(
         self, action, approval_granted: bool = False, expected_snapshots=None

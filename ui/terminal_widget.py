@@ -52,6 +52,8 @@ class TerminalWidget(QAbstractScrollArea):
 
         self.screen = Screen()
         self.stream = pyte.Stream(self.screen)
+        self._capture_screen = None
+        self._capture_stream = None
         self._input_enabled = False
         self._cursor_on = True
         self._cursor_timer = QTimer(self)
@@ -117,12 +119,29 @@ class TerminalWidget(QAbstractScrollArea):
         bar = self.verticalScrollBar()
         at_bottom = bar.value() == bar.maximum()
         self.stream.feed(text)
+        if self._capture_stream is not None:
+            self._capture_stream.feed(text)
         self.screen.dirty.clear()
         bar.setRange(0, len(self.screen.history.top))
         bar.setPageStep(self.screen.lines)
         if at_bottom:
             bar.setValue(bar.maximum())
         self.viewport().update()
+
+    def start_capture(self):
+        """Keep completed command text independently of subsequent PTY redraws."""
+        import pyte
+        self._capture_screen = pyte.HistoryScreen(self.screen.columns, self.screen.lines, history=5000)
+        self._capture_screen.cursor_position(self.screen.cursor.y + 1, self.screen.cursor.x + 1)
+        self._capture_stream = pyte.Stream(self._capture_screen)
+
+    def finish_capture(self):
+        screen = self._capture_screen
+        self._capture_screen = self._capture_stream = None
+        if screen is None:
+            return ""
+        lines = list(screen.history.top) + [screen.buffer[y] for y in range(screen.lines)]
+        return "\n".join("".join(line[x].data for x in range(screen.columns)).rstrip() for line in lines).strip("\n")
 
     def append_message(self, text: str, color: str | None = None):
         # Application messages are text, never terminal instructions.
