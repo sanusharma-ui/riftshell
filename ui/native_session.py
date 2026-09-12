@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import queue
+from time import perf_counter
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -34,6 +35,7 @@ class NativeSession(QObject):
         self._syncing = False
         self._queued_command = ""
         self._sync_target = None
+        self._pending_output = ""
         terminal.input_enabled = True  # Profiles may ask for interactive input.
         terminal.input_ready.connect(self._write_input)
         terminal.size_changed.connect(self.transport.resize)
@@ -139,12 +141,24 @@ class NativeSession(QObject):
             self.changed.emit()
 
     def _drain(self):
+        deadline = perf_counter() + 0.006
+        remaining = 8192
         for _ in range(32):
-            try:
-                kind, payload = self.transport.events.get_nowait()
-            except queue.Empty:
+            if getattr(self.terminal, "output_pending", False):
+                break  # Keep application messages ahead of subsequent PTY output.
+            if remaining <= 0 or perf_counter() >= deadline:
                 break
+            if self._pending_output:
+                kind, payload = "output", self._pending_output
+                self._pending_output = ""
+            else:
+                try:
+                    kind, payload = self.transport.events.get_nowait()
+                except queue.Empty:
+                    break
             if kind == "output":
+                payload, self._pending_output = payload[:2048], payload[2048:]
+                remaining -= len(payload)
                 self.terminal.feed(payload)
                 if self.command:
                     self._output = (self._output + payload)[-65536:]

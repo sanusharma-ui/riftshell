@@ -2,12 +2,13 @@
 import base64
 import json
 import queue
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.native_terminal import PromptDecoder, output_excerpt, powershell_startup
+from core.native_terminal import NativeTerminal, PromptDecoder, output_excerpt, powershell_startup
 from ai.safety import SafetyPolicy
 
 
@@ -74,6 +75,56 @@ class PowerShellSafetyTests(unittest.TestCase):
         ):
             with self.subTest(raw=raw):
                 self.assertTrue(policy.check_powershell_command(raw).requires_approval)
+
+
+class NativeTransportTests(unittest.TestCase):
+    def test_blocked_output_read_does_not_block_input_or_close(self):
+        reading = threading.Event()
+        release = threading.Event()
+        written = threading.Event()
+
+        class Pty:
+            alive = True
+            pid = 123
+
+            def spawn(self, *args, **kwargs):
+                pass
+
+            def read(self, *args, **kwargs):
+                reading.set()
+                release.wait(3)
+                if not self.alive:
+                    raise EOFError
+                return ""
+
+            def write(self, text):
+                if text == "\x03":
+                    written.set()
+
+            def isalive(self):
+                return self.alive
+
+        process = Pty()
+
+        def terminate(*args, **kwargs):
+            process.alive = False
+            release.set()
+
+        with patch.dict("sys.modules", {"winpty": SimpleNamespace(PTY=lambda *args, **kwargs: process)}), \
+                patch("core.native_terminal.shutil.which", return_value="powershell.exe"), \
+                patch("core.native_terminal.subprocess.CREATE_NO_WINDOW", 0, create=True), \
+                patch("core.native_terminal.subprocess.run", side_effect=terminate):
+            terminal = NativeTerminal(Path.cwd())
+            terminal.start()
+            try:
+                self.assertTrue(reading.wait(2))
+                terminal.write("\x03")
+                self.assertTrue(written.wait(1), "Ctrl+C waited for an idle output read")
+            finally:
+                terminal.close()
+                terminal._thread.join(3)
+                release.set()
+            self.assertTrue(terminal.stopped)
 
 
 class MockSignal:
@@ -185,6 +236,33 @@ class NativeSessionTests(unittest.TestCase):
         self.assertFalse(self.session.context_available)
         self.assertEqual(self.shell.ctx.cwd, Path("C:/Work"))
 
+    def test_large_output_yields_without_losing_output_or_completing_early(self):
+        chunks = []
+        self.terminal.feed = chunks.append
+        self.session.submit("large-output")
+        self.session.transport.events.put(("output", "x" * 40000))
+        self.session.transport.events.put(("prompt", dict(sequence=2, exit_code=0, cwd="C:/Work", filesystem=True)))
+        self.session._drain()
+        self.assertLessEqual(sum(map(len, chunks)), 8192)
+        self.assertTrue(self.session.busy)
+        for _ in range(100):
+            self.session._drain()
+            if self.results:
+                break
+        self.assertEqual("".join(chunks), "x" * 40000)
+        self.assertTrue(self.results[0][1].success)
+
+    def test_pending_application_output_precedes_native_output(self):
+        chunks = []
+        self.terminal.feed = chunks.append
+        self.terminal.output_pending = True
+        self.session.transport.events.put(("output", "native"))
+        self.session._drain()
+        self.assertEqual(chunks, [])
+        self.terminal.output_pending = False
+        self.session._drain()
+        self.assertEqual(chunks, ["native"])
+
 
 class OrbitNativeRoutingTests(unittest.TestCase):
     def test_native_pipeline_is_validated_only_for_native_desktop_context(self):
@@ -225,7 +303,7 @@ class TerminalSurfaceTests(unittest.TestCase):
             session = TerminalSession(Shell(), "Test", preferences)
         try:
             self.assertIsNone(session.native)
-            self.assertEqual(session.mode.currentData(), "legacy")
+            self.assertFalse(hasattr(session, "mode"))
             self.assertIs(session.input.completer(), session.legacy_completer)
             self.assertIn("Install requirements.txt", session.console.toPlainText())
         finally:
@@ -239,6 +317,93 @@ class TerminalSurfaceTests(unittest.TestCase):
             self.assertTrue(terminal.toPlainText().startswith("download 90%"))
             self.assertNotIn("10%", terminal.toPlainText())
         finally:
+            terminal.deleteLater()
+
+    def test_unified_routing_preserves_builtins_plugins_and_powershell_syntax(self):
+        from core.shell import Shell
+        from core.base import CommandResult
+        from ui.main_window import TerminalSession
+        from PySide6.QtCore import QEventLoop, QTimer
+        preferences = dict(font_family="Consolas", font_size=11, theme="vscode-dark-plus", confirm_risky=False)
+        with patch("ui.main_window.native_dependency_error", return_value=""), patch("ui.native_session.NativeTerminal", FakeTransport):
+            session = TerminalSession(Shell(), "Test", preferences)
+        try:
+            session.native_console.screen.resize(lines=24, columns=100)
+            session.native._prompt(dict(sequence=1, exit_code=0, cwd=str(session.shell.ctx.cwd), filesystem=True))
+            self.assertFalse(hasattr(session, "mode"))
+            for command in ("files", "read README.md", "files | filter .py", "where; now", "theme", "cd .."):
+                self.assertFalse(session._uses_native(command), command)
+            for command in ("python --version", "npm --version", "Get-ChildItem | Select-Object -First 2", "$x = 42", "& 'python' --version", "run git status"):
+                self.assertTrue(session._uses_native(command), command)
+            session.shell.ctx.aliases["listing"] = "files"
+            self.assertFalse(session._uses_native("listing"))
+            session.shell.registry.register(SimpleNamespace(name="customplugin", aliases=[], execute=lambda ctx, args: CommandResult("plugin result")))
+            self.assertFalse(session._uses_native("customplugin"))
+            self.assertFalse(session._uses_native("files", from_orbit=True))
+            self.assertTrue(session._uses_native("run git status", from_orbit=True))
+            session.input.setText("customplugin")
+            self.assertTrue(session.run_command())
+            loop = QEventLoop()
+            session.worker.finished.connect(loop.quit)
+            QTimer.singleShot(3000, loop.quit)
+            loop.exec()
+            self.assertFalse(session.worker.isRunning())
+            while session.native_console.output_pending:
+                session.native_console._drain_messages()
+            self.assertIn("plugin result", session.native_console.toPlainText())
+            self.assertIs(session.console_stack.currentWidget(), session.native_console)
+            session.input.setText("Get-ChildItem | Select-Object -First 2")
+            self.assertTrue(session.run_command())
+            self.assertEqual(session.native.transport.writes[-1], "Get-ChildItem | Select-Object -First 2\r")
+            self.assertIs(session.console_stack.currentWidget(), session.native_console)
+        finally:
+            session.shutdown()
+            session.deleteLater()
+
+    def test_large_builtin_output_is_incremental_and_clear_discards_pending_text(self):
+        from ui.terminal_widget import TerminalWidget
+        terminal = TerminalWidget()
+        try:
+            terminal.append_message("line\n" * 20000)
+            self.assertTrue(terminal.output_pending)
+            terminal._drain_messages()
+            self.assertTrue(terminal.output_pending)
+            self.assertIn("line", terminal.toPlainText())
+            terminal.clear()
+            self.assertFalse(terminal.output_pending)
+            self.assertEqual(terminal.toPlainText(), "")
+        finally:
+            terminal.deleteLater()
+
+    def test_event_loop_stays_responsive_while_output_is_rendering(self):
+        from PySide6.QtCore import QEventLoop, QTimer
+        from ui.terminal_widget import TerminalWidget
+        terminal = TerminalWidget()
+        terminal.resize(900, 500)
+        terminal._resize_screen()
+        loop = QEventLoop()
+        ticks = []
+        heartbeat = QTimer()
+        heartbeat.setInterval(1)
+
+        def tick():
+            ticks.append(terminal.output_pending)
+            if not terminal.output_pending:
+                loop.quit()
+
+        heartbeat.timeout.connect(tick)
+        try:
+            terminal.append_message("output line\n" * 3000, "#ff0000")
+            heartbeat.start()
+            QTimer.singleShot(5000, loop.quit)
+            loop.exec()
+            self.assertFalse(terminal.output_pending)
+            self.assertGreater(sum(ticks), 2)
+            # Exercise actual painting, including grouped colors and text styles.
+            terminal.feed("\x1b[1;4;32mstyled\x1b[0m Unicode: \u4e2d\r\n")
+            self.assertFalse(terminal.grab().isNull())
+        finally:
+            heartbeat.stop()
             terminal.deleteLater()
 
     def test_alternate_screen_restores_main_screen_and_scrollback(self):

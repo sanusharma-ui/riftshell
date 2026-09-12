@@ -339,11 +339,6 @@ class TerminalSession(QWidget):
         header_layout.setContentsMargins(12, 8, 12, 8)
         header_layout.addWidget(self.name_label)
         header_layout.addWidget(self.path_label, 1)
-        self.mode = QComboBox()
-        self.mode.addItem("PowerShell", "native")
-        self.mode.addItem("RiftShell commands", "legacy")
-        self.mode.setToolTip("PowerShell runs system commands. RiftShell commands preserves the built-in command set and plugins.")
-        header_layout.addWidget(self.mode)
         header_layout.addWidget(self.state_label)
         self.console = QTextEdit()
         self.console.setReadOnly(True)
@@ -398,27 +393,31 @@ class TerminalSession(QWidget):
             self.native.changed.connect(self._native_changed)
             self.native.completed.connect(self._native_completed)
             self.native.failed.connect(self._native_failed)
+            self.console_stack.setCurrentWidget(self.native_console)
+            self.append_system("RiftShell ready. Built-ins and PowerShell commands share this terminal.")
         else:
-            self.mode.setCurrentIndex(1)
-            self.mode.model().item(0).setEnabled(False)
             self.append_error(dependency_error)
-        self.mode.currentIndexChanged.connect(self._mode_changed)
-        self._mode_changed()
+        self.input.setPlaceholderText("RiftShell / PowerShell command (help, files, Get-ChildItem, git...)")
+        self._set_running(self.is_busy)
         self.apply_preferences(preferences)
 
     @property
     def is_busy(self) -> bool:
         return bool(self.worker is not None and self.worker.isRunning() or self.native and self.native.busy)
 
-    def _mode_changed(self, *_):
-        native_mode = self.native and self.mode.currentData() == "native"
-        self.console_stack.setCurrentWidget(self.native_console if native_mode else self.console)
-        self.input.setPlaceholderText("PowerShell command (npm, pip, git...)" if native_mode else "RiftShell command (help, files, read...)")
-        self.input.setCompleter(None if native_mode else self.legacy_completer)
-        self.input.set_completion_items([] if native_mode else self.shell.registry.all_names())
-        self._set_running(self.is_busy)
-        if native_mode and self.is_busy:
-            self.native_console.setFocus()
+    def _uses_native(self, command, from_orbit=False):
+        if not self.native:
+            return False
+        name = command.split(maxsplit=1)[0].lower()
+        if name in {"run", "exec", "native"}:
+            return True
+        if from_orbit:
+            return False  # Orbit's catalog actions retain their reviewed semantics.
+        parts = self.shell.parser.parse_line(command)
+        return not parts or any(
+            self.shell.registry.get(self.shell._prepare_command(parsed).name) is None
+            for part in parts for parsed in part.pipeline.commands
+        )
 
     def _native_changed(self):
         if self.native.context_available:
@@ -433,7 +432,6 @@ class TerminalSession(QWidget):
 
     def _native_failed(self, message):
         self.append_error(message)
-        self.console_stack.setCurrentWidget(self.console)
         self.state_label.setText("SHELL ERROR")
 
     def _native_completed(self, command, result):
@@ -467,6 +465,9 @@ class TerminalSession(QWidget):
         return get_theme(self.preferences["theme"])
 
     def append_html(self, text: str, color: str, label: str = ""):
+        if self.native:
+            self.native_console.append_message(f"{label} {text}" if label else text, color)
+            return
         safe = escape(text).replace("\n", "<br>")
         prefix = f'<span style="color:{self._theme().muted};">{escape(label)}</span> ' if label else ""
         self.console.moveCursor(QTextCursor.End)
@@ -484,6 +485,7 @@ class TerminalSession(QWidget):
 
     def clear_console(self):
         if self.native and self.console_stack.currentWidget() is self.native_console:
+            self.native_console.clear()
             self.native.transport.write("\x0c")
             return
         self.console.clear()
@@ -503,8 +505,7 @@ class TerminalSession(QWidget):
         command = self.input.text().strip()
         if not command or self.is_busy:
             return False
-        wrapper = command.split(maxsplit=1)[0].lower() in {"run", "exec", "native"}
-        use_native = bool(self.native and (wrapper if from_orbit else self.mode.currentData() == "native"))
+        use_native = self._uses_native(command, from_orbit)
         if command.lower() in {"clear", "cls"} and not use_native:
             self.clear_console()
             self.input.clear()
@@ -528,8 +529,7 @@ class TerminalSession(QWidget):
                 return False
         if use_native:
             if not self.native.submit(command):
-                self.append_error("PowerShell is unavailable. Open a new tab or select RiftShell commands.")
-                self.console_stack.setCurrentWidget(self.console)
+                self.append_error("PowerShell is unavailable. Open a new tab to restart it.")
                 return False
             self.active_command = command
             self._active_native = True
@@ -539,7 +539,6 @@ class TerminalSession(QWidget):
             self.native_console.setFocus()
             self._set_running(True)
             return True
-        self.console_stack.setCurrentWidget(self.console)
         self.append_html(f"{self.shell.prompt()}{command}", self._theme().accent_alt, "$")
         self.active_command = command
         self._set_running(True)
@@ -585,7 +584,6 @@ class TerminalSession(QWidget):
         self.run_button.setEnabled(not running)
         self.clear_button.setEnabled(not running)
         self.cancel_button.setEnabled(running)
-        self.mode.setEnabled(not running)
         self.state_label.setText("RUNNING" if running else "READY")
         self.session_changed.emit()
 
@@ -1181,7 +1179,6 @@ class MainWindow(QMainWindow):
         if session:
             if session.is_busy:
                 return
-            session.mode.setCurrentIndex(1)
             session.input.setText(command + " ")
             session.input.setFocus()
 

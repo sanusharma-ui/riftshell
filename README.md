@@ -352,8 +352,8 @@ Restart RiftShell after adding or changing a plugin. Run `plugins` to inspect lo
 
 ## Development and verification
 
-The Windows desktop now includes persistent PowerShell terminals for native
-commands and a separate mode for the existing RiftShell command set. See the
+The Windows desktop runs existing RiftShell commands and persistent PowerShell
+commands in one terminal, with automatic routing and shared output. See the
 [native terminal guide](docs/native-terminal.md) for dependency setup, Orbit
 integration, manual acceptance checks, and current compatibility limits.
 

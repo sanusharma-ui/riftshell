@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import copy
 import re
+from collections import deque
+from itertools import groupby
+from time import perf_counter
 
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QKeySequence
@@ -54,6 +57,9 @@ class TerminalWidget(QAbstractScrollArea):
         self.background = QColor("#1e1e1e")
         self._selection_start = None
         self._selection_end = None
+        self._messages = deque()
+        self._message_timer = QTimer(self)
+        self._message_timer.timeout.connect(self._drain_messages)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.verticalScrollBar().valueChanged.connect(lambda _: self.viewport().update())
@@ -77,11 +83,33 @@ class TerminalWidget(QAbstractScrollArea):
             bar.setValue(bar.maximum())
         self.viewport().update()
 
-    def append_message(self, text: str):
+    def append_message(self, text: str, color: str | None = None):
         # Application messages are text, never terminal instructions.
-        self.feed("\r\n" + re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text).replace("\n", "\r\n") + "\r\n")
+        text = "\r\n" + re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text).replace("\n", "\r\n") + "\r\n"
+        if color:
+            tint = QColor(color)
+            if tint.isValid():
+                text = f"\x1b[0;38;2;{tint.red()};{tint.green()};{tint.blue()}m" + text + "\x1b[0m"
+        self._messages.extend(text[i:i + 2048] for i in range(0, len(text), 2048))
+        if not self._message_timer.isActive():
+            self._message_timer.start(16)
+
+    @property
+    def output_pending(self):
+        return bool(self._messages)
+
+    def _drain_messages(self):
+        deadline = perf_counter() + 0.006
+        for _ in range(4):
+            if not self._messages or perf_counter() >= deadline:
+                break
+            self.feed(self._messages.popleft())
+        if not self._messages:
+            self._message_timer.stop()
 
     def clear(self):
+        self._messages.clear()
+        self._message_timer.stop()
         self.screen.reset()
         self._selection_start = self._selection_end = None
         self.verticalScrollBar().setRange(0, 0)
@@ -130,28 +158,50 @@ class TerminalWidget(QAbstractScrollArea):
         lines = self._all_lines()
         offset = self.verticalScrollBar().value()
         selected = sorted((self._selection_start, self._selection_end)) if self._selection_start is not None and self._selection_end is not None else None
+        colors = {}
+        fonts = {}
+        def color(value, background=False):
+            key = (value, background)
+            if key not in colors:
+                colors[key] = self._color(value, self.background if background else self.foreground)
+            return colors[key]
+
         for y, line in enumerate(lines[offset:offset + self.screen.lines]):
-            for x in range(self.screen.columns):
-                cell = line[x]
-                fg, bg = self._color(cell.fg, self.foreground), self._color(cell.bg, self.background)
-                if cell.reverse:
-                    fg, bg = bg, fg
-                if selected and selected[0] <= (y + offset, x) <= selected[1]:
-                    bg = QColor("#365780")
-                painter.fillRect(x * width, y * height, width, height, bg)
+            cells = [line[x] for x in range(self.screen.columns)]
+            def background_key(x):
+                cell = cells[x]
+                highlighted = bool(selected and selected[0] <= (y + offset, x) <= selected[1])
+                return (cell.fg if cell.reverse else cell.bg, not cell.reverse, highlighted)
+
+            for key, indices in groupby(range(len(cells)), background_key):
+                run = list(indices)
+                bg = QColor("#365780") if key[2] else color(key[0], key[1])
+                if bg != self.background:
+                    painter.fillRect(run[0] * width, y * height, len(run) * width, height, bg)
             # Paint glyphs after backgrounds so a wide Unicode glyph is not
             # erased by the background of its following continuation cell.
-            for x in range(self.screen.columns):
-                cell = line[x]
-                fg = self._color(cell.bg, self.background) if cell.reverse else self._color(cell.fg, self.foreground)
-                font = QFont(self.font())
-                font.setBold(cell.bold)
-                font.setItalic(cell.italics)
-                font.setUnderline(cell.underscore)
-                font.setStrikeOut(cell.strikethrough)
-                painter.setFont(font)
-                painter.setPen(fg)
-                painter.drawText(x * width, y * height + ascent, cell.data)
+            def foreground_key(x):
+                cell = cells[x]
+                # Non-ASCII glyphs keep their explicit terminal-cell positions.
+                return (cell.bg if cell.reverse else cell.fg, cell.reverse,
+                        cell.bold, cell.italics, cell.underscore, cell.strikethrough,
+                        x if len(cell.data) != 1 or not cell.data.isascii() else None)
+
+            for key, indices in groupby(range(len(cells)), foreground_key):
+                run = list(indices)
+                style = key[2:6]
+                if style not in fonts:
+                    font = QFont(self.font())
+                    font.setBold(style[0])
+                    font.setItalic(style[1])
+                    font.setUnderline(style[2])
+                    font.setStrikeOut(style[3])
+                    fonts[style] = font
+                painter.setFont(fonts[style])
+                painter.setPen(color(key[0], key[1]))
+                text = "".join(cells[x].data for x in run)
+                if text.strip() or style[2] or style[3]:
+                    painter.drawText(run[0] * width, y * height + ascent, text)
         cursor = self.screen.cursor
         if not cursor.hidden and offset == self.verticalScrollBar().maximum():
             painter.setPen(self.foreground)

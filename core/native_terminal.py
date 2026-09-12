@@ -152,6 +152,7 @@ class NativeTerminal:
         self._process = None
         self._closing = threading.Event()
         self._requests: queue.Queue = queue.Queue()
+        self._reader = None
         self._thread = threading.Thread(target=self._run, daemon=True, name="rift-pty")
 
     def start(self):
@@ -179,7 +180,27 @@ class NativeTerminal:
 
     @property
     def stopped(self) -> bool:
-        return not self._thread.is_alive()
+        return not self._thread.is_alive() and not (self._reader and self._reader.is_alive())
+
+    def _read_output(self, process, finished):
+        decoder = PromptDecoder(self.token)
+        try:
+            while not self._closing.is_set():
+                chunk = process.read(8192, blocking=False)
+                if chunk:
+                    for event in decoder.feed(chunk):
+                        self._emit(*event)
+                elif not process.isalive():
+                    break
+                else:
+                    self._closing.wait(0.016)
+        except EOFError:
+            pass
+        except Exception as exc:
+            if not self._closing.is_set():
+                self._emit("error", f"Native terminal read failed: {exc}")
+        finally:
+            finished.set()
 
     def _run(self):
         process = None
@@ -197,10 +218,15 @@ class NativeTerminal:
                 cmdline=" " + subprocess.list2cmdline(["-NoLogo", "-NoExit", "-EncodedCommand", powershell_startup(self.token)]),
             )
             self._process = process
-            decoder = PromptDecoder(self.token)
-            while not self._closing.is_set():
-                # A single transport owner avoids read/close races and avoids
-                # PtyProcess's extra loopback-socket reader thread entirely.
+            read_finished = threading.Event()
+            self._reader = threading.Thread(
+                target=self._read_output, args=(process, read_finished),
+                daemon=True, name="rift-pty-reader",
+            )
+            self._reader.start()
+            while not self._closing.is_set() and not read_finished.is_set():
+                # Reads in pywinpty 2.x can wait even with blocking=False.
+                # Keep input, Ctrl+C and shutdown independent of output reads.
                 for _ in range(64):
                     try:
                         kind, payload = self._requests.get_nowait()
@@ -210,17 +236,9 @@ class NativeTerminal:
                         process.write(payload)
                     elif kind == "resize":
                         process.set_size(payload[1], payload[0])
-                try:
-                    chunk = process.read(8192, blocking=False)
-                except EOFError:
+                if not process.isalive():
                     break
-                if chunk:
-                    for event in decoder.feed(chunk):
-                        self._emit(*event)
-                elif not process.isalive() or process.iseof():
-                    break
-                else:
-                    self._closing.wait(0.016)
+                self._closing.wait(0.016)
         except Exception as exc:
             self._emit("error", f"Native terminal failed: {exc}")
         finally:
@@ -236,6 +254,8 @@ class NativeTerminal:
                         )
                 except Exception:
                     self._emit("error", "Could not terminate the terminal process tree. Check running processes before restarting the task.")
+            if self._reader:
+                self._reader.join(timeout=2)
             self._emit("exit", None)
             self._process = None
             # Dropping the last PTY reference closes the ConPTY handles.

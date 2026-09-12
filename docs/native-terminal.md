@@ -1,10 +1,21 @@
 # Native desktop terminal
 
-Desktop tabs now offer **PowerShell** and **RiftShell commands**. PowerShell is
-the default when the native dependencies are installed. Existing built-ins and
-plugins remain in RiftShell commands; selecting a command in the command palette
-selects that mode automatically. The command-line and Telegram execution engines
-retain their previous behavior.
+Desktop tabs provide one **RiftShell** terminal. Existing built-ins and plugins
+run through the RiftShell engine; other commands run through a persistent
+PowerShell session. Both share the same output view, command field and history.
+The command palette inserts commands into that field without switching modes.
+The command-line and Telegram execution engines retain their previous behavior.
+
+Existing names and aliases keep their RiftShell meanings, including `files`,
+`read`, `cd`, `where`, and built-in pipelines such as `files | filter .py`.
+PowerShell cmdlets, expressions and programs can be entered directly, for example
+`Get-ChildItem | Select-Object -First 2`, `$value = 42`, or `python --version`.
+For overlapping names, use the full PowerShell cmdlet name (`Write-Output` instead
+of RiftShell's `echo`) or the existing `run` prefix to request PowerShell explicitly.
+A pipeline or command chain containing an unknown RiftShell command is sent whole
+to PowerShell, preserving its syntax; mixing RiftShell-only commands into that
+PowerShell pipeline is not supported. Missing native dependencies leave existing
+built-ins available and show a setup diagnostic.
 
 Each desktop tab owns a persistent PowerShell process hosted through Windows
 ConPTY. PowerShell 7 (`pwsh.exe`) is preferred when installed; otherwise the tab
@@ -15,7 +26,7 @@ execution-policy changes are made. `npm`/`npx` use their installed `.cmd` launch
 when available, avoiding the corresponding `.ps1` launcher policy problem.
 
 Type system commands directly in the bottom command field. `run` is optional in
-PowerShell mode. Output streams into the terminal, including ANSI colors and
+the unified terminal. Output streams into the terminal, including ANSI colors and
 progress redraws. While a program is running, click the terminal to enter input,
 answer prompts, or use arrows, Tab and Ctrl+C. Command entry at the outer prompt
 uses the bottom field and its local Up/Down history; native PSReadLine completion
@@ -31,8 +42,8 @@ service manager or another elevation context may outlive the terminal.
 
 Orbit remains a conversational helper. Its existing built-ins, reviewed file
 writes, approvals, original-tab binding and result-driven continuation remain in
-place. Its `run <command>` actions use the same desktop PowerShell session even
-when the selected display mode is RiftShell commands. A legacy navigation action
+place. Its `run <command>` actions use the same desktop PowerShell session.
+A built-in navigation action
 is synchronized into PowerShell before the next native command. Native navigation
 updates the workspace path used by Orbit. In a PowerShell registry/provider
 location, workspace actions pause until the user returns to a filesystem folder.
@@ -47,8 +58,7 @@ approval system is also not an operating-system sandbox.
 
 ## Manual setup and verification
 
-These commands are provided for manual use; they were **not run** during the
-implementation. Use the same Python interpreter/environment that launches
+Use the same Python interpreter/environment that launches
 RiftShell. From `D:\riftshell`, in your existing external terminal:
 
 ```powershell
@@ -57,12 +67,23 @@ python -m unittest discover -s tests -p "test_*.py"
 python main.py
 ```
 
-The new tests mock transport and exercise prompt framing, command completion,
+The default tests mock transport and exercise prompt framing, command completion,
 interruption, directory synchronization, safety classification, Orbit routing,
-dependency fallback and rendering. They do not establish live ConPTY compatibility
-or actual package installation. The following desktop checks are still required:
+dependency fallback, unified routing and bounded output rendering. An opt-in local
+ConPTY test checks persistent variables, a pipeline, directory tracking and Ctrl+C:
 
-1. Open a PowerShell tab. Check `python --version`, `python -m pip --version`,
+```powershell
+$env:RIFT_TEST_LIVE_TERMINAL = '1'
+python -m pytest tests/test_native_terminal_live.py -q -p no:cacheprovider
+Remove-Item Env:RIFT_TEST_LIVE_TERMINAL
+```
+
+Output parsing yields between small batches; rendering groups adjacent text with
+the same style. Large built-in responses also render incrementally. These tests
+do not establish every external program's compatibility or package installation.
+The following desktop checks cover those remaining cases:
+
+1. Open a RiftShell tab. Check `python --version`, `python -m pip --version`,
    `node --version`, `npm --version`, and `git --version` for tools installed on
    your PC. A missing executable should produce PowerShell's diagnostic rather
    than RiftShell's `Unknown command`.
@@ -93,7 +114,7 @@ or actual package installation. The following desktop checks are still required:
    require PowerShell 7; Windows PowerShell's normal syntax limits still apply.
 9. Resize the tab while output is flowing; verify colors, progress redraws,
    scrollback, selection/copy, and an interactive application's screen restore.
-10. Switch to RiftShell commands and check `files`, `read README.md`, `where`,
+10. In the same terminal check `files`, `read README.md`, `where`,
     themes and installed plugins. Ask Orbit a general question, request a native
     command, reject an approval, and review a file-write proposal. General chat
     must remain conversational and rejected actions must not execute.
