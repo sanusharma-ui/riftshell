@@ -295,6 +295,69 @@ class TerminalSurfaceTests(unittest.TestCase):
         from PySide6.QtWidgets import QApplication
         cls.app = QApplication.instance() or QApplication(["rift-tests", "-platform", "offscreen"])
 
+    def test_cursor_only_blinks_during_focused_interactive_input(self):
+        from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit
+        from ui.terminal_widget import TerminalWidget
+        host = QWidget()
+        layout = QVBoxLayout(host)
+        terminal, entry = TerminalWidget(), QLineEdit()
+        layout.addWidget(terminal)
+        layout.addWidget(entry)
+        old_flash_time = self.app.cursorFlashTime()
+        try:
+            self.app.setCursorFlashTime(1000)
+            host.show()
+            host.activateWindow()
+            terminal.setFocus()
+            self.app.processEvents()
+            self.assertFalse(terminal._cursor_timer.isActive())
+            terminal.input_enabled = True
+            self.assertTrue(terminal._cursor_timer.isActive())
+            entry.setFocus()
+            self.app.processEvents()
+            self.assertFalse(terminal._cursor_timer.isActive())
+            terminal.setFocus()
+            self.app.processEvents()
+            terminal.input_enabled = False
+            self.assertFalse(terminal._cursor_timer.isActive())
+        finally:
+            self.app.setCursorFlashTime(old_flash_time)
+            host.close()
+            host.deleteLater()
+
+    def test_completion_returns_focus_without_stealing_it_from_other_panels(self):
+        from core.shell import Shell
+        from ui.main_window import TerminalSession
+        from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit
+        preferences = dict(font_family="Consolas", font_size=11, theme="vscode-dark-plus", confirm_risky=False)
+        host = QWidget()
+        layout = QVBoxLayout(host)
+        with patch("ui.main_window.native_dependency_error", return_value=""), patch("ui.native_session.NativeTerminal", FakeTransport):
+            session = TerminalSession(Shell(), "Test", preferences)
+        other = QLineEdit()
+        layout.addWidget(session)
+        layout.addWidget(other)
+        try:
+            host.show()
+            host.activateWindow()
+            self.app.processEvents()
+            session.native._prompt(dict(sequence=1, exit_code=0, cwd=str(session.shell.ctx.cwd), filesystem=True))
+            self.assertNotIn("PowerShell", session.input.placeholderText())
+            for sequence, keep_elsewhere in ((2, False), (3, True)):
+                session.input.setText("python --version")
+                self.assertTrue(session.run_command())
+                if keep_elsewhere:
+                    other.setFocus()
+                self.app.processEvents()
+                session.native._prompt(dict(sequence=sequence, exit_code=0, cwd=str(session.shell.ctx.cwd), filesystem=True))
+                self.app.processEvents()
+                self.assertTrue(session.input.isEnabled())
+                self.assertTrue((other if keep_elsewhere else session.input).hasFocus())
+        finally:
+            session.shutdown()
+            host.close()
+            host.deleteLater()
+
     def test_missing_native_dependencies_preserves_legacy_session(self):
         from core.shell import Shell
         from ui.main_window import TerminalSession

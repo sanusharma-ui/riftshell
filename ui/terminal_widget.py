@@ -52,9 +52,16 @@ class TerminalWidget(QAbstractScrollArea):
 
         self.screen = Screen()
         self.stream = pyte.Stream(self.screen)
-        self.input_enabled = False
+        self._input_enabled = False
+        self._cursor_on = True
+        self._cursor_timer = QTimer(self)
+        self._cursor_timer.timeout.connect(self._blink_cursor)
         self.foreground = QColor("#d4d4d4")
-        self.background = QColor("#1e1e1e")
+        self.background = QColor("#181818")
+        self.selection_color = QColor("#264f78")
+        self.accent_color = QColor("#4daafc")
+        self.PAD_X = 12
+        self.PAD_Y = 10
         self._selection_start = None
         self._selection_end = None
         self._messages = deque()
@@ -66,10 +73,44 @@ class TerminalWidget(QAbstractScrollArea):
         self._resize_timer = QTimer(self)
         self._resize_timer.setSingleShot(True)
         self._resize_timer.timeout.connect(self._resize_screen)
-        self.setFont(QFont("Consolas", 11))
+        self.setFont(QFont("Cascadia Code", 11))
+        self.viewport().setCursor(Qt.IBeamCursor)
 
-    def set_colors(self, foreground: str, background: str):
+    @property
+    def input_enabled(self):
+        return self._input_enabled
+
+    @input_enabled.setter
+    def input_enabled(self, enabled):
+        self._input_enabled = bool(enabled)
+        self._refresh_cursor()
+
+    def _refresh_cursor(self):
+        self._cursor_on = True
+        self._cursor_timer.stop()
+        flash_time = QApplication.cursorFlashTime()
+        if self.input_enabled and self.hasFocus() and flash_time > 0:
+            self._cursor_timer.start(max(100, flash_time // 2))
+        self.viewport().update()
+
+    def _blink_cursor(self):
+        self._cursor_on = not self._cursor_on
+        self.viewport().update()
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._refresh_cursor()
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self._refresh_cursor()
+
+    def set_colors(self, foreground: str, background: str, selection: str | None = None, accent: str | None = None):
         self.foreground, self.background = QColor(foreground), QColor(background)
+        if selection:
+            self.selection_color = QColor(selection)
+        if accent:
+            self.accent_color = QColor(accent)
         self.viewport().update()
 
     def feed(self, text: str):
@@ -131,8 +172,8 @@ class TerminalWidget(QAbstractScrollArea):
 
     def _resize_screen(self):
         width, height, _ = self._metrics()
-        rows = max(2, self.viewport().height() // height)
-        columns = max(10, self.viewport().width() // width)
+        rows = max(2, (self.viewport().height() - 2 * self.PAD_Y) // height)
+        columns = max(10, (self.viewport().width() - 2 * self.PAD_X) // width)
         if (rows, columns) != (self.screen.lines, self.screen.columns):
             self.screen.resize(lines=rows, columns=columns)
             self.size_changed.emit(rows, columns)
@@ -140,11 +181,11 @@ class TerminalWidget(QAbstractScrollArea):
 
     def _color(self, value, default):
         palette = {
-            "black": "#1e1e1e", "red": "#cd3131", "green": "#0dbc79", "brown": "#e5e510",
-            "blue": "#2472c8", "magenta": "#bc3fbc", "cyan": "#11a8cd", "white": "#e5e5e5",
-            "brightblack": "#666666", "brightred": "#f14c4c", "brightgreen": "#23d18b",
-            "brightbrown": "#f5f543", "brightblue": "#3b8eea", "brightmagenta": "#d670d6",
-            "brightcyan": "#29b8db", "brightwhite": "#ffffff",
+            "black": "#1e1e24", "red": "#ff5c57", "green": "#5af78e", "brown": "#f3f99d",
+            "blue": "#57c7ff", "magenta": "#ff6ac1", "cyan": "#9aedfe", "white": "#f1f1f0",
+            "brightblack": "#686868", "brightred": "#ff6e6e", "brightgreen": "#69ff94",
+            "brightbrown": "#ffffa5", "brightblue": "#66d9ef", "brightmagenta": "#ff92d0",
+            "brightcyan": "#a4ffff", "brightwhite": "#ffffff",
         }
         if value == "default":
             return default
@@ -153,13 +194,25 @@ class TerminalWidget(QAbstractScrollArea):
 
     def paintEvent(self, event):
         painter = QPainter(self.viewport())
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
         painter.fillRect(self.viewport().rect(), self.background)
         width, height, ascent = self._metrics()
         lines = self._all_lines()
         offset = self.verticalScrollBar().value()
-        selected = sorted((self._selection_start, self._selection_end)) if self._selection_start is not None and self._selection_end is not None else None
+        selected = (
+            sorted((self._selection_start, self._selection_end))
+            if self._selection_start is not None
+            and self._selection_end is not None
+            and self._selection_start != self._selection_end
+            else None
+        )
         colors = {}
         fonts = {}
+        pad_x = self.PAD_X
+        pad_y = self.PAD_Y
+
         def color(value, background=False):
             key = (value, background)
             if key not in colors:
@@ -175,9 +228,9 @@ class TerminalWidget(QAbstractScrollArea):
 
             for key, indices in groupby(range(len(cells)), background_key):
                 run = list(indices)
-                bg = QColor("#365780") if key[2] else color(key[0], key[1])
+                bg = self.selection_color if key[2] else color(key[0], key[1])
                 if bg != self.background:
-                    painter.fillRect(run[0] * width, y * height, len(run) * width, height, bg)
+                    painter.fillRect(pad_x + run[0] * width, pad_y + y * height, len(run) * width, height, bg)
             # Paint glyphs after backgrounds so a wide Unicode glyph is not
             # erased by the background of its following continuation cell.
             def foreground_key(x):
@@ -201,22 +254,30 @@ class TerminalWidget(QAbstractScrollArea):
                 painter.setPen(color(key[0], key[1]))
                 text = "".join(cells[x].data for x in run)
                 if text.strip() or style[2] or style[3]:
-                    painter.drawText(run[0] * width, y * height + ascent, text)
+                    painter.drawText(pad_x + run[0] * width, pad_y + y * height + ascent, text)
         cursor = self.screen.cursor
-        if not cursor.hidden and offset == self.verticalScrollBar().maximum():
-            painter.setPen(self.foreground)
-            painter.drawRect(min(cursor.x, self.screen.columns - 1) * width, cursor.y * height, width - 1, height - 1)
+        if (self.input_enabled and self.hasFocus() and self._cursor_on
+                and not cursor.hidden and offset == self.verticalScrollBar().maximum()):
+            cx = pad_x + min(cursor.x, self.screen.columns - 1) * width
+            cy = pad_y + cursor.y * height
+            painter.fillRect(cx, cy, 2, height, self.accent_color)
 
     def _point(self, event):
         width, height, _ = self._metrics()
-        return (max(0, min(self.screen.lines - 1, int(event.position().y()) // height)) + self.verticalScrollBar().value(),
-                max(0, min(self.screen.columns - 1, int(event.position().x()) // width)))
+        py = max(0, min(self.screen.lines - 1, int(event.position().y() - self.PAD_Y) // height))
+        px = max(0, min(self.screen.columns - 1, int(event.position().x() - self.PAD_X) // width))
+        return (py + self.verticalScrollBar().value(), px)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.setFocus()
             self._selection_start = self._selection_end = self._point(event)
             self.viewport().update()
+        elif event.button() == Qt.RightButton:
+            if self.copy_selection():
+                event.accept()
+                return
+            super().mousePressEvent(event)
         else:
             super().mousePressEvent(event)
 
@@ -224,6 +285,34 @@ class TerminalWidget(QAbstractScrollArea):
         if event.buttons() & Qt.LeftButton:
             self._selection_end = self._point(event)
             self.viewport().update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            if self._selection_start == self._selection_end:
+                self._selection_start = self._selection_end = None
+                self.viewport().update()
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            pt = self._point(event)
+            row = pt[0]
+            all_lines = self._all_lines()
+            if 0 <= row < len(all_lines):
+                line = all_lines[row]
+                col = min(pt[1], self.screen.columns - 1)
+                start_x = end_x = col
+                while start_x > 0 and line[start_x - 1].data.strip():
+                    start_x -= 1
+                while end_x < self.screen.columns - 1 and line[end_x + 1].data.strip():
+                    end_x += 1
+                if line[col].data.strip():
+                    self._selection_start = (row, start_x)
+                    self._selection_end = (row, end_x)
+                    self.copy_selection()
+                    self.viewport().update()
+                    return
+        super().mouseDoubleClickEvent(event)
 
     def copy_selection(self):
         if self._selection_start is None or self._selection_end is None:
@@ -276,6 +365,7 @@ class TerminalWidget(QAbstractScrollArea):
         if (1 << 5) in self.screen.mode and text in {"\x1b[A", "\x1b[B", "\x1b[C", "\x1b[D", "\x1b[H", "\x1b[F"}:
             text = text.replace("[", "O", 1)
         if text:
+            self._refresh_cursor()
             self._selection_start = self._selection_end = None
             self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
             self.input_ready.emit(text)

@@ -4,10 +4,10 @@ STYLE = build_stylesheet(get_theme(DEFAULT_THEME_KEY))
 
 BOOT_BANNER = r"""
 <pre style="
-color:#00ff9c;
-font-family:Consolas;
-font-size:11pt;
-line-height:115%;
+color:#38bdf8;
+font-family:'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+font-size:10.5pt;
+line-height:120%;
 ">
 
 ██████╗ ██╗███████╗████████╗     ███████╗██╗  ██╗███████╗██╗     ██╗

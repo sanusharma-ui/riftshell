@@ -289,6 +289,7 @@ class PreferencesDialog(QDialog):
         self.restore = QCheckBox("Restore recent command history on launch")
         self.restore.setChecked(preferences["restore_history"])
         form = QFormLayout()
+        form.setSpacing(12)
         form.addRow("Theme", self.theme)
         form.addRow("Terminal font", self.font)
         form.addRow("Font size", self.font_size)
@@ -299,6 +300,7 @@ class PreferencesDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 22, 22, 22)
+        layout.setSpacing(14)
         layout.addWidget(title)
         layout.addLayout(form)
         layout.addStretch()
@@ -328,8 +330,8 @@ class TerminalSession(QWidget):
         self._active_native = False
         self.active_command = ""
         self.name_label = QLabel(title)
-        self.name_label.setFont(QFont(preferences["font_family"], 11, QFont.Bold))
-        self.path_label = QLabel(str(shell.ctx.cwd))
+        self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
+        self.path_label = QLabel(f"📁 {shell.ctx.cwd}")
         self.path_label.setObjectName("sessionPath")
         self.state_label = QLabel("READY")
         self.state_label.setObjectName("statusPill")
@@ -342,10 +344,12 @@ class TerminalSession(QWidget):
         header_layout.addWidget(self.state_label)
         self.console = QTextEdit()
         self.console.setReadOnly(True)
+        self.console.setObjectName("terminalOutput")
         self.console.document().setMaximumBlockCount(5000)
         self.console_stack = QStackedWidget()
         self.console_stack.addWidget(self.console)
         self.input = CommandInput()
+        self.input.setObjectName("commandInput")
         self.input.setPlaceholderText("Run a RiftShell command…  Ctrl+K for command palette")
         self.input.set_history(shell.ctx.history)
         names = shell.registry.all_names()
@@ -355,19 +359,20 @@ class TerminalSession(QWidget):
         completer.setFilterMode(Qt.MatchContains)
         self.legacy_completer = completer
         self.input.setCompleter(completer)
-        self.run_button = QPushButton("Run  ↵")
+        self.run_button = QPushButton("Run")
         self.run_button.setObjectName("primaryButton")
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setEnabled(False)
         self.clear_button = QPushButton("Clear")
-        self.copy_button = QPushButton("Copy output")
+        self.copy_button = QPushButton("Copy")
         bottom = QHBoxLayout()
         bottom.setSpacing(8)
         bottom.addWidget(self.input, 1)
         bottom.addWidget(self.run_button)
         bottom.addWidget(self.cancel_button)
-        bottom.addWidget(self.clear_button)
-        bottom.addWidget(self.copy_button)
+        header_layout.insertWidget(2, self.clear_button)
+        header_layout.insertWidget(3, self.copy_button)
+        self.copy_button.setToolTip("Copy selected text, or all output")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
@@ -397,7 +402,7 @@ class TerminalSession(QWidget):
             self.append_system("RiftShell ready. Built-ins and PowerShell commands share this terminal.")
         else:
             self.append_error(dependency_error)
-        self.input.setPlaceholderText("RiftShell / PowerShell command (help, files, Get-ChildItem, git...)")
+        self.input.setPlaceholderText("RiftShell command (help, files, git...)")
         self._set_running(self.is_busy)
         self.apply_preferences(preferences)
 
@@ -421,18 +426,18 @@ class TerminalSession(QWidget):
 
     def _native_changed(self):
         if self.native.context_available:
-            self.path_label.setText(str(self.shell.ctx.cwd))
+            self.path_label.setText(f"📁 {self.shell.ctx.cwd}")
         else:
-            self.path_label.setText(self.native.location + " (non-filesystem)")
+            self.path_label.setText(f"📁 {self.native.location} (non-filesystem)")
         self._set_running(self.is_busy)
         if self.native.exited:
-            self.state_label.setText("SHELL EXITED")
+            self.state_label.setText("EXITED")
         elif not self.native.ready:
             self.state_label.setText("STARTING")
 
     def _native_failed(self, message):
         self.append_error(message)
-        self.state_label.setText("SHELL ERROR")
+        self.state_label.setText("ERROR")
 
     def _native_completed(self, command, result):
         self._active_native = False
@@ -455,10 +460,11 @@ class TerminalSession(QWidget):
         font = QFont(preferences["font_family"], preferences["font_size"])
         self.console.setFont(font)
         self.input.setFont(font)
-        self.name_label.setFont(QFont(preferences["font_family"], 11, QFont.Bold))
+        self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
         if self.native:
             self.native_console.setFont(font)
-            self.native_console.set_colors(self._theme().text, self._theme().background)
+            theme = self._theme()
+            self.native_console.set_colors(theme.text, theme.background, theme.selection, theme.accent)
             self.native_console._resize_screen()
 
     def _theme(self):
@@ -469,13 +475,13 @@ class TerminalSession(QWidget):
             self.native_console.append_message(f"{label} {text}" if label else text, color)
             return
         safe = escape(text).replace("\n", "<br>")
-        prefix = f'<span style="color:{self._theme().muted};">{escape(label)}</span> ' if label else ""
+        prefix = f'<span style="color:{self._theme().accent}; font-weight:700;">{escape(label)}</span> ' if label else ""
         self.console.moveCursor(QTextCursor.End)
-        self.console.append(f'<div style="color:{color}; white-space:pre-wrap;">{prefix}{safe}</div>')
+        self.console.append(f'<div style="color:{color}; line-height:140%; white-space:pre-wrap; font-family:\'Cascadia Code\', \'JetBrains Mono\', Consolas, monospace;">{prefix}{safe}</div>')
         self.console.moveCursor(QTextCursor.End)
 
     def append_system(self, text: str):
-        self.append_html(text, self._theme().text, "•")
+        self.append_html(text, self._theme().muted, "•")
 
     def append_output(self, text: str):
         self.append_html(text, self._theme().output)
@@ -492,7 +498,11 @@ class TerminalSession(QWidget):
         self.append_system("Console cleared.")
 
     def copy_output(self):
-        QApplication.clipboard().setText(self.console_stack.currentWidget().toPlainText())
+        widget = self.console_stack.currentWidget()
+        if hasattr(widget, "copy_selection") and widget.copy_selection():
+            self.state_label.setText("COPIED")
+            return
+        QApplication.clipboard().setText(widget.toPlainText())
         self.state_label.setText("COPIED")
 
     def _approval_decision(self, command: str):
@@ -551,7 +561,7 @@ class TerminalSession(QWidget):
     def request_cancel(self):
         if self.native and self.native.busy:
             self.native.cancel()
-            self.state_label.setText("INTERRUPTING")
+            self.state_label.setText("STOPPING")
             return
         if self.worker:
             self.worker.requestInterruption()
@@ -567,12 +577,11 @@ class TerminalSession(QWidget):
             (self.append_output if result.success else self.append_error)(result.output)
         if result.actions.get("theme"):
             self.window().apply_theme(str(result.actions["theme"]))
-        self.path_label.setText(str(self.shell.ctx.cwd))
+        self.path_label.setText(f"📁 {self.shell.ctx.cwd}")
         self.input.set_history(self.shell.ctx.history)
         if self.shell.ctx.history:
             self.history_added.emit(self.shell.ctx.history[-1])
         self.input.clear()
-        self.input.setFocus()
         self.session_changed.emit()
         self.command_completed.emit(self.active_command, result)
         self.active_command = ""
@@ -580,11 +589,15 @@ class TerminalSession(QWidget):
             self.close_requested.emit(self)
 
     def _set_running(self, running: bool):
+        was_running = not self.input.isEnabled()
+        focus = QApplication.focusWidget()
         self.input.setEnabled(not running)
         self.run_button.setEnabled(not running)
         self.clear_button.setEnabled(not running)
         self.cancel_button.setEnabled(running)
         self.state_label.setText("RUNNING" if running else "READY")
+        if was_running and not running and focus is not None and self.isAncestorOf(focus):
+            self.input.setFocus(Qt.OtherFocusReason)
         self.session_changed.emit()
 
     def can_close(self) -> bool:
@@ -620,7 +633,7 @@ class OrbitPanel(QFrame):
         self.continue_timer = QTimer(self)
         self.continue_timer.setSingleShot(True)
         self.continue_timer.timeout.connect(self._continue_task)
-        heading = QLabel("ORBIT")
+        heading = QLabel("ORBIT AI")
         heading.setObjectName("sectionTitle")
         self.thinking_indicator = QLabel("")
         self.thinking_indicator.setObjectName("statusPill")
@@ -634,23 +647,23 @@ class OrbitPanel(QFrame):
         self.stream_message_index: int | None = None
         self.stream_done = None
         self.messages: list[tuple[str, str]] = []
-        self.status = QLabel("Ask anything, or request a workspace action.")
+        self.status = QLabel("Ask anything or request a workspace action.")
         self.status.setWordWrap(True)
         self.conversation = QTextEdit()
+        self.conversation.setObjectName("orbitConversation")
         self.conversation.setReadOnly(True)
         self.conversation.setMinimumHeight(200)
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Ask: ‘show Python files’")
+        self.input.setPlaceholderText("Ask Orbit: 'explain code', 'show files'…")
         self.plan_button = QPushButton("Ask Orbit")
         self.plan_button.setObjectName("primaryButton")
-        self.approve_button = QPushButton("Approve & run")
+        self.approve_button = QPushButton("Approve")
         self.approve_button.setEnabled(False)
         self.reject_button = QPushButton("Dismiss")
         self.reject_button.setEnabled(False)
-        self.stop_button = QPushButton("Stop task")
+        self.stop_button = QPushButton("Stop")
         self.stop_button.setEnabled(False)
         actions = QHBoxLayout()
-        actions.addWidget(self.plan_button)
         actions.addWidget(self.approve_button)
         actions.addWidget(self.reject_button)
         actions.addWidget(self.stop_button)
@@ -664,6 +677,7 @@ class OrbitPanel(QFrame):
         layout.addWidget(self.status)
         layout.addWidget(self.conversation, 1)
         layout.addWidget(self.input)
+        layout.addWidget(self.plan_button)
         layout.addLayout(actions)
         self.plan_button.clicked.connect(self.create_plan)
         self.input.returnPressed.connect(self.create_plan)
@@ -1003,19 +1017,22 @@ class MainWindow(QMainWindow):
 
     def _build_workspace(self):
         root = QSplitter(Qt.Horizontal)
+        root.setHandleWidth(5)
         root.setChildrenCollapsible(False)
         self.setCentralWidget(root)
         root.addWidget(self._build_sidebar())
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("workspaceTabs")
         self.tabs.setTabsClosable(True)
         self.tabs.setDocumentMode(True)
         self.tabs.currentChanged.connect(self._refresh_workspace)
         self.tabs.tabCloseRequested.connect(self.close_session_at)
         root.addWidget(self.tabs)
         self.orbit = OrbitPanel(self.current_session)
+        self.orbit.setMinimumWidth(320)
         self.orbit.action_requested.connect(self._run_orbit_action)
         root.addWidget(self.orbit)
-        root.setSizes([250, 900, 300])
+        root.setSizes([260, 880, 300])
         self.root_splitter = root
         self.status_label = QLabel()
         self.statusBar().addWidget(self.status_label, 1)
@@ -1026,8 +1043,8 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("sidebar")
-        panel.setMinimumWidth(220)
-        panel.setMaximumWidth(310)
+        panel.setMinimumWidth(230)
+        panel.setMaximumWidth(320)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(16, 18, 16, 16)
         layout.setSpacing(8)
@@ -1037,20 +1054,20 @@ class MainWindow(QMainWindow):
         subtitle = QLabel("DEVELOPER WORKSPACE")
         subtitle.setObjectName("eyebrow")
         layout.addWidget(subtitle)
-        layout.addSpacing(16)
-        self.new_button = QPushButton("+  New terminal")
+        layout.addSpacing(14)
+        self.new_button = QPushButton("+  New Terminal")
         self.new_button.setObjectName("primaryButton")
         self.new_button.clicked.connect(self.new_session)
         layout.addWidget(self.new_button)
         for label, callback in [
-            ("⌘  Command palette", self.open_palette), ("◷  Command history", self.show_history),
-            ("◈  Command explorer", self.show_command_explorer), ("⚙  Workspace settings", self.open_settings),
+            ("Command Palette", self.open_palette), ("Command History", self.show_history),
+            ("Command Explorer", self.show_command_explorer), ("Workspace Settings", self.open_settings),
         ]:
             button = QPushButton(label)
             button.setObjectName("navButton")
             button.clicked.connect(callback)
             layout.addWidget(button)
-        layout.addSpacing(12)
+        layout.addSpacing(14)
         sessions_title = QLabel("SESSIONS")
         sessions_title.setObjectName("sectionTitle")
         layout.addWidget(sessions_title)
@@ -1065,12 +1082,12 @@ class MainWindow(QMainWindow):
         self.plugin_summary = QLabel()
         self.plugin_summary.setWordWrap(True)
         layout.addWidget(self.plugin_summary)
-        plugins_button = QPushButton("Manage plugins")
+        plugins_button = QPushButton("Manage Extensions")
         plugins_button.setObjectName("navButton")
         plugins_button.clicked.connect(self.show_plugins)
         layout.addWidget(plugins_button)
         layout.addStretch()
-        hint = QLabel("Ctrl+K palette  •  Ctrl+Shift+T new session")
+        hint = QLabel("Ctrl+K  Command palette\nCtrl+Shift+T  New terminal")
         hint.setWordWrap(True)
         hint.setObjectName("sessionPath")
         layout.addWidget(hint)
@@ -1133,7 +1150,8 @@ class MainWindow(QMainWindow):
             tab = self.tabs.widget(index)
             if not isinstance(tab, TerminalSession):
                 continue
-            item = QListWidgetItem(f"{'●' if tab.is_busy else '○'}  {tab.title}")
+            status_dot = "●" if tab.is_busy else "○"
+            item = QListWidgetItem(f"{status_dot}  {tab.title}")
             item.setData(Qt.UserRole, index)
             item.setToolTip(str(tab.shell.ctx.cwd))
             self.session_list.addItem(item)
@@ -1146,7 +1164,8 @@ class MainWindow(QMainWindow):
             loaded = len(plugins.loaded) if plugins else 0
             failed = len(plugins.failed) if plugins else 0
             self.plugin_summary.setText(f"{loaded} loaded  •  {failed} needs attention")
-            self.status_label.setText(f"{'running' if session.is_busy else 'ready'}  ·  {session.shell.ctx.cwd}  ·  {len(session.shell.registry.all_names())} commands")
+            status_str = "● RUNNING" if session.is_busy else "● READY"
+            self.status_label.setText(f"{status_str}  ·  📁 {session.shell.ctx.cwd}  ·  {len(session.shell.registry.all_names())} commands")
 
     def _activate_session_item(self, item):
         self.tabs.setCurrentIndex(item.data(Qt.UserRole))
