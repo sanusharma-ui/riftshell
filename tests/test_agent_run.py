@@ -116,7 +116,7 @@ class OrbitLoopUITests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
-        self.session = SimpleNamespace(shell=SimpleNamespace(ctx=SimpleNamespace(cwd=Path.cwd())), is_busy=False)
+        self.session = SimpleNamespace(shell=SimpleNamespace(ctx=SimpleNamespace(cwd=Path.cwd())), is_busy=False, native=None)
         self.panel = OrbitPanel(lambda: self.session)
         self.panel.task = AgentRun("Inspect the project")
         self.panel.task_session = self.session
@@ -157,7 +157,7 @@ class OrbitLoopUITests(unittest.TestCase):
         other = Mock()
         window = SimpleNamespace(orbit=self.panel, current_session=lambda: other)
         MainWindow._run_orbit_action(window, AgentAction("shell", command="files"))
-        self.session.run_command.assert_called_once_with(approval_granted=False)
+        self.session.run_command.assert_called_once_with(approval_granted=False, from_orbit=True)
         other.run_command.assert_not_called()
 
     def test_result_schedules_continuation_without_unlocking_input(self):

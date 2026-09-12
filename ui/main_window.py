@@ -10,11 +10,12 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
-    QSpinBox, QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
+    QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from core.shell import Shell
 from core.base import CommandResult
+from core.native_terminal import native_dependency_error
 from ai.agent_run import AgentRun
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
@@ -166,6 +167,7 @@ class OrbitWorker(QThread):
                 current_dir_provider=lambda: self.shell.ctx.cwd,
                 last_output_provider=lambda: self.shell.ctx.last_output,
                 cancelled=lambda task=self.task: bool(task and task.stopped),
+                native_context_provider=getattr(self.shell, "native_context_provider", None),
             )
             if self.task:
                 self.task.planner = planner
@@ -322,6 +324,8 @@ class TerminalSession(QWidget):
         self.shell, self.title, self.preferences = shell, title, preferences
         self.safety = SafetyPolicy()
         self.worker: CommandWorker | None = None
+        self.native = None
+        self._active_native = False
         self.active_command = ""
         self.name_label = QLabel(title)
         self.name_label.setFont(QFont(preferences["font_family"], 11, QFont.Bold))
@@ -335,10 +339,17 @@ class TerminalSession(QWidget):
         header_layout.setContentsMargins(12, 8, 12, 8)
         header_layout.addWidget(self.name_label)
         header_layout.addWidget(self.path_label, 1)
+        self.mode = QComboBox()
+        self.mode.addItem("PowerShell", "native")
+        self.mode.addItem("RiftShell commands", "legacy")
+        self.mode.setToolTip("PowerShell runs system commands. RiftShell commands preserves the built-in command set and plugins.")
+        header_layout.addWidget(self.mode)
         header_layout.addWidget(self.state_label)
         self.console = QTextEdit()
         self.console.setReadOnly(True)
         self.console.document().setMaximumBlockCount(5000)
+        self.console_stack = QStackedWidget()
+        self.console_stack.addWidget(self.console)
         self.input = CommandInput()
         self.input.setPlaceholderText("Run a RiftShell command…  Ctrl+K for command palette")
         self.input.set_history(shell.ctx.history)
@@ -347,6 +358,7 @@ class TerminalSession(QWidget):
         completer = QCompleter(QStringListModel(names, self), self)
         completer.setCaseSensitivity(Qt.CaseInsensitive)
         completer.setFilterMode(Qt.MatchContains)
+        self.legacy_completer = completer
         self.input.setCompleter(completer)
         self.run_button = QPushButton("Run  ↵")
         self.run_button.setObjectName("primaryButton")
@@ -365,7 +377,7 @@ class TerminalSession(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
         layout.addWidget(header)
-        layout.addWidget(self.console, 1)
+        layout.addWidget(self.console_stack, 1)
         layout.addLayout(bottom)
         self.run_button.clicked.connect(self.run_command)
         self.input.returnPressed.connect(self.run_command)
@@ -374,10 +386,66 @@ class TerminalSession(QWidget):
         self.copy_button.clicked.connect(self.copy_output)
         self.apply_preferences(preferences)
         self.append_system("Workspace terminal ready. Type help to explore available commands.")
+        dependency_error = native_dependency_error()
+        if not dependency_error:
+            from ui.terminal_widget import TerminalWidget
+            from ui.native_session import NativeSession
+
+            self.native_console = TerminalWidget(self)
+            self.console_stack.addWidget(self.native_console)
+            self.native = NativeSession(shell, self.native_console, self)
+            self.shell.native_context_provider = self.native.context_summary
+            self.native.changed.connect(self._native_changed)
+            self.native.completed.connect(self._native_completed)
+            self.native.failed.connect(self._native_failed)
+        else:
+            self.mode.setCurrentIndex(1)
+            self.mode.model().item(0).setEnabled(False)
+            self.append_error(dependency_error)
+        self.mode.currentIndexChanged.connect(self._mode_changed)
+        self._mode_changed()
+        self.apply_preferences(preferences)
 
     @property
     def is_busy(self) -> bool:
-        return self.worker is not None and self.worker.isRunning()
+        return bool(self.worker is not None and self.worker.isRunning() or self.native and self.native.busy)
+
+    def _mode_changed(self, *_):
+        native_mode = self.native and self.mode.currentData() == "native"
+        self.console_stack.setCurrentWidget(self.native_console if native_mode else self.console)
+        self.input.setPlaceholderText("PowerShell command (npm, pip, git...)" if native_mode else "RiftShell command (help, files, read...)")
+        self.input.setCompleter(None if native_mode else self.legacy_completer)
+        self.input.set_completion_items([] if native_mode else self.shell.registry.all_names())
+        self._set_running(self.is_busy)
+        if native_mode and self.is_busy:
+            self.native_console.setFocus()
+
+    def _native_changed(self):
+        if self.native.context_available:
+            self.path_label.setText(str(self.shell.ctx.cwd))
+        else:
+            self.path_label.setText(self.native.location + " (non-filesystem)")
+        self._set_running(self.is_busy)
+        if self.native.exited:
+            self.state_label.setText("SHELL EXITED")
+        elif not self.native.ready:
+            self.state_label.setText("STARTING")
+
+    def _native_failed(self, message):
+        self.append_error(message)
+        self.console_stack.setCurrentWidget(self.console)
+        self.state_label.setText("SHELL ERROR")
+
+    def _native_completed(self, command, result):
+        self._active_native = False
+        self._on_finished(result, display_output=False)
+        self._native_changed()
+
+    def shutdown(self) -> bool:
+        if not self.native:
+            return True
+        self.native.close()
+        return self.native.transport.stopped
 
     def set_title(self, title: str):
         self.title = title
@@ -390,6 +458,10 @@ class TerminalSession(QWidget):
         self.console.setFont(font)
         self.input.setFont(font)
         self.name_label.setFont(QFont(preferences["font_family"], 11, QFont.Bold))
+        if self.native:
+            self.native_console.setFont(font)
+            self.native_console.set_colors(self._theme().text, self._theme().background)
+            self.native_console._resize_screen()
 
     def _theme(self):
         return get_theme(self.preferences["theme"])
@@ -411,11 +483,14 @@ class TerminalSession(QWidget):
         self.append_html(text, self._theme().error, "!")
 
     def clear_console(self):
+        if self.native and self.console_stack.currentWidget() is self.native_console:
+            self.native.transport.write("\x0c")
+            return
         self.console.clear()
         self.append_system("Console cleared.")
 
     def copy_output(self):
-        QApplication.clipboard().setText(self.console.toPlainText())
+        QApplication.clipboard().setText(self.console_stack.currentWidget().toPlainText())
         self.state_label.setText("COPIED")
 
     def _approval_decision(self, command: str):
@@ -424,15 +499,22 @@ class TerminalSession(QWidget):
         decision = self.safety.check_shell_command(command)
         return decision if decision.requires_approval else None
 
-    def run_command(self, approval_granted: bool = False):
+    def run_command(self, approval_granted: bool = False, from_orbit: bool = False):
         command = self.input.text().strip()
         if not command or self.is_busy:
             return False
-        if command.lower() in {"clear", "cls"}:
+        wrapper = command.split(maxsplit=1)[0].lower() in {"run", "exec", "native"}
+        use_native = bool(self.native and (wrapper if from_orbit else self.mode.currentData() == "native"))
+        if command.lower() in {"clear", "cls"} and not use_native:
             self.clear_console()
             self.input.clear()
             return True
-        decision = None if approval_granted else self._approval_decision(command)
+        decision = None if approval_granted else (
+            self.safety.check_powershell_command(command) if use_native and self.preferences["confirm_risky"]
+            else self._approval_decision(command)
+        )
+        if decision and not decision.requires_approval:
+            decision = None
         if decision:
             dialog = QMessageBox(self)
             dialog.setIcon(QMessageBox.Warning)
@@ -444,6 +526,20 @@ class TerminalSession(QWidget):
             if dialog.exec() != QMessageBox.Yes:
                 self.append_system("Command cancelled before execution.")
                 return False
+        if use_native:
+            if not self.native.submit(command):
+                self.append_error("PowerShell is unavailable. Open a new tab or select RiftShell commands.")
+                self.console_stack.setCurrentWidget(self.console)
+                return False
+            self.active_command = command
+            self._active_native = True
+            self.shell.ctx.history.append(command)
+            self.input.clear()
+            self.console_stack.setCurrentWidget(self.native_console)
+            self.native_console.setFocus()
+            self._set_running(True)
+            return True
+        self.console_stack.setCurrentWidget(self.console)
         self.append_html(f"{self.shell.prompt()}{command}", self._theme().accent_alt, "$")
         self.active_command = command
         self._set_running(True)
@@ -454,6 +550,10 @@ class TerminalSession(QWidget):
         return True
 
     def request_cancel(self):
+        if self.native and self.native.busy:
+            self.native.cancel()
+            self.state_label.setText("INTERRUPTING")
+            return
         if self.worker:
             self.worker.requestInterruption()
             self.shell.request_cancel()
@@ -463,8 +563,8 @@ class TerminalSession(QWidget):
     def _worker_finished(self):
         self._set_running(False)
 
-    def _on_finished(self, result):
-        if result.output:
+    def _on_finished(self, result, display_output=True):
+        if display_output and result.output:
             (self.append_output if result.success else self.append_error)(result.output)
         if result.actions.get("theme"):
             self.window().apply_theme(str(result.actions["theme"]))
@@ -485,10 +585,19 @@ class TerminalSession(QWidget):
         self.run_button.setEnabled(not running)
         self.clear_button.setEnabled(not running)
         self.cancel_button.setEnabled(running)
+        self.mode.setEnabled(not running)
         self.state_label.setText("RUNNING" if running else "READY")
         self.session_changed.emit()
 
     def can_close(self) -> bool:
+        if self.native and self.native.busy:
+            if QMessageBox.question(
+                self, "Close terminal", "Close this terminal and terminate its shell and running processes?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            ) != QMessageBox.Yes:
+                return False
+            self.native.close()
+            return True
         if not self.is_busy:
             return True
         QMessageBox.warning(self, "Command still running", "Request stop, then wait for the command to finish before closing this session.")
@@ -1006,6 +1115,9 @@ class MainWindow(QMainWindow):
             self.orbit.stop_task()
         if not session.can_close():
             return
+        if not session.shutdown():
+            QTimer.singleShot(100, lambda: self.close_session(session))
+            return
         index = self.tabs.indexOf(session)
         if index < 0:
             return
@@ -1067,6 +1179,9 @@ class MainWindow(QMainWindow):
     def _insert_command(self, command: str):
         session = self.current_session()
         if session:
+            if session.is_busy:
+                return
+            session.mode.setCurrentIndex(1)
             session.input.setText(command + " ")
             session.input.setFocus()
 
@@ -1222,6 +1337,11 @@ class MainWindow(QMainWindow):
                 self.orbit._append("Orbit", "The active terminal is busy. Wait for the current command to finish, then try again.")
                 self.orbit.status.setText("Waiting for the active terminal to become available.")
                 return
+            if session.native and not session.native.context_available:
+                self.orbit.executing = False
+                self.orbit.stop_task()
+                self.orbit._append("Orbit", "The terminal is in a non-filesystem PowerShell location. Return to a filesystem folder before I perform workspace actions.")
+                return
             if action.action == "code_write":
                 if not approval_granted:
                     self.orbit.executing = False
@@ -1255,11 +1375,11 @@ class MainWindow(QMainWindow):
             command = action.command
             self._orbit_execution = (session, command)
             session.input.setText(command)
-            if not session.run_command(approval_granted=approval_granted):
+            if not session.run_command(approval_granted=approval_granted, from_orbit=True):
                 self._orbit_execution = None
                 self.orbit.executing = False
                 self.orbit.stop_task()
-            elif command.lower().strip() in {"clear", "cls"}:
+            elif command.lower().strip() in {"clear", "cls"} and not session._active_native:
                 self._orbit_execution = None
                 self.orbit.show_execution_result(command, WriteResult("Terminal cleared.", True))
 
@@ -1288,8 +1408,17 @@ class MainWindow(QMainWindow):
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 if session.is_busy:
-                    QMessageBox.warning(self, "Command still running", "Finish or cancel active commands before closing RiftShell.")
-                    event.ignore()
-                    return
+                    if not session.can_close():
+                        event.ignore()
+                        return
+        stopped = True
+        for index in range(self.tabs.count()):
+            session = self.tabs.widget(index)
+            if session and not session.shutdown():
+                stopped = False
+        if not stopped:
+            event.ignore()
+            QTimer.singleShot(100, self.close)
+            return
         self.settings.sync()
         event.accept()

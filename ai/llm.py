@@ -109,6 +109,7 @@ class AgentPlanner:
     current_dir_provider: Callable[[], Path] | None = None
     last_output_provider: Callable[[], str] | None = None
     cancelled: Callable[[], bool] | None = None
+    native_context_provider: Callable[[], str] | None = None
 
     _NO_ARGUMENT_COMMANDS = {
         "help", "plugins", "exit", "quit", "clear", "cls", "where", "pwd",
@@ -543,6 +544,10 @@ class AgentPlanner:
             return action
 
         command = action.command.strip()
+        if self.native_context_provider and re.match(r"^(?:run|exec|native)\s+\S", command, flags=re.IGNORECASE):
+            # Native syntax belongs to PowerShell. SafetyPolicy still reviews
+            # the entire expression before the desktop dispatches it.
+            return action
         try:
             parts = CommandParser().parse_line(command)
         except Exception:
@@ -1006,6 +1011,7 @@ class AgentPlanner:
             if workspace_context
             else "Request an inspect action when file contents are required to answer accurately."
         )
+        native_context = self.native_context_provider() if self.native_context_provider else "Native programs use the catalog's run command."
 
         return f"""
 You are Orbit: a thoughtful, warm, capable English-only workspace assistant inside RiftShell.
@@ -1024,6 +1030,7 @@ Runtime context:
 - Current directory: {current_dir}
 - AI workspace root: {self.config.workspace_root}
 - Access mode: {access_mode}
+- Terminal capabilities: {native_context}
 - Interface: Orbit is a chat panel beside the active terminal. Shell command output is rendered in that terminal, not inside the chat panel.
 - Latest terminal output (may be truncated):
 {last_output}
@@ -1032,7 +1039,7 @@ UNIVERSAL RULES (READ AND OBEY):
 1. ASSISTANT FIRST: Your primary role is a capable conversational assistant. General knowledge, explanations, planning, brainstorming, recommendations, coding guidance, follow-up questions, and casual conversation must return {{"action":"respond","message":"..."}}.
 2. COMMAND INTENT: Use "shell" only when the user clearly asks to inspect or change the computer/workspace, run a listed command, navigate files, show system info, capture a screenshot, or execute a specific machine task. A word that happens to match a command name is not enough.
 3. READ THE CATALOG: Never guess command syntax. Look at the "Available Commands" catalog below. Format shell commands EXACTLY as the catalog requires.
-4. UNKNOWN COMMANDS: If the user asks for something that is not supported by the catalog, respond conversationally and explain what you can do instead. Never say "No such commands" for general chat.
+4. NATIVE COMMANDS: The catalog's run command can execute native tools such as npm, pip, python, git and uvicorn. Use it for explicitly requested system work; never assume a tool is installed or install missing tools without user authorization. If neither a catalog action nor native execution fits, explain conversationally. Never say "No such commands" for general chat.
 5. LOCATION: Relative paths run from the Current directory above. Use `cd <path>` when the user asks to move to a location. Use absolute paths only when the user gives or clearly asks for one.
 6. FULL-PC MODE: If Access mode is FULL_PC, commands and code_write may target any user-provided location on this PC. If Access mode is WORKSPACE_ONLY, stay inside the AI workspace root.
 7. WINDOWS PROCESSES: If killing or finding a process, append `.exe` (e.g., `kill chrome.exe`).

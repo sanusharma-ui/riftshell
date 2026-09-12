@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+import re
 
 from core.parser import CommandParser
 
@@ -91,6 +92,8 @@ class SafetyPolicy:
         raw = command.strip()
         if not raw:
             return SafetyDecision(False, "No executable action.", "low")
+        if raw.split(maxsplit=1)[0].lower() in self.NATIVE_WRAPPERS:
+            return self.check_powershell_command(raw)
 
         try:
             parsed_parts = self.parser.parse_line(raw)
@@ -155,6 +158,26 @@ class SafetyPolicy:
         if medium_reason:
             return SafetyDecision(False, medium_reason, "medium")
         return SafetyDecision(False, "Read-only or session-local action.", "low")
+
+    def check_powershell_command(self, command: str) -> SafetyDecision:
+        """The legacy parser is not a PowerShell parser. Fail closed on syntax
+        that can hide another expression, script block or command expansion.
+        This classification never rewrites what will be executed.
+        """
+        raw = command.strip()
+        if not raw:
+            return SafetyDecision(False, "No executable action.", "low")
+        if re.search(r"[\r\n`$;|&><(){}@]", raw):
+            return self._approval("This PowerShell expression can execute code or change files; review the complete command.", level="high")
+        parsed = self.parser.parse(raw)
+        if parsed is None:
+            return self._approval("The native command could not be classified.", level="high")
+        args = [parsed.name, *parsed.args]
+        if args[0].lower() in self.NATIVE_WRAPPERS:
+            args = args[1:]
+        if args and args[0].lower() in {"cd", "chdir", "set-location", "pwd", "get-location", "clear", "cls", "clear-host"}:
+            return SafetyDecision(False, "Session-local navigation or display change.", "low")
+        return self._check_native_command(args)
 
     def _check_native_command(self, args: list[str]) -> SafetyDecision:
         if not args:
