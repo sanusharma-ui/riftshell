@@ -18,8 +18,8 @@ class AgentRunTests(unittest.TestCase):
     def test_results_drive_next_action_then_final_answer(self):
         planner = AgentPlanner(make_config(Path.cwd()), ["where", "files"], [])
         planner._gemini = SequencedGemini(
-            {"action": "shell", "command": "where", "message": "Checking location."},
-            {"action": "shell", "command": "files", "message": "Checking files."},
+            {"action": "shell", "command": "where", "message": "Checking location.", "continue_after_result": True},
+            {"action": "shell", "command": "files", "message": "Checking files.", "continue_after_result": True},
             {"action": "respond", "message": "The folder contains main.py."},
         )
         task = AgentRun("Find the current folder and list its files", planner=planner)
@@ -172,11 +172,19 @@ class OrbitLoopUITests(unittest.TestCase):
         self.assertEqual(outputs, [(self.session, "Requested result")])
 
     def test_result_schedules_continuation_without_unlocking_input(self):
-        self.panel._show_plan(AgentAction("shell", command="files"))
+        self.panel._show_plan(AgentAction("shell", command="files", continue_after_result=True))
         self.panel.show_execution_result("files", SimpleNamespace(success=True, output="main.py"))
         self.assertTrue(self.panel.continue_timer.isActive())
         self.assertFalse(self.panel.input.isEnabled())
         self.assertEqual(self.panel.task.observations[0]["output"], "main.py")
+
+    def test_one_step_command_completes_locally_without_second_model_call(self):
+        self.panel._show_plan(AgentAction("shell", command="where"))
+        self.panel.show_execution_result("where", SimpleNamespace(success=True, output=str(Path.cwd())))
+        self.assertFalse(self.panel.continue_timer.isActive())
+        self.assertTrue(self.panel.input.isEnabled())
+        self.assertTrue(self.panel.task.stopped)
+        self.assertIn("You are currently in the workspace directory", self.panel.stream_text)
 
     def test_command_exception_returns_a_failure_result(self):
         shell = Mock()

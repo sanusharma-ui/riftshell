@@ -977,9 +977,14 @@ class OrbitPanel(QFrame):
             return
         self._start_planning()
 
-    def _observe_result(self, result):
+    def _observe_result(self, result, continue_after_result=True):
         self.executing = False
         if self.task and self.task.observe(result):
+            if not continue_after_result:
+                self.task.stop()
+                self.stop_button.setEnabled(False)
+                self._set_thinking(False)
+                return False
             self.task_cwd = self.task_session.shell.ctx.cwd
             self.status.setText(f"Step {self.task.steps}: reviewing the result…")
             self.continue_timer.start(50)
@@ -990,10 +995,20 @@ class OrbitPanel(QFrame):
         return False
 
     def show_execution_result(self, command: str, result):
-        if self._observe_result(result):
+        continue_after_result = bool(
+            self.task
+            and self.task.pending
+            and self.task.pending.continue_after_result
+        )
+        if self._observe_result(result, continue_after_result):
             return
         if result.success:
-            self._stream("Orbit", f"Completed: {command}\nThe command output is now available in the active terminal.")
+            output = str(result.output).strip()
+            if command.strip().lower() == "where" and output:
+                message = f"You are currently in the workspace directory `{output.splitlines()[-1]}`."
+            else:
+                message = f"Completed: {command}\nThe command output is now available in the active terminal."
+            self._stream("Orbit", message)
             self.status.setText("Completed. Review the terminal output for the full result.")
             return
         detail = result.output.strip().splitlines()[0] if result.output else "The command did not complete successfully."

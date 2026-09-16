@@ -76,6 +76,7 @@ class AgentAction:
     files: list[FileWrite] = field(default_factory=list)
     paths: list[str] = field(default_factory=list)
     objective: str = ""
+    continue_after_result: bool = False
 
     @classmethod
     def from_payload(cls, payload: dict) -> "AgentAction":
@@ -99,6 +100,7 @@ class AgentAction:
                 paths.append(path)
 
         objective = str(payload.get("objective", "")).strip()
+        continue_after_result = payload.get("continue_after_result") is True
 
         if action not in {"respond", "shell", "screenshot", "code_write", "inspect"}:
             action = "respond"
@@ -111,5 +113,6 @@ class AgentAction:
             files=files,
             paths=paths,
             objective=objective,
+            continue_after_result=continue_after_result,
         )
 
