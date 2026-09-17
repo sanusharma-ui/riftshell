@@ -65,13 +65,20 @@ def ensure_safe_delete_target(path: Path) -> None:
             raise PermissionError(f"Refusing to delete protected folder: {resolved}")
 
 
+def unquote_path(value: str) -> str:
+    """Remove the paired delimiter retained by the Windows command parser."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
 def resolve_path(ctx, user_path: str | None = None) -> Path:
     base = Path(ctx.cwd)
 
     if not user_path or user_path.strip() == "":
         target = base
     else:
-        candidate = Path(user_path).expanduser()
+        candidate = Path(unquote_path(user_path)).expanduser()
         target = candidate if candidate.is_absolute() else (base / candidate)
 
     return ensure_path_allowed(ctx, target)

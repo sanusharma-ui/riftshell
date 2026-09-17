@@ -164,6 +164,7 @@ class OrbitWorker(QThread):
                 config=config,
                 command_names=self.shell.registry.all_names(),
                 command_catalog=self.shell.registry.catalog_entries(),
+                command_metadata=self.shell.registry.list_metadata(),
                 current_dir_provider=lambda: self.shell.ctx.cwd,
                 last_output_provider=lambda: self.shell.ctx.last_output,
                 cancelled=lambda task=self.task: bool(task and task.stopped),

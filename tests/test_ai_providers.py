@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from ai.config import _parse_int
+from ai.config import _parse_int, _parse_provider_order
 from ai.llm import AgentPlanner, _extract_json
 from core.shell import Shell
 
@@ -41,6 +41,22 @@ class FakeGroq:
         self.chat = SimpleNamespace(completions=FakeGroqCompletions(self))
 
 
+class FailingGroqCompletions:
+    def __init__(self, owner, error):
+        self.owner = owner
+        self.error = error
+
+    def create(self, **_kwargs):
+        self.owner.calls += 1
+        raise self.error
+
+
+class FailingGroq:
+    def __init__(self, error):
+        self.calls = 0
+        self.chat = SimpleNamespace(completions=FailingGroqCompletions(self, error))
+
+
 class FakeHTTPResponse:
     def __init__(self, message="local response"):
         model_payload = json.dumps({"action": "respond", "message": message})
@@ -59,11 +75,12 @@ class FakeHTTPResponse:
 def make_config(**overrides):
     values = {
         "ai_provider": "auto",
-        "ai_provider_order": ("gemini", "groq", "ollama"),
+        "ai_provider_order": ("groq", "gemini"),
         "gemini_api_key": "",
         "gemini_model": "gemini-test",
         "groq_api_key": "",
         "groq_model": "groq-test",
+        "groq_timeout_seconds": 30,
         "ollama_base_url": "http://127.0.0.1:11434",
         "ollama_model": "",
         "ollama_timeout_seconds": 5,
@@ -81,6 +98,38 @@ def make_planner(config):
 
 
 class ProviderSelectionTests(unittest.TestCase):
+    def test_auto_prefers_groq_when_both_cloud_providers_are_configured(self):
+        planner = make_planner(make_config(
+            gemini_api_key="test-key",
+            groq_api_key="test-key",
+        ))
+        gemini = FakeGemini()
+        groq = FakeGroq("primary response")
+        planner._gemini = gemini
+        planner._groq = groq
+
+        action = planner.plan("Explain dependency injection")
+
+        self.assertEqual(action.message, "primary response")
+        self.assertEqual(groq.calls, 1)
+        self.assertEqual(gemini.calls, 0)
+
+    def test_auto_falls_back_from_failed_groq_to_gemini(self):
+        planner = make_planner(make_config(
+            gemini_api_key="test-key",
+            groq_api_key="test-key",
+        ))
+        groq = FailingGroq(RuntimeError("model unavailable"))
+        gemini = FakeGemini("fallback response")
+        planner._groq = groq
+        planner._gemini = gemini
+
+        action = planner.plan("Explain dependency injection")
+
+        self.assertEqual(action.message, "fallback response")
+        self.assertEqual(groq.calls, 1)
+        self.assertEqual(gemini.calls, 1)
+
     def test_forced_ollama_uses_local_http_only(self):
         planner = make_planner(make_config(ai_provider="ollama", ollama_model="qwen-test"))
         cloud = FakeGemini()
@@ -187,6 +236,9 @@ class ProviderSelectionTests(unittest.TestCase):
 
 
 class ConfigParsingTests(unittest.TestCase):
+    def test_default_provider_order_is_groq_then_gemini(self):
+        self.assertEqual(_parse_provider_order(None), ("groq", "gemini"))
+
     def test_integer_setting_tolerates_markdown_backticks(self):
         self.assertEqual(_parse_int("3500`   `", 100), 3500)
 

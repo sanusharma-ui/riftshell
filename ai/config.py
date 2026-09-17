@@ -56,7 +56,7 @@ def _parse_user_ids(value: str | None) -> set[int]:
     return result
 
 
-VALID_AI_PROVIDERS = ("gemini", "groq", "ollama")
+VALID_AI_PROVIDERS = ("groq", "gemini", "ollama")
 
 
 def _parse_provider(value: str | None) -> str:
@@ -68,7 +68,7 @@ def _parse_provider(value: str | None) -> str:
 
 
 def _parse_provider_order(value: str | None) -> tuple[str, ...]:
-    raw_items = (value or "gemini,groq,ollama").replace(";", ",").split(",")
+    raw_items = (value or "groq,gemini").replace(";", ",").split(",")
     result: list[str] = []
     for raw_item in raw_items:
         item = raw_item.strip().lower()
@@ -93,6 +93,7 @@ class AIConfig:
     gemini_model: str
     groq_api_key: str
     groq_model: str
+    groq_timeout_seconds: int
     ai_provider: str
     ai_provider_order: tuple[str, ...]
     ollama_base_url: str
@@ -124,6 +125,7 @@ class AIConfig:
             gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip(),
             groq_api_key=os.getenv("GROQ_API_KEY", "").strip(),
             groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip(),
+            groq_timeout_seconds=_parse_int(os.getenv("GROQ_TIMEOUT_SECONDS"), 30, minimum=1),
             ai_provider=_parse_provider(os.getenv("AI_PROVIDER")),
             ai_provider_order=_parse_provider_order(os.getenv("AI_PROVIDER_ORDER")),
             ollama_base_url=(os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").strip().rstrip("/"),

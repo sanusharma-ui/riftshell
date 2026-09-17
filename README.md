@@ -172,6 +172,11 @@ py main.py
 
 The terminal itself works without an AI provider. Orbit needs Gemini, Groq, or Ollama for broader reasoning and workspace analysis.
 
+Clear English and Hinglish command requests can now use a local extractor without
+waiting for model planning. Normal conversation and complex tasks keep Orbit's AI
+reasoning; command approvals still apply. See [command extraction](docs/command-intents.md)
+for supported examples, plugin extensions, and the future ML adapter interface.
+
 ## AI provider configuration
 
 ### Gemini
@@ -188,6 +193,7 @@ GEMINI_MODEL=gemini-2.5-flash
 AI_PROVIDER=groq
 GROQ_API_KEY=your_groq_key
 GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_TIMEOUT_SECONDS=30
 ```
 
 ### Local Ollama
@@ -207,14 +213,14 @@ ollama pull qwen2.5:7b
 
 RiftShell talks to Ollama through its local HTTP API, so no additional Python SDK is required.
 
-### Local-first with cloud fallback
+### Groq-first with Gemini fallback
 
 ```env
 AI_PROVIDER=auto
-AI_PROVIDER_ORDER=ollama,gemini,groq
+AI_PROVIDER_ORDER=groq,gemini
 ```
 
-In `auto` mode, Orbit tries only configured providers in the specified order. To guarantee that prompts never fall back to a cloud model, set `AI_PROVIDER=ollama` instead of `auto`.
+In `auto` mode, Orbit tries only configured providers in the specified order. With the configuration above, every request goes to Groq first; an exception, timeout, invalid response, or empty response then falls back to Gemini. Groq SDK retries are disabled so a failed primary request reaches the fallback promptly. To guarantee that prompts never fall back to another model, select a provider directly instead of using `auto`.
 
 > [!TIP]
 > The shell runtime is always local. Model privacy depends on your selected provider: Gemini and Groq receive prompts through their APIs, while a localhost Ollama configuration keeps model requests on the machine.

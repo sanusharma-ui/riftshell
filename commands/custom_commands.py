@@ -23,6 +23,7 @@ from core.base import BaseCommand, CommandResult
 from ui.themes import get_theme, list_themes
 from utils.safe_fs import (
     resolve_path,
+    unquote_path,
     list_entries,
     tree_view,
     find_names,
@@ -406,7 +407,7 @@ class RenameCommand(BaseCommand):
         if not src.exists():
             return CommandResult(output=f"Source not found: {src}", success=False)
 
-        dst = src.with_name(args[1])
+        dst = src.with_name(unquote_path(args[1]))
         src.rename(dst)
         return CommandResult(output=f"Renamed to: {dst}")
 
