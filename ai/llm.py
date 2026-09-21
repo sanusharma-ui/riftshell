@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -93,6 +94,7 @@ class MemoryManager:
         if len(history) > max_messages:
             history = history[-max_messages:]
 
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
 
@@ -126,7 +128,10 @@ class AgentPlanner:
     def __post_init__(self) -> None:
         # 1. Memory Setup using env vars or config
         memory_enabled = str(getattr(self.config, "ai_memory_enabled", os.getenv("AI_MEMORY_ENABLED", "true"))).lower() == "true"
-        memory_path = getattr(self.config, "ai_memory_path", os.getenv("AI_MEMORY_PATH", ".riftshell_ai_memory.json"))
+        default_memory = ".riftshell_ai_memory.json"
+        if getattr(sys, "frozen", False):
+            default_memory = str(Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "RiftShell" / "orbit_memory.json")
+        memory_path = getattr(self.config, "ai_memory_path", os.getenv("AI_MEMORY_PATH", default_memory))
         memory_turns = int(getattr(self.config, "ai_memory_recent_turns", os.getenv("AI_MEMORY_RECENT_TURNS", 12)))
 
         self.memory = MemoryManager(path=memory_path, limit=memory_turns, enabled=memory_enabled)
@@ -1029,7 +1034,8 @@ class AgentPlanner:
             action="respond",
             message=(
                 "I can help with the built-in RiftShell workspace requests locally. "
-                "For broader reasoning and more complex phrasing, configure a Gemini or Groq API key. "
+                "For broader reasoning and more complex phrasing, open Workspace Settings "
+                "(Ctrl+,) to add a Groq or Gemini API key, or select a local Ollama model. "
                 "You can also use the Command Explorer to browse every available command."
             ),
         )

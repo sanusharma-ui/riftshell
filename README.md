@@ -158,19 +158,24 @@ py -m venv .venv
 py -m pip install -r requirements.txt
 ```
 
-### 4. Configure Orbit
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Open `.env` and configure at least one AI provider. Then start the desktop app:
+### 4. Start RiftShell and configure Orbit
 
 ```powershell
 py main.py
 ```
 
-The terminal itself works without an AI provider. Orbit needs Gemini, Groq, or Ollama for broader reasoning and workspace analysis.
+Open **Workspace Settings** (`Ctrl+,`) and choose Groq, Gemini, or Local Ollama.
+Paste a cloud API key once; RiftShell stores it in Windows Credential Manager,
+not in the settings file. For Ollama, start the local service and enter an
+installed model name. The provider choice takes effect on the next Orbit task.
+The terminal works without a provider.
+
+Developers can still use `.env`: copy `.env.example` to `.env` and edit it.
+Desktop settings take precedence once saved; environment keys remain available
+when no key is saved in Credential Manager. The optional Telegram bot continues
+to use environment configuration.
+
+Orbit needs Gemini, Groq, or Ollama for broader reasoning and workspace analysis.
 
 Clear English and Hinglish command requests can now use a local extractor without
 waiting for model planning. Normal conversation and complex tasks keep Orbit's AI
@@ -225,7 +230,46 @@ In `auto` mode, Orbit tries only configured providers in the specified order. Wi
 > [!TIP]
 > The shell runtime is always local. Model privacy depends on your selected provider: Gemini and Groq receive prompts through their APIs, while a localhost Ollama configuration keeps model requests on the machine.
 
+## Build the Windows app
+
+Build on Windows with Python installed. Create a clean virtual environment and
+install the app and packager:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller
+```
+
+From the repository root, build the distributable folder:
+
+```powershell
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name RiftShell --collect-submodules keyring.backends --add-data "plugins;plugins" main.py
+```
+
+Share the **whole** `dist\RiftShell` folder as a ZIP. The launch file is
+`dist\RiftShell\RiftShell.exe`. Do not ship a local `.env` or API keys.
+Test the ZIP on another Windows account or PC with no Python installation:
+launch, save a Groq key, run an Orbit request, switch to a local Ollama model,
+and check terminal commands and bundled plugins. Ollama and its model must be
+installed separately by users who choose local inference.
+
+A single-file build is possible by replacing `--onedir` with `--onefile`,
+but it extracts to a temporary directory at every launch. After each code
+release, build and distribute a new version of the EXE; users' QSettings
+preferences and Credential Manager keys remain outside the app folder.
+
 ## Workspace and safety configuration
+
+For the desktop app, open **Workspace Settings** (`Ctrl+,`) to choose the Orbit
+workspace folder. Leave **Allow Orbit file inspection and writes outside this
+folder** off to limit those AI file operations to the chosen folder. Turn it on
+when you want Orbit to inspect or propose edits elsewhere. This does not remove
+the existing review and approval for file writes or risky commands. Manual
+terminal navigation and commands already use their own shell and approval flow.
+New settings apply to the next Orbit task; a pending task keeps its original
+access boundary.
+
+Source runs and the optional Telegram bot can still use environment variables:
 
 ```env
 AI_WORKSPACE_ROOT=D:\Projects\riftshell
@@ -234,7 +278,14 @@ AI_APPROVAL_TIMEOUT_MINUTES=30
 AI_COMMAND_OUTPUT_LIMIT=3500
 ```
 
-Keep `AI_ALLOW_OUTSIDE_WORKSPACE=false` for a bounded AI workspace. Full-PC mode is available when intentionally enabled, but high-impact actions still pass through the approval policy.
+`AI_APPROVAL_TIMEOUT_MINUTES` expires pending **Telegram bot** approvals after
+30 minutes by default; desktop Orbit does not use that timer.
+`AI_COMMAND_OUTPUT_LIMIT` trims **Telegram bot** messages and review previews
+to about 3,500 characters by default; it does not cap the desktop terminal.
+Provider request timeouts are separate: Groq defaults to 30 seconds and Ollama
+to 120 seconds (`GROQ_TIMEOUT_SECONDS` and `OLLAMA_TIMEOUT_SECONDS`). Advanced
+users of a packaged app can set those as Windows environment variables before
+launching RiftShell.
 
 ## Optional Telegram assistant
 

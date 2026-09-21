@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import re
+import sys
 from html import escape
 from pathlib import Path
+from urllib.parse import urlparse
 
 from PySide6.QtCore import Qt, QSettings, QThread, Signal, QStringListModel, QTimer
 from PySide6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
-    QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+    QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
     QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -17,6 +19,8 @@ from core.shell import Shell
 from core.base import CommandResult
 from core.native_terminal import native_dependency_error
 from ai.agent_run import AgentRun
+from ai.config import AIConfig
+from ai.desktop_settings import load_desktop_config, remove_api_key, save_api_key, saved_key_exists
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
 from ui.themes import build_stylesheet, get_theme, list_themes
@@ -156,10 +160,9 @@ class OrbitWorker(QThread):
 
     def run(self):
         try:
-            from ai.config import AIConfig
             from ai.llm import AgentPlanner
 
-            config = AIConfig.from_env()
+            config = load_desktop_config()
             planner = self.task.planner if self.task and self.task.planner else AgentPlanner(
                 config=config,
                 command_names=self.shell.registry.all_names(),
@@ -289,6 +292,33 @@ class PreferencesDialog(QDialog):
         self.confirm.setChecked(preferences["confirm_risky"])
         self.restore = QCheckBox("Restore recent command history on launch")
         self.restore.setChecked(preferences["restore_history"])
+        self.provider = QComboBox()
+        for label, value in (
+            ("Auto (configured order)", "auto"), ("Groq", "groq"),
+            ("Gemini", "gemini"), ("Local Ollama", "ollama"),
+        ):
+            self.provider.addItem(label, value)
+        self.provider.setCurrentIndex(max(0, self.provider.findData(preferences["ai_provider"])))
+        self.groq_key = QLineEdit()
+        self.groq_key.setEchoMode(QLineEdit.Password)
+        self.groq_key.setPlaceholderText("Leave blank to keep saved key")
+        self.groq_remove = QCheckBox("Remove saved Groq key")
+        self.gemini_key = QLineEdit()
+        self.gemini_key.setEchoMode(QLineEdit.Password)
+        self.gemini_key.setPlaceholderText("Leave blank to keep saved key")
+        self.gemini_remove = QCheckBox("Remove saved Gemini key")
+        self.groq_model = QLineEdit(preferences["groq_model"])
+        self.ollama_url = QLineEdit(preferences["ollama_base_url"])
+        self.ollama_model = QLineEdit(preferences["ollama_model"])
+        self.ollama_model.setPlaceholderText("Model installed in Ollama")
+        self.workspace_root = QLineEdit(preferences["workspace_root"])
+        browse_workspace = QPushButton("Browse")
+        browse_workspace.clicked.connect(self._browse_workspace)
+        workspace_row = QHBoxLayout()
+        workspace_row.addWidget(self.workspace_root, 1)
+        workspace_row.addWidget(browse_workspace)
+        self.allow_outside_workspace = QCheckBox("Allow Orbit file inspection and writes outside this folder")
+        self.allow_outside_workspace.setChecked(preferences["allow_outside_workspace"])
         form = QFormLayout()
         form.setSpacing(12)
         form.addRow("Theme", self.theme)
@@ -296,6 +326,16 @@ class PreferencesDialog(QDialog):
         form.addRow("Font size", self.font_size)
         form.addRow("Safety", self.confirm)
         form.addRow("Workspace", self.restore)
+        form.addRow("AI provider", self.provider)
+        form.addRow("Groq API key", self.groq_key)
+        form.addRow("", self.groq_remove)
+        form.addRow("Groq model", self.groq_model)
+        form.addRow("Gemini API key", self.gemini_key)
+        form.addRow("", self.gemini_remove)
+        form.addRow("Ollama URL", self.ollama_url)
+        form.addRow("Ollama model", self.ollama_model)
+        form.addRow("Orbit workspace", workspace_row)
+        form.addRow("AI file access", self.allow_outside_workspace)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
@@ -307,11 +347,52 @@ class PreferencesDialog(QDialog):
         layout.addStretch()
         layout.addWidget(buttons)
 
+    def _browse_workspace(self):
+        selected = QFileDialog.getExistingDirectory(self, "Choose Orbit workspace", self.workspace_root.text())
+        if selected:
+            self.workspace_root.setText(selected)
+
     def _save(self):
+        workspace_text = self.workspace_root.text().strip()
+        workspace = Path(workspace_text).expanduser() if workspace_text else None
+        if workspace is None or not workspace.is_dir():
+            QMessageBox.warning(self, "Orbit workspace", "Choose an existing folder for Orbit's workspace.")
+            return
+        workspace = workspace.resolve(strict=True)
+        provider = self.provider.currentData()
+        url = self.ollama_url.text().strip().rstrip("/")
+        parsed = urlparse(url)
+        if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            QMessageBox.warning(self, "Local model", "Use a local HTTP address such as http://127.0.0.1:11434.")
+            return
+        if provider == "ollama" and not self.ollama_model.text().strip():
+            QMessageBox.warning(self, "Local model", "Enter the model name installed in Ollama.")
+            return
+        try:
+            for name, field, remove in (
+                ("groq", self.groq_key, self.groq_remove),
+                ("gemini", self.gemini_key, self.gemini_remove),
+            ):
+                if remove.isChecked():
+                    remove_api_key(name)
+                elif field.text().strip():
+                    save_api_key(name, field.text().strip())
+            env_config = AIConfig.from_env()
+            env_key = env_config.groq_api_key if provider == "groq" else env_config.gemini_api_key
+            if provider in {"groq", "gemini"} and not (saved_key_exists(provider) or env_key):
+                QMessageBox.warning(self, "API key required", f"Enter a {provider.title()} API key.")
+                return
+        except Exception as exc:
+            QMessageBox.warning(self, "Credential storage", f"Could not save the API key: {exc}")
+            return
         self.preferences_saved.emit({
             "theme": self.theme.currentData(), "font_family": self.font.currentText(),
             "font_size": self.font_size.value(), "confirm_risky": self.confirm.isChecked(),
             "restore_history": self.restore.isChecked(),
+            "ai_provider": provider, "groq_model": self.groq_model.text().strip(),
+            "ollama_base_url": url, "ollama_model": self.ollama_model.text().strip(),
+            "workspace_root": str(workspace),
+            "allow_outside_workspace": self.allow_outside_workspace.isChecked(),
         })
         self.accept()
 
@@ -813,9 +894,7 @@ class OrbitPanel(QFrame):
                 self._stream("Orbit", "The active workspace session is no longer available.")
                 self.status.setText("Open a workspace session and try again.")
                 return
-            from ai.config import AIConfig
-
-            config = AIConfig.from_env()
+            config = self.task.planner.config if self.task and self.task.planner else load_desktop_config()
             preview = preview_file_writes(
                 action.files,
                 config.workspace_root,
@@ -1048,7 +1127,21 @@ class MainWindow(QMainWindow):
         self._refresh_workspace()
 
     def _load_preferences(self) -> dict:
+        try:
+            ai = AIConfig.from_env()
+            defaults = (ai.ai_provider, ai.groq_model, ai.ollama_base_url, ai.ollama_model,
+                        str(ai.workspace_root), ai.allow_outside_workspace)
+        except ValueError:
+            # A bad developer .env must not prevent the desktop shell from opening.
+            defaults = ("auto", "llama-3.3-70b-versatile", "http://127.0.0.1:11434", "",
+                        str(Path.home()), False)
         return {
+            "ai_provider": self.settings.value("ai/provider", defaults[0], type=str),
+            "groq_model": self.settings.value("ai/groq_model", defaults[1], type=str),
+            "ollama_base_url": self.settings.value("ai/ollama_base_url", defaults[2], type=str),
+            "ollama_model": self.settings.value("ai/ollama_model", defaults[3], type=str),
+            "workspace_root": self.settings.value("ai/workspace_root", defaults[4], type=str),
+            "allow_outside_workspace": self.settings.value("ai/allow_outside_workspace", defaults[5], type=bool),
             "theme": self.settings.value("appearance/theme", "vscode-dark-plus", type=str),
             "font_family": self.settings.value("appearance/font_family", "Cascadia Code", type=str),
             "font_size": self.settings.value("appearance/font_size", 11, type=int),
@@ -1147,7 +1240,11 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Shift+C"), self, activated=lambda: self.current_session() and self.current_session().copy_output())
 
     def new_session(self, start_dir: Path | None = None, title: str | None = None):
-        shell = Shell(start_dir=start_dir or Path.cwd())
+        default_dir = Path.cwd()
+        if getattr(sys, "frozen", False):
+            chosen = Path(self.preferences["workspace_root"])
+            default_dir = chosen if chosen.is_dir() else Path.home()
+        shell = Shell(start_dir=start_dir or default_dir)
         shell.ctx.current_theme = self.preferences["theme"]
         shell.ctx.history = self.history[-300:]
         session = TerminalSession(shell, title or f"Terminal {self.tabs.count() + 1}", self.preferences, self.tabs)
@@ -1340,8 +1437,14 @@ class MainWindow(QMainWindow):
     def save_preferences(self, preferences: dict):
         self.preferences = preferences
         for key, value in preferences.items():
-            group = "appearance" if key in {"theme", "font_family", "font_size"} else "safety" if key == "confirm_risky" else "workspace"
-            self.settings.setValue(f"{group}/{key}", value)
+            if key in {"ai_provider", "groq_model", "ollama_base_url", "ollama_model",
+                       "workspace_root", "allow_outside_workspace"}:
+                setting = "provider" if key == "ai_provider" else key
+                self.settings.setValue(f"ai/{setting}", value)
+            else:
+                group = "appearance" if key in {"theme", "font_family", "font_size"} else "safety" if key == "confirm_risky" else "workspace"
+                self.settings.setValue(f"{group}/{key}", value)
+        self.settings.sync()
         self.apply_theme(preferences["theme"])
         self.setFont(QFont(preferences["font_family"], preferences["font_size"]))
         for index in range(self.tabs.count()):
@@ -1419,9 +1522,8 @@ class MainWindow(QMainWindow):
                     self.orbit.stop_task()
                     self.orbit._append("Orbit", "Another file update is already in progress.")
                     return
-                from ai.config import AIConfig
-
-                config = AIConfig.from_env()
+                task = self.orbit.task
+                config = task.planner.config if task and task.planner else load_desktop_config()
                 self._orbit_write_worker = FileWriteWorker(
                     action.files,
                     config.workspace_root,

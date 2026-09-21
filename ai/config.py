@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_WORKSPACE_ROOT = Path.home() if getattr(sys, "frozen", False) else PROJECT_ROOT
 
 
 def _load_dotenv(path: Path) -> None:
@@ -106,13 +108,14 @@ class AIConfig:
 
     @classmethod
     def from_env(cls) -> "AIConfig":
-        _load_dotenv(PROJECT_ROOT / ".env")
+        if not getattr(sys, "frozen", False):
+            _load_dotenv(PROJECT_ROOT / ".env")
 
-        workspace_text = os.getenv("AI_WORKSPACE_ROOT", str(PROJECT_ROOT))
+        workspace_text = os.getenv("AI_WORKSPACE_ROOT", str(DEFAULT_WORKSPACE_ROOT))
         try:
             workspace_root = Path(workspace_text).expanduser().resolve(strict=False)
         except Exception:
-            workspace_root = PROJECT_ROOT
+            workspace_root = DEFAULT_WORKSPACE_ROOT
 
         return cls(
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
