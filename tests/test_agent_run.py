@@ -173,6 +173,53 @@ class OrbitLoopUITests(unittest.TestCase):
         self.panel._append("You", "follow up")
         self.assertEqual(outputs, [(self.session, "Requested result")])
 
+    def test_complete_reply_is_visible_immediately_without_timer_or_duplicate_callback(self):
+        text = "## Result\n\n" + "Complete answer. " * 400
+        done = Mock()
+        with patch.object(self.panel, "_render_conversation", wraps=self.panel._render_conversation) as render:
+            self.panel._stream("Orbit", text, on_done=done)
+            self.assertEqual(self.panel.messages[-1], ("Orbit", text))
+            self.assertIn("Complete answer.", self.panel.conversation.toPlainText())
+            self.assertFalse(self.panel.stream_timer.isActive())
+            self.panel._stream_next_chunk()
+            render.assert_called_once()
+        done.assert_called_once()
+
+    def test_retry_status_is_ignored_after_stop(self):
+        worker = OrbitWorker(Mock(), "task", task=self.panel.task)
+        self.panel.worker = worker
+        worker.progress.connect(self.panel._show_provider_progress)
+        worker.progress.emit("Waiting for Groq")
+        self.assertEqual(self.panel.status.text(), "Waiting for Groq")
+        self.panel.stop_task()
+        stopped_status = self.panel.status.text()
+        worker.progress.emit("late update")
+        self.assertEqual(self.panel.status.text(), stopped_status)
+        self.panel.worker = None
+
+    def test_provider_retry_keeps_risky_command_behind_one_approval(self):
+        from ai.provider_runtime import ProviderRuntime
+        from test_provider_runtime import FakeClock, RateLimitError
+        clock = FakeClock()
+        planner = AgentPlanner(make_config(Path.cwd()), ["run"], [])
+        planner.provider_runtime = ProviderRuntime(clock=clock, sleep=clock.sleep)
+        planner._call_provider = Mock(side_effect=[
+            RateLimitError(headers={"retry-after": "1"}),
+            '{"action":"shell","command":"run python check.py","message":"Check project"}',
+        ])
+        self.panel.task.planner = planner
+        worker = OrbitWorker(Mock(), "Help me verify this project", task=self.panel.task)
+        worker.planned.connect(self.panel._show_plan)
+        with patch("ui.main_window.load_desktop_config", return_value=make_config(Path.cwd())):
+            worker.run()
+        self.assertEqual(planner._call_provider.call_count, 2)
+        self.assertEqual(self.emitted, [])
+        self.assertEqual(self.panel.pending_action.command, "run python check.py")
+        self.panel.approve()
+        self.panel.approve()
+        self.assertEqual(len(self.emitted), 1)
+        self.assertTrue(self.emitted[0][1])
+
     def test_result_schedules_continuation_without_unlocking_input(self):
         self.panel._show_plan(AgentAction("shell", command="files", continue_after_result=True))
         self.panel.show_execution_result("files", SimpleNamespace(success=True, output="main.py"))

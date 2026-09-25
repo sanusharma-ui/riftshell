@@ -230,7 +230,13 @@ AI_PROVIDER=auto
 AI_PROVIDER_ORDER=groq,gemini
 ```
 
-In `auto` mode, Orbit tries only configured providers in the specified order. With the configuration above, every request goes to Groq first; an exception, timeout, invalid response, or empty response then falls back to Gemini. Groq SDK retries are disabled so a failed primary request reaches the fallback promptly. To guarantee that prompts never fall back to another model, select a provider directly instead of using `auto`.
+In `auto` mode, Orbit tries configured providers in the specified order, skipping providers with a known active quota cooldown. With the configuration above, Groq is preferred; an exception, timeout, invalid response, or empty response falls back to Gemini. Groq SDK retries remain disabled so a failed primary request reaches the fallback promptly. To guarantee that prompts never fall back to another model, select a provider directly instead of using `auto`.
+
+Orbit shares quota cooldowns across turns in the same process, scoped to provider, credential and model. It reads Groq quota headers and provider retry hints. If no provider succeeds, a short rate limit can trigger one generation retry, with at most 15 seconds of total cooldown waiting per task. The desktop shows a cancellable countdown. Confirmed daily exhaustion does not trigger this automatic retry. A generic quota error does not identify whether the limit is daily; unknown retry delays use a 60-second cooldown. Cooldowns are cleared when the app exits and cannot account for other apps using the same organization/project quota.
+
+Provider failure details are kept out of subsequent conversation prompts; the user request and a short failure status remain. Existing saved error records are compacted when constructing prompts without rewriting the history file. Continuation inspections include execution evidence without duplicating the complete base prompt. Command definitions, safety rules, user constraints, inspected source, model choices and output limits are preserved. Completed replies render immediately instead of replaying a typing animation.
+
+For local diagnosis, `ai.provider_runtime.PROVIDER_RUNTIME.diagnostics()` returns the latest 100 timing/status events **inside the running process**. Events include provider calls, quota waits, planning, execution, rendering and input readiness. Provider errors redact configured API keys; prompts, generated answers and command output are not recorded by the diagnostics code. Events also go to the `ai.provider_runtime` Python logger at `DEBUG` level if a developer enables it. These timings are diagnostic evidence, not a guarantee of live provider speed or answer quality.
 
 > [!TIP]
 > The shell runtime is always local. Model privacy depends on your selected provider: Gemini and Groq receive prompts through their APIs, while a localhost Ollama configuration keeps model requests on the machine.

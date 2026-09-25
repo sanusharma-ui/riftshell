@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+from time import perf_counter
 from html import escape
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,6 +24,7 @@ from ai.config import AIConfig
 from ai.desktop_settings import load_desktop_config, remove_api_key, save_api_key, saved_key_exists
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
+from ai.provider_runtime import PROVIDER_RUNTIME
 from ui.themes import build_stylesheet, get_theme, list_themes
 
 
@@ -141,16 +143,19 @@ class CommandWorker(QThread):
         if self.isInterruptionRequested():
             self.result_ready.emit(CommandResult(output="Command cancelled before execution.", success=False))
             return
+        started = perf_counter()
         try:
             result = self.shell.execute_line(self.command)
         except Exception as exc:
             result = CommandResult(output=f"Command failed: {exc}", success=False)
+        PROVIDER_RUNTIME.record("execution", elapsed_seconds=perf_counter() - started, success=result.success)
         self.result_ready.emit(result)
 
 
 class OrbitWorker(QThread):
     planned = Signal(object)
     failed = Signal(str)
+    progress = Signal(str)
 
     def __init__(self, shell: Shell, prompt: str, parent=None, task=None):
         super().__init__(parent)
@@ -159,6 +164,7 @@ class OrbitWorker(QThread):
         self.task = task
 
     def run(self):
+        started = perf_counter()
         try:
             from ai.llm import AgentPlanner
 
@@ -175,11 +181,15 @@ class OrbitWorker(QThread):
             )
             if self.task:
                 self.task.planner = planner
+            planner.progress = self.progress.emit
             action = (planner.continue_task(self.prompt, self.task.observations)
                       if self.task and self.task.observations else planner.plan(self.prompt))
             self.planned.emit(action)
         except Exception as exc:
             self.failed.emit(str(exc))
+        finally:
+            PROVIDER_RUNTIME.record("planning", elapsed_seconds=perf_counter() - started,
+                                    continuation=bool(self.task and self.task.observations))
 
 
 class FileWriteWorker(QThread):
@@ -799,8 +809,11 @@ class OrbitPanel(QFrame):
         self.thinking_timer.stop()
         self.thinking_indicator.setText("")
         available = not self.executing and not self.continue_timer.isActive()
+        becoming_available = available and not self.input.isEnabled()
         self.input.setEnabled(available)
         self.plan_button.setEnabled(available)
+        if becoming_available:
+            PROVIDER_RUNTIME.record("input_ready")
 
     def _advance_thinking_indicator(self):
         frames = ("|", "/", "-", "\\")
@@ -847,9 +860,14 @@ class OrbitPanel(QFrame):
         self.worker = OrbitWorker(self.task_session.shell, self.task.objective, self, task=self.task)
         self.worker.planned.connect(self._show_plan)
         self.worker.failed.connect(self._show_failure)
+        self.worker.progress.connect(self._show_provider_progress)
         worker = self.worker
         worker.finished.connect(lambda: self._planning_finished(worker))
         self.worker.start()
+
+    def _show_provider_progress(self, message):
+        if self.sender() is self.worker and self.task and not self.task.stopped:
+            self.status.setText(message)
 
     def _planning_finished(self, worker):
         if self.worker is worker:
@@ -976,16 +994,20 @@ class OrbitPanel(QFrame):
         self.stream_message_index = None
 
     def _stream(self, label: str, text: str, on_done=None):
-        """Reveal a response while continuously rendering its Markdown structure."""
+        """The provider already returned complete text: render it once, immediately."""
+        started = perf_counter()
         self._finish_stream()
+        self.stream_timer.stop()
         self._publish_output(label, text)
         self.stream_text = text
-        self.stream_index = 0
-        self.stream_done = on_done
-        self.messages.append((label, ""))
-        self.stream_message_index = len(self.messages) - 1
+        self.stream_index = len(text)
+        self.stream_done = None
+        self.messages.append((label, text))
+        self.stream_message_index = None
         self._render_conversation()
-        self.stream_timer.start(16)
+        PROVIDER_RUNTIME.record("render", elapsed_seconds=perf_counter() - started, response_chars=len(text))
+        if on_done:
+            on_done()
 
     def _stream_next_chunk(self):
         if self.stream_index >= len(self.stream_text):
