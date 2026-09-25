@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Callable
 
 from ai.actions import AgentAction
-from ai.command_intent import IntentExtractor, RuleIntentExtractor, valid_candidate
+from ai.command_intent import IntentExtractor, valid_candidate
+from ai.semantic_intent import HybridIntentExtractor
 from ai.config import AIConfig
 from ai.workspace_reader import WorkspaceInspection, inspect_workspace_paths
 from core.parser import CommandParser
@@ -135,7 +136,7 @@ class AgentPlanner:
         memory_turns = int(getattr(self.config, "ai_memory_recent_turns", os.getenv("AI_MEMORY_RECENT_TURNS", 12)))
 
         self.memory = MemoryManager(path=memory_path, limit=memory_turns, enabled=memory_enabled)
-        self.intent_extractor = self.intent_extractor or RuleIntentExtractor(
+        self.intent_extractor = self.intent_extractor or HybridIntentExtractor(
             self.command_names, metadata=self.command_metadata or (),
         )
 
@@ -201,12 +202,16 @@ class AgentPlanner:
 
     def plan(self, user_text: str) -> AgentAction:
         self._task_origin_dir = self.current_dir_provider() if self.current_dir_provider else self.config.workspace_root
-        # Only complete, unambiguous grammar matches bypass model planning.
+        # Complete rule matches and validated local semantic matches avoid cloud planning.
         # A miss adds no prompt text or extra provider request to normal chat.
         extracted = self.intent_extractor.extract(user_text)
         candidate = extracted.match
         if (
-            candidate and candidate.source == "rules" and candidate.confidence == 1.0
+            candidate and (
+                (candidate.source == "rules" and candidate.confidence == 1.0)
+                or (type(self.intent_extractor) is HybridIntentExtractor
+                    and self.intent_extractor.permits(candidate))
+            )
             and valid_candidate(candidate, self.command_names)
         ):
             action = AgentAction("shell", command=candidate.command, message=candidate.message)

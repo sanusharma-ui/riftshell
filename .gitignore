@@ -33,6 +33,9 @@ logs/
 *.tmp
 *.temp
 
+# Downloaded, checksum-verified local intent model (scripts/setup_intent_model.py)
+assets/intent-model/
+
 # IDE and OS files
 .vscode/
 .idea/

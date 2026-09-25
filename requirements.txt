@@ -6,4 +6,7 @@ keyring>=25.0.0
 Pillow>=10.0.0
 pywinpty>=2.0.15,<3; sys_platform == "win32"
 pyte>=0.8.2,<0.9
+numpy>=1.26,<3
+onnxruntime>=1.23,<2
+tokenizers>=0.21,<1
 

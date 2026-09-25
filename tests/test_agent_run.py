@@ -1,5 +1,6 @@
 import unittest
 import os
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 from ai.actions import AgentAction
 from ai.agent_run import AgentRun
 from ai.llm import AgentPlanner
+from core.shell import Shell
 from test_workspace_agent import make_config, SequencedGemini
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -88,7 +90,7 @@ class AgentRunTests(unittest.TestCase):
         task = AgentRun("Check files", planner=planner)
         task.observations.append({"success": True, "output": "main.py"})
         worker = OrbitWorker(Mock(), task.objective, task=task)
-        with patch("ai.config.AIConfig.from_env", return_value=make_config(Path.cwd())):
+        with patch("ui.main_window.load_desktop_config", return_value=make_config(Path.cwd())):
             worker.run()
         planner.continue_task.assert_called_once_with(task.objective, task.observations)
         planner.plan.assert_not_called()
@@ -185,6 +187,45 @@ class OrbitLoopUITests(unittest.TestCase):
         self.assertTrue(self.panel.input.isEnabled())
         self.assertTrue(self.panel.task.stopped)
         self.assertIn("You are currently in the workspace directory", self.panel.stream_text)
+
+    def test_show_me_folders_worker_output_and_input_unlock_without_model(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp:
+            root = Path(temp)
+            (root / "Visible Folder").mkdir()
+            (root / "notes.txt").write_text("not a folder", encoding="utf-8")
+            self.session.shell = Shell(start_dir=root, workspace_root=root, allow_outside_workspace=False)
+            self.panel.task_cwd = root
+            self.panel.task = AgentRun("show me folders")
+            self.panel._set_thinking(True)
+            worker = OrbitWorker(self.session.shell, self.panel.task.objective, task=self.panel.task)
+            failures = []
+            worker.failed.connect(failures.append)
+            worker.planned.connect(self.panel._show_plan)
+            with patch("ui.main_window.load_desktop_config", return_value=make_config(root)), \
+                 patch.object(AgentPlanner, "_ensure_provider", side_effect=AssertionError("provider initialized")), \
+                 patch.object(AgentPlanner, "_request_model_action", side_effect=AssertionError("model called")), \
+                 patch.object(AgentPlanner, "continue_task", side_effect=AssertionError("continued")):
+                worker.run()
+                self.assertEqual(failures, [])
+                self.assertEqual(len(self.emitted), 1)
+                action, approved, snapshots = self.emitted[0]
+                self.assertEqual(action.command, "folders")
+                self.assertFalse(approved)
+                self.assertIsNone(snapshots)
+                results = []
+                command_worker = CommandWorker(self.session.shell, action.command)
+                command_worker.result_ready.connect(results.append)
+                command_worker.run()
+                self.assertEqual(len(results), 1)
+                self.assertTrue(results[0].success)
+                self.assertIn("Visible Folder", results[0].output)
+                self.assertNotIn("notes.txt", results[0].output)
+                self.panel.show_execution_result(action.command, results[0])
+                self.assertFalse(self.panel.continue_timer.isActive())
+                self.assertTrue(self.panel.task.stopped)
+                self.assertTrue(self.panel.input.isEnabled())
+                self.assertTrue(self.panel.plan_button.isEnabled())
+                self.assertFalse(self.panel.executing)
 
     def test_command_exception_returns_a_failure_result(self):
         shell = Mock()

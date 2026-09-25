@@ -17,6 +17,45 @@ from core.shell import Shell
 from test_ai_providers import make_config
 
 
+LISTING_CASES = {
+    "show me folders": "folders",
+    "SHOW ME FOLDERS!": "folders",
+    "Could you please show me all the folders?": "folders",
+    "show me only folders here": "folders",
+    "list directories right here": "folders",
+    "display all the directories inside the current folder": "folders",
+    "show folders in src": "folders src",
+    "show me all the folders inside the directory src": "folders src",
+    'list only directories in "My  Reports"': 'folders "My  Reports"',
+    'show folders in "D:\\Do Not Delete"': 'folders "D:\\Do Not Delete"',
+    "show folders in .": "folders .",
+    "show folders in ..": "folders ..",
+    "show me all the files": "files",
+    "show files here": "files",
+    "display files inside this directory": "files",
+    "show me files and folders": "files",
+    "list folders and files here": "files",
+    "display files and directories in src": "files src",
+    "list directories and files inside src": "files src",
+    "mujhe folders dikhao": "folders",
+    "mujhe saare folders dikha do": "folders",
+    "mujhe sirf directories dikhao": "folders",
+    "is folder ke folders dikhao": "folders",
+    "is folder ki files dikhao": "files",
+    '"is" folder ke folders dikhao': "folders is",
+    "./is ke folders dikhao": "folders ./is",
+    "current directory ke folders batao": "folders",
+    "mujhe current folder ke saare directories dikhao": "folders",
+    "src ke folders dikhao": "folders src",
+    "src folder ki directories dikha do": "folders src",
+    'mujhe "My Reports" ke sirf folders dikhao!': 'folders "My Reports"',
+    "mujhe saari files dikhao": "files",
+    "is directory ki files dikha do": "files",
+    "src ke files dikhao": "files src",
+    "mujhe src ki files dikhao": "files src",
+}
+
+
 class CommandIntentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -94,6 +133,37 @@ class CommandIntentTests(unittest.TestCase):
         }.items():
             with self.subTest(text=text):
                 self.assertEqual(self.extractor.extract(text).match.command, command)
+
+    def test_listing_variants_preserve_target_and_folder_filter(self):
+        for text, expected in LISTING_CASES.items():
+            with self.subTest(text=text):
+                result = self.extractor.extract(text)
+                self.assertEqual(result.status, "matched")
+                self.assertEqual(result.match.command, expected)
+
+    def test_listing_expansion_does_not_discard_constraints_or_extra_actions(self):
+        for text in (
+            "show me folders", "show me all the folders", "show folders in src",
+            "show files and folders here", "mujhe folders dikhao", "src ke folders dikhao",
+        ):
+            for prefix in ("don't ", "do not ", "explain how to ", "if possible "):
+                with self.subTest(text=prefix + text):
+                    self.assertIsNone(self.extractor.extract(prefix + text).match)
+            for suffix in (" and delete notes.txt", " but don't execute", " mat karo", " nahi",
+                           "; delete confirm notes.txt", " recursively", " sorted by size"):
+                with self.subTest(text=text + suffix):
+                    self.assertIsNone(self.extractor.extract(text + suffix).match)
+        for text in (
+            "show folders in it", "show folders in the directory", "show folders in My Reports",
+            'show folders in "src; delete confirm notes.txt"', "show folders in $HOME",
+            "show folders in *.txt", "show folders in src.", "show folders in src then run tests",
+            "show hidden folders here", "show only files here", "show files and delete folders",
+            "mujhe folders nahi dikhao", "is folder ke folders mat dikhao",
+            "is ke folders dikhao",
+            "show me folders\nand files", "show folders in src and docs",
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(self.extractor.extract(text).match)
 
     def test_chat_negation_explanations_and_incomplete_requests_abstain(self):
         cases = (
@@ -196,6 +266,17 @@ class PlannerIntentIntegrationTests(unittest.TestCase):
         self.assertIsNone(planner._gemini)
         self.assertIsNone(planner._groq)
 
+    def test_listing_variants_skip_provider_and_result_continuation(self):
+        planner = self.planner()
+        with patch.object(planner, "_ensure_provider", side_effect=AssertionError("provider initialized")), \
+             patch.object(planner, "_request_model_action", side_effect=AssertionError("model called")):
+            for prompt, expected in LISTING_CASES.items():
+                with self.subTest(prompt=prompt):
+                    action = planner.plan(prompt)
+                    self.assertEqual(action.action, "shell")
+                    self.assertEqual(action.command, expected)
+                    self.assertFalse(action.continue_after_result)
+
     def test_no_match_keeps_normal_reasoning_without_an_extra_model_call(self):
         planner = self.planner()
         for text in ("Explain dependency injection", "List files and then check git status",
@@ -276,6 +357,16 @@ class PlannerIntentIntegrationTests(unittest.TestCase):
             result = shell.execute_line(action.command)
             self.assertTrue(result.success, result.output)
             self.assertIn("Notes.TXT", result.output)
+            (root / "My Reports" / "Nested Folder").mkdir()
+            for text in ('show me folders', 'show folders in "My Reports"',
+                         'mujhe "My Reports" ke folders dikhao'):
+                result = shell.execute_line(planner.plan(text).command)
+                self.assertTrue(result.success, result.output)
+                self.assertIn("My Reports" if text == "show me folders" else "Nested Folder", result.output)
+                self.assertNotIn("Notes.TXT", result.output)
+            result = shell.execute_line(planner.plan('show folders in "../outside workspace"').command)
+            self.assertFalse(result.success)
+            self.assertIn("Blocked path outside", result.output)
             for text in (
                 'Copy "My Reports/Notes.TXT" to "My Reports/Copy.TXT"',
                 'Rename "My Reports/Copy.TXT" to "Renamed Copy.TXT"',

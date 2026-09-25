@@ -6,7 +6,7 @@ from core.base import CommandResult
 from core.context import ShellContext
 from core.parser import CommandParser, ParsedCommand
 from commands import build_registry
-from utils.safe_fs import ensure_path_allowed, resolve_path
+from utils.safe_fs import ensure_path_allowed, resolve_path, unquote_path
 
 
 class Shell:
@@ -118,7 +118,9 @@ class Shell:
         return ParsedCommand(
             raw=parsed.raw,
             name=self._expand_vars(parsed.name).lower(),
-            args=[self._expand_vars(arg) for arg in parsed.args],
+            # The Windows parser retains grouping quotes. Commands receive the
+            # literal argument value, preserving internal spaces/backslashes.
+            args=[unquote_path(self._expand_vars(arg)) for arg in parsed.args],
             redirect_path=self._expand_vars(parsed.redirect_path) if parsed.redirect_path else None,
             redirect_append=parsed.redirect_append,
         )

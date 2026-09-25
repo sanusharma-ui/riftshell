@@ -156,6 +156,7 @@ py -m venv .venv
 
 ```powershell
 py -m pip install -r requirements.txt
+py scripts/setup_intent_model.py
 ```
 
 ### 4. Start RiftShell and configure Orbit
@@ -177,10 +178,14 @@ to use environment configuration.
 
 Orbit needs Gemini, Groq, or Ollama for broader reasoning and workspace analysis.
 
-Clear English and Hinglish command requests can now use a local extractor without
-waiting for model planning. Normal conversation and complex tasks keep Orbit's AI
-reasoning; command approvals still apply. See [command extraction](docs/command-intents.md)
-for supported examples, plugin extensions, and the future ML adapter interface.
+Orbit combines fast English/Hinglish rules with an offline English semantic
+extractor. The setup script downloads a checksum-verified MiniLM model (about
+24 MB) once. It compares unfamiliar wording with command capabilities locally;
+matched commands avoid cloud planning. Normal conversation and complex tasks
+keep Orbit's AI reasoning, and command approvals still apply. See
+[command extraction](docs/command-intents.md) for setup, limitations, examples,
+plugin extensions, and validation. Without the local model, the original rules
+and normal Orbit routing remain available.
 
 ## AI provider configuration
 
@@ -243,11 +248,13 @@ py -m venv .venv
 From the repository root, build the distributable folder:
 
 ```powershell
-.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name RiftShell --collect-submodules keyring.backends --add-data "plugins;plugins" main.py
+.\.venv\Scripts\python.exe scripts/setup_intent_model.py
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name RiftShell --collect-submodules keyring.backends --add-data "plugins;plugins" --add-data "assets/intent-model;assets/intent-model" main.py
 ```
 
 Share the **whole** `dist\RiftShell` folder as a ZIP. The launch file is
 `dist\RiftShell\RiftShell.exe`. Do not ship a local `.env` or API keys.
+Keep the bundled intent model's `MODEL_CARD.md` and `LICENSE.txt` with its files.
 Test the ZIP on another Windows account or PC with no Python installation:
 launch, save a Groq key, run an Orbit request, switch to a local Ollama model,
 and check terminal commands and bundled plugins. Ollama and its model must be

@@ -12,9 +12,16 @@ ATOM = r'''(?:"[^"\r\n]+"|'[^'\r\n]+'|[^\s"']+)'''
 TARGET = rf"(?P<target>{ATOM})"
 SOURCE = rf"(?P<source>{ATOM})"
 DEST = rf"(?P<destination>{ATOM})"
-SHOW = r"(?:show|list|display)(?:\s+me)?\s+(?:the\s+|all\s+)?"
-HERE = r"(?:\s+(?:in|of)\s+(?:this|the current|my current|current)\s+(?:folder|directory))?"
+SHOW = r"(?:show|list|display)(?:\s+me)?\s+(?:all\s+(?:the\s+)?|the\s+)?"
+HERE = r"(?:\s+(?:here|right\s+here|(?:in|inside|of)\s+(?:this|the\s+current|my\s+current|current)\s+(?:folder|directory)))?"
 HSHOW = r"(?:dikhao|dikha\s+do|dikhaao|batao|show\s+karo|list\s+karo)"
+# Listing nouns are shared by current-directory and literal-path grammars.
+# A conjunction is allowed only between these nouns, never between actions.
+FILE_ITEMS = r"(?:files(?:\s+and\s+(?:folders|directories))?|(?:folders|directories)\s+and\s+files)"
+FOLDER_ITEMS = r"(?:only\s+)?(?:folders|directories)"
+HLIST = r"(?:mujhe\s+)?(?:(?:is|current)\s+(?:folder|directory)\s+(?:ki|ke)\s+)?(?:sab\s+|saare\s+|saari\s+|sare\s+|sari\s+)?"
+# Unquoted Hinglish "is" means "this", not a literal directory named "is".
+HLIST_TARGET = rf"(?!is\s){TARGET}"
 
 
 def fixed(command, message, phrases=(), patterns=(), starts=()):
@@ -40,10 +47,14 @@ BUILTIN_INTENTS = (
         "show folder contents", "list folder contents", "files dikhao", "files dikha do",
         "saari files dikhao", "sab files dikhao", "is folder ki files dikhao",
         "current folder ki files dikhao", "mujhe files dikhao",
-    ), (rf"{SHOW}files{HERE}[?!.]?",), ("show", "list", "display")),
+    ), (rf"{SHOW}{FILE_ITEMS}{HERE}[?!.]?",
+        rf"{HLIST}files\s+{HSHOW}[?!.]?"),
+       ("show", "list", "display", "mujhe", "is", "current", "sab", "saare", "saari", "sare", "sari", "files")),
     fixed("folders", "I will list the folders in the current directory.", (
         "only folders", "folders dikhao", "directories dikhao", "sirf folders dikhao",
-    ), (rf"{SHOW}(?:folders|directories){HERE}[?!.]?",), ("show", "list", "display")),
+    ), (rf"{SHOW}{FOLDER_ITEMS}{HERE}[?!.]?",
+        rf"{HLIST}(?:sirf\s+)?(?:folders|directories)\s+{HSHOW}[?!.]?"),
+       ("show", "list", "display", "mujhe", "is", "current", "sab", "saare", "saari", "sare", "sari", "sirf", "folders", "directories")),
     fixed("up", "I will move to the parent directory.", (
         "go up", "go up one level", "go to the parent folder", "go to parent folder",
         "go to the parent directory", "move up one directory", "ek folder upar jao",
@@ -109,8 +120,12 @@ BUILTIN_INTENTS = (
         rf"{TARGET}\s+(?:folder\s+)?(?:mein|me)\s+(?:jao|chalo)",
     )),
     target_rule("list_path", "files", "I will list files in the requested directory.", (
-        rf"{SHOW}files\s+(?:in|inside)\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}",
-        rf"{TARGET}\s+(?:folder\s+)?ki\s+files\s+{HSHOW}",
+        rf"{SHOW}{FILE_ITEMS}\s+(?:in|inside)\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}",
+        rf"(?:mujhe\s+)?{HLIST_TARGET}\s+(?:(?:folder|directory)\s+)?(?:ki|ke)\s+files\s+{HSHOW}[?!.]?",
+    )),
+    target_rule("list_folders_path", "folders", "I will list folders in the requested directory.", (
+        rf"{SHOW}{FOLDER_ITEMS}\s+(?:in|inside)\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}",
+        rf"(?:mujhe\s+)?{HLIST_TARGET}\s+(?:(?:folder|directory)\s+)?(?:ki|ke)\s+(?:sirf\s+)?(?:folders|directories)\s+{HSHOW}[?!.]?",
     )),
     target_rule("create_folder", "makefolder", "I will create the requested folder.", (
         rf"(?:create|make)\s+(?:a\s+|the\s+)?(?:folder|directory)\s+(?:(?:named|called)\s+)?{TARGET}",
