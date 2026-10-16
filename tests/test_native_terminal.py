@@ -243,7 +243,7 @@ class NativeSessionTests(unittest.TestCase):
         self.session.transport.events.put(("output", "x" * 40000))
         self.session.transport.events.put(("prompt", dict(sequence=2, exit_code=0, cwd="C:/Work", filesystem=True)))
         self.session._drain()
-        self.assertLessEqual(sum(map(len, chunks)), 8192)
+        self.assertLessEqual(sum(map(len, chunks)), 16384)
         self.assertTrue(self.session.busy)
         for _ in range(100):
             self.session._drain()

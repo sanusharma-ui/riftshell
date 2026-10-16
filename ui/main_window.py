@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import sys
 from time import perf_counter
-from html import escape
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -26,6 +25,7 @@ from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
 from ai.provider_runtime import PROVIDER_RUNTIME
 from ui.themes import build_stylesheet, get_theme, list_themes
+from ui.terminal_output import TerminalOutput
 
 
 def pending_action_reply(text: str) -> str | None:
@@ -223,6 +223,30 @@ class FileWriteWorker(QThread):
         except Exception as exc:
             result = WriteResult(output=f"File update failed: {exc}", success=False)
         self.result_ready.emit(result)
+
+
+class PreviewWorker(QThread):
+    result_ready = Signal(object, object, str)  # (preview, action, message)
+
+    def __init__(self, action, config, current_dir, message, parent=None):
+        super().__init__(parent)
+        self.action = action
+        self.config = config
+        self.current_dir = current_dir
+        self.message = message
+
+    def run(self):
+        try:
+            preview = preview_file_writes(
+                self.action.files,
+                self.config.workspace_root,
+                self.config.allow_outside_workspace,
+                self.current_dir,
+            )
+        except Exception as exc:
+            from ai.code_writer import WriteResult
+            preview = WriteResult(output=f"Preview failed: {exc}", success=False)
+        self.result_ready.emit(preview, self.action, self.message)
 
 
 class CommandPalette(QDialog):
@@ -423,7 +447,7 @@ class TerminalSession(QWidget):
         self.active_command = ""
         self.name_label = QLabel(title)
         self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
-        self.path_label = QLabel(f"📁 {shell.ctx.cwd}")
+        self.path_label = QLabel(f"{shell.ctx.cwd}")
         self.path_label.setObjectName("sessionPath")
         self.state_label = QLabel("READY")
         self.state_label.setObjectName("statusPill")
@@ -434,10 +458,9 @@ class TerminalSession(QWidget):
         header_layout.addWidget(self.name_label)
         header_layout.addWidget(self.path_label, 1)
         header_layout.addWidget(self.state_label)
-        self.console = QTextEdit()
+        self.console = TerminalOutput()
         self.console.setReadOnly(True)
         self.console.setObjectName("terminalOutput")
-        self.console.setLineWrapMode(QTextEdit.WidgetWidth)
         self.console.document().setMaximumBlockCount(5000)
         self.console_stack = QStackedWidget()
         self.console_stack.addWidget(self.console)
@@ -450,6 +473,9 @@ class TerminalSession(QWidget):
         completer = QCompleter(QStringListModel(names, self), self)
         completer.setCaseSensitivity(Qt.CaseInsensitive)
         completer.setFilterMode(Qt.MatchContains)
+        completer.setMaxVisibleItems(8)
+        completer.popup().setObjectName("commandSuggestions")
+        completer.popup().setUniformItemSizes(True)
         self.legacy_completer = completer
         self.input.setCompleter(completer)
         self.run_button = QPushButton("Run")
@@ -519,9 +545,9 @@ class TerminalSession(QWidget):
 
     def _native_changed(self):
         if self.native.context_available:
-            self.path_label.setText(f"📁 {self.shell.ctx.cwd}")
+            self.path_label.setText(f"{self.shell.ctx.cwd}")
         else:
-            self.path_label.setText(f"📁 {self.native.location} (non-filesystem)")
+            self.path_label.setText(f"{self.native.location} (non-filesystem)")
         self._set_running(self.is_busy)
         if self.native.exited:
             self.state_label.setText("EXITED")
@@ -561,10 +587,22 @@ class TerminalSession(QWidget):
     def apply_preferences(self, preferences: dict):
         self.preferences = preferences
         font = QFont(preferences["font_family"], preferences["font_size"])
+        font.setStyleHint(QFont.Monospace)
+        font.setFixedPitch(True)
+        family = font.family().replace(chr(34), "").replace(";", "")
+        font_css = f'font-family: "{family}"; font-size: {font.pointSize()}pt;'
+        for widget in (self.console, self.input, self.legacy_completer.popup()):
+            widget.setStyleSheet(font_css)
+        self.legacy_completer.popup().setStyleSheet(
+            build_stylesheet(self._theme())
+            + f"QAbstractItemView#commandSuggestions {{{font_css}}}"
+        )
+        self.legacy_completer.popup().setFont(font)
         self.console.setFont(font)
         self.input.setFont(font)
         self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
         if self.native:
+            self.native_console.setStyleSheet(font_css)
             self.native_console.setFont(font)
             theme = self._theme()
             self.native_console.set_colors(theme.text, theme.background, theme.selection, theme.accent)
@@ -574,14 +612,7 @@ class TerminalSession(QWidget):
         return get_theme(self.preferences["theme"])
 
     def append_html(self, text: str, color: str, label: str = ""):
-        # Completed output belongs to the document, outside the PTY repaint buffer.
-        bar = self.console.verticalScrollBar()
-        at_bottom = bar.value() == bar.maximum()
-        position = bar.value()
-        safe = escape(text).replace("\n", "<br>")
-        prefix = f'<span style="color:{self._theme().accent}; font-weight:700;">{escape(label)}</span> ' if label else ""
-        self.console.append(f'<div style="color:{color}; line-height:140%; white-space:pre-wrap; font-family:\'Cascadia Code\', \'JetBrains Mono\', Consolas, monospace;">{prefix}{safe}</div>')
-        bar.setValue(bar.maximum() if at_bottom else position)
+        self.console.append_output(text, color, label, self._theme().accent)
 
     def append_system(self, text: str):
         self.append_html(text, self._theme().muted, "•")
@@ -689,7 +720,7 @@ class TerminalSession(QWidget):
             (self.append_output if result.success else self.append_error)(result.output)
         if result.actions.get("theme"):
             self.window().apply_theme(str(result.actions["theme"]))
-        self.path_label.setText(f"📁 {self.shell.ctx.cwd}")
+        self.path_label.setText(f"{self.shell.ctx.cwd}")
         self.input.set_history(self.shell.ctx.history)
         if self.shell.ctx.history:
             self.history_added.emit(self.shell.ctx.history[-1])
@@ -759,7 +790,9 @@ class OrbitPanel(QFrame):
         self.stream_index = 0
         self.stream_message_index: int | None = None
         self.stream_done = None
+        self._preview_worker = None
         self.messages: list[tuple[str, str]] = []
+        self._last_rendered_count = 0
         self.status = QLabel("Ask anything or request a workspace action.")
         self.status.setWordWrap(True)
         self.conversation = QTextEdit()
@@ -808,7 +841,8 @@ class OrbitPanel(QFrame):
             return
         self.thinking_timer.stop()
         self.thinking_indicator.setText("")
-        available = not self.executing and not self.continue_timer.isActive()
+        available = (not self.executing and not self.continue_timer.isActive()
+                     and self._preview_worker is None)
         becoming_available = available and not self.input.isEnabled()
         self.input.setEnabled(available)
         self.plan_button.setEnabled(available)
@@ -822,7 +856,7 @@ class OrbitPanel(QFrame):
 
     def create_plan(self):
         prompt, session = self.input.text().strip(), self.session_provider()
-        if not prompt or session is None or self.executing or self.continue_timer.isActive() or self.worker and self.worker.isRunning():
+        if not prompt or session is None or self.executing or self.continue_timer.isActive() or self._preview_worker is not None or self.worker and self.worker.isRunning():
             return
 
         # A confirmation typed into the chat box approves the exact proposal
@@ -876,6 +910,8 @@ class OrbitPanel(QFrame):
         worker.deleteLater()
 
     def _show_plan(self, action):
+        if self.sender() is not None and getattr(self.sender(), "task", None) is not self.task:
+            return
         if not self.task or self.task.stopped:
             return
         if self.task_session.shell.ctx.cwd != self.task_cwd:
@@ -913,43 +949,61 @@ class OrbitPanel(QFrame):
                 self.status.setText("Open a workspace session and try again.")
                 return
             config = self.task.planner.config if self.task and self.task.planner else load_desktop_config()
-            preview = preview_file_writes(
-                action.files,
-                config.workspace_root,
-                config.allow_outside_workspace,
-                session.shell.ctx.cwd,
+            self.status.setText("Generating file preview…")
+            self._preview_worker = PreviewWorker(
+                action, config, session.shell.ctx.cwd, message, self
             )
-            if not preview.success:
-                self.task.stop()
-                self.stop_button.setEnabled(False)
-                self._stream("Orbit", f"{message}\n\nI could not prepare a safe file preview:\n\n{preview.output}")
-                self.status.setText("The proposed file change was blocked.")
-                return
-            paths = ", ".join(file.path for file in action.files)
-            self.pending_action = action
-            self.pending_snapshots = preview.snapshots
-            self._stream(
-                "Orbit",
-                f"{message}\n\nFiles: {paths}\n\nReview the proposed diff:\n\n```diff\n{preview.output}\n```",
-            )
-            self.status.setText("Review the diff before applying these file changes.")
-            self.approve_button.setText("Approve changes")
-            self.approve_button.setEnabled(True)
-            self.reject_button.setEnabled(True)
+            self._preview_worker.result_ready.connect(self._show_preview_result)
+            preview_worker = self._preview_worker
+            preview_worker.finished.connect(lambda: self._preview_finished(preview_worker))
+            self._preview_worker.start()
         else:
             self.task.stop()
             self.stop_button.setEnabled(False)
+            self._set_thinking(False)
             if action.action != "respond":
                 message = "This action is not available in the desktop task runner. No action was executed."
             self._stream("Orbit", message)
             self.status.setText("Ready for your next question or task.")
 
+    def _preview_finished(self, worker):
+        if self._preview_worker is worker:
+            self._preview_worker = None
+            self._set_thinking(False)
+        worker.deleteLater()
+
+    def _show_preview_result(self, preview, action, message):
+        if self.sender() is not None and self.sender() is not self._preview_worker:
+            return
+        if not self.task or self.task.stopped:
+            return
+        if not preview.success:
+            self.task.stop()
+            self.stop_button.setEnabled(False)
+            self._stream("Orbit", f"{message}\n\nI could not prepare a safe file preview:\n\n{preview.output}")
+            self.status.setText("The proposed file change was blocked.")
+            return
+        paths = ", ".join(file.path for file in action.files)
+        self.pending_action = action
+        self.pending_snapshots = preview.snapshots
+        self._stream(
+            "Orbit",
+            f"{message}\n\nFiles: {paths}\n\nReview the proposed diff:\n\n```diff\n{preview.output}\n```",
+        )
+        self.status.setText("Review the diff before applying these file changes.")
+        self.approve_button.setText("Approve changes")
+        self.approve_button.setEnabled(True)
+        self.reject_button.setEnabled(True)
+
     def _show_failure(self, error: str):
+        if self.sender() is not None and getattr(self.sender(), "task", None) is not self.task:
+            return
         if self.task and self.task.stopped:
             return
         if self.task:
             self.task.stop()
         self.stop_button.setEnabled(False)
+        self._set_thinking(False)
         self._append("Orbit", f"Planning failed: {error}")
         self.status.setText("Could not reach the configured AI provider.")
 
@@ -973,11 +1027,39 @@ class OrbitPanel(QFrame):
         return text
 
     def _render_conversation(self):
-        blocks = []
-        for label, text in self.messages:
-            body = self._escape_user_markdown(text) if label == "You" else text
-            blocks.append(f"**{label}**\n\n{body}")
-        self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
+        # Fast path: only render newly added messages incrementally
+        rendered = getattr(self, '_last_rendered_count', 0)
+        total = len(self.messages)
+
+        if rendered == 0 or rendered > total:
+            # Full re-render needed (first time or after reset)
+            blocks = []
+            for label, text in self.messages:
+                body = self._escape_user_markdown(text) if label == "You" else text
+                blocks.append(f"**{label}**\n\n{body}")
+            self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
+            self._last_rendered_count = total
+        elif total > rendered:
+            # Incremental: append only new messages
+            cursor = self.conversation.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            for label, text in self.messages[rendered:]:
+                body = self._escape_user_markdown(text) if label == "You" else text
+                cursor.insertBlock()
+                cursor.insertMarkdown(f"---\n\n**{label}**\n\n{body}")
+            self._last_rendered_count = total
+        else:
+            # Same count but content may have changed (streaming update)
+            # Only re-render the last message block
+            if total > 0:
+                label, text = self.messages[-1]
+                body = self._escape_user_markdown(text) if label == "You" else text
+                blocks = []
+                for l, t in self.messages:
+                    b = self._escape_user_markdown(t) if l == "You" else t
+                    blocks.append(f"**{l}**\n\n{b}")
+                self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
+
         cursor = self.conversation.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.conversation.setTextCursor(cursor)
@@ -1064,7 +1146,13 @@ class OrbitPanel(QFrame):
         if self.executing and self.task_session and self.task_session.is_busy:
             self.task_session.request_cancel()
         self.status.setText("Stopped. An in-flight request or approved write may finish; no further step will run.")
-        self._set_thinking(bool(self.worker and self.worker.isRunning()))
+        # QThreads remain parent-owned until their finished handlers delete them.
+        # Detach cancelled planning/preview work so it cannot lock a new request
+        # or deliver a late action into a different task. Approved execution is
+        # still busy until its actual result returns.
+        self.worker = None
+        self._preview_worker = None
+        self._set_thinking(False)
 
     def _continue_task(self):
         if not self.task or self.task.stopped:
@@ -1093,6 +1181,7 @@ class OrbitPanel(QFrame):
             self.input.setEnabled(False)
             self.plan_button.setEnabled(False)
             return True
+        self.stop_button.setEnabled(False)
         self._set_thinking(False)
         return False
 
@@ -1142,7 +1231,7 @@ class MainWindow(QMainWindow):
         self.resize(1440, 880)
         self.setMinimumSize(1080, 680)
         self.setStyleSheet(build_stylesheet(self.theme))
-        self.setFont(QFont(self.preferences["font_family"], self.preferences["font_size"]))
+        self.setFont(QFont("Segoe UI", 10))
         self._build_workspace()
         self._install_shortcuts()
         self.new_session()
@@ -1330,7 +1419,7 @@ class MainWindow(QMainWindow):
             failed = len(plugins.failed) if plugins else 0
             self.plugin_summary.setText(f"{loaded} loaded  •  {failed} needs attention")
             status_str = "● RUNNING" if session.is_busy else "● READY"
-            self.status_label.setText(f"{status_str}  ·  📁 {session.shell.ctx.cwd}  ·  {len(session.shell.registry.all_names())} commands")
+            self.status_label.setText(f"{status_str}  ·  {session.shell.ctx.cwd}  ·  {len(session.shell.registry.all_names())} commands")
 
     def _activate_session_item(self, item):
         self.tabs.setCurrentIndex(item.data(Qt.UserRole))
@@ -1468,7 +1557,7 @@ class MainWindow(QMainWindow):
                 self.settings.setValue(f"{group}/{key}", value)
         self.settings.sync()
         self.apply_theme(preferences["theme"])
-        self.setFont(QFont(preferences["font_family"], preferences["font_size"]))
+        self.setFont(QFont("Segoe UI", 10))
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 session.apply_preferences(preferences)
@@ -1586,7 +1675,7 @@ class MainWindow(QMainWindow):
         self.orbit.show_execution_result(command, result)
 
     def closeEvent(self, event):
-        if self.orbit.worker and self.orbit.worker.isRunning():
+        if any(worker.isRunning() for worker in self.orbit.findChildren(QThread)):
             QMessageBox.warning(self, "Orbit is thinking", "Stop the task and wait for the current model request to return before closing.")
             event.ignore()
             return

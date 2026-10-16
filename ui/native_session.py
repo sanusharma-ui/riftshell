@@ -142,8 +142,9 @@ class NativeSession(QObject):
 
     def _drain(self):
         deadline = perf_counter() + 0.006
-        remaining = 8192
-        for _ in range(32):
+        remaining = 16384
+        processed = False
+        for _ in range(64):
             if getattr(self.terminal, "output_pending", False):
                 break  # Keep application messages ahead of subsequent PTY output.
             if remaining <= 0 or perf_counter() >= deadline:
@@ -156,8 +157,9 @@ class NativeSession(QObject):
                     kind, payload = self.transport.events.get_nowait()
                 except queue.Empty:
                     break
+            processed = True
             if kind == "output":
-                payload, self._pending_output = payload[:2048], payload[2048:]
+                payload, self._pending_output = payload[:4096], payload[4096:]
                 remaining -= len(payload)
                 self.terminal.feed(payload)
                 if self.command:
@@ -172,5 +174,12 @@ class NativeSession(QObject):
                 self._finish(False, "The PowerShell session ended. Open a new tab to start another session.")
                 self.failed.emit("PowerShell session ended. Open a new tab to continue.")
                 self.timer.stop()
+        # Adaptive timer: fast when active, slow when idle
+        if processed or self._pending_output or self.command:
+            if self.timer.interval() != 8:
+                self.timer.setInterval(8)
+        else:
+            if self.timer.interval() != 100:
+                self.timer.setInterval(100)
         if self.closing and self.transport.stopped:
             self.timer.stop()

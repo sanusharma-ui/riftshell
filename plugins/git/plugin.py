@@ -45,6 +45,7 @@ class GitCommand(BaseCommand):
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                timeout=30,
             )
 
             output = result.stdout.strip()
@@ -58,6 +59,12 @@ class GitCommand(BaseCommand):
             return CommandResult(
                 output=output,
                 success=result.returncode == 0,
+            )
+
+        except subprocess.TimeoutExpired:
+            return CommandResult(
+                output="Git command timed out after 30 seconds.",
+                success=False,
             )
 
         except FileNotFoundError:

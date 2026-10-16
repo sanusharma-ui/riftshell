@@ -30,15 +30,15 @@ THEMES: dict[str, Theme] = {
         key="vscode-dark-plus",
         display_name="VS Code Dark+ (Default)",
         aliases=("default", "dark+", "dark-plus", "vscode", "vs-code", "vs-code-dark-plus"),
-        background="#101218",
-        surface="#181c25",
-        surface_alt="#222837",
-        border="#30384a",
-        text="#e7ecf5",
-        muted="#9aa7bc",
-        accent="#8baaff",
-        accent_alt="#b8a4ff",
-        output="#bdc9dc",
+        background="#141619",
+        surface="#1b1e22",
+        surface_alt="#24282e",
+        border="#343a42",
+        text="#e2e5e9",
+        muted="#929ba6",
+        accent="#8aadd4",
+        accent_alt="#b6c5d6",
+        output="#ced3da",
         error="#f48771",
         selection="#264f78",
         button="#2d2d30",
@@ -247,11 +247,8 @@ QTextEdit {{
     background-color: {theme.surface};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 9px;
+    border-radius: 6px;
     padding: 10px 12px;
-    font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", "Consolas", monospace;
-    font-size: 10.5pt;
-    line-height: 140%;
     selection-background-color: {theme.selection};
     selection-color: {theme.text};
 }}
@@ -262,8 +259,6 @@ QLineEdit {{
     border: 1px solid {theme.border};
     border-radius: 8px;
     padding: 8px 12px;
-    font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", "Consolas", monospace;
-    font-size: 10.5pt;
     selection-background-color: {theme.selection};
     selection-color: {theme.text};
 }}
@@ -299,6 +294,26 @@ QListWidget::item:selected {{
     color: {theme.accent_alt};
     border: 1px solid {theme.border};
     font-weight: 600;
+}}
+
+QAbstractItemView#commandSuggestions {{
+    background-color: {theme.surface};
+    color: {theme.text};
+    border: 1px solid {theme.border};
+    padding: 4px;
+    outline: none;
+    selection-background-color: {theme.selection};
+    selection-color: {theme.text};
+}}
+
+QAbstractItemView#commandSuggestions::item {{
+    padding: 7px 12px;
+    min-height: 20px;
+    border: none;
+}}
+
+QAbstractItemView#commandSuggestions::item:hover {{
+    background-color: {theme.surface_alt};
 }}
 
 QPushButton {{
@@ -338,7 +353,7 @@ QStatusBar {{
 QFrame#sidebar, QFrame#inspector, QFrame#terminalHeader {{
     background-color: {theme.surface};
     border: 1px solid {theme.border};
-    border-radius: 10px;
+    border-radius: 6px;
 }}
 
 QFrame#sidebar {{
@@ -354,13 +369,14 @@ QFrame#sidebar QLabel, QFrame#inspector QLabel, QFrame#terminalHeader QLabel {{
 }}
 
 QFrame#terminalHeader {{
-    border-radius: 12px;
+    border-radius: 6px;
+    background-color: {theme.surface};
 }}
 
 QLineEdit#commandInput {{
     background-color: {theme.surface};
-    border-radius: 12px;
-    padding: 13px 16px;
+    border-radius: 6px;
+    padding: 10px 12px;
     min-height: 24px;
 }}
 
@@ -372,7 +388,7 @@ QLineEdit#commandInput:focus {{
 QTextEdit#orbitConversation {{
     background-color: {theme.background};
     border: none;
-    border-radius: 12px;
+    border-radius: 6px;
     padding: 14px;
     font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
     font-size: 10.5pt;
@@ -381,6 +397,7 @@ QTextEdit#orbitConversation {{
 QTextEdit#terminalOutput {{
     background-color: {theme.background};
     border: none;
+    padding: 12px 14px;
 }}
 
 QFrame#terminalHeader QPushButton {{
@@ -400,24 +417,24 @@ QPushButton:focus {{
 }}
 
 QLabel#brand {{
-    color: {theme.accent_alt};
+    color: {theme.text};
     font-size: 16pt;
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.3px;
 }}
 
 QLabel#eyebrow {{
     color: {theme.muted};
     font-size: 7.5pt;
-    font-weight: 700;
-    letter-spacing: 1.2px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
 }}
 
 QLabel#sectionTitle {{
-    color: {theme.accent};
+    color: {theme.muted};
     font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 1px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }}
 
 QLabel#sessionPath {{
@@ -428,12 +445,12 @@ QLabel#sessionPath {{
 
 QLabel#statusPill {{
     background-color: {theme.surface_alt};
-    color: {theme.accent_alt};
+    color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 10px;
+    border-radius: 6px;
     padding: 3px 10px;
     font-size: 7.5pt;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.8px;
 }}
 
@@ -443,7 +460,7 @@ QPushButton#primaryButton {{
     border: 1px solid {theme.accent};
     border-radius: 7px;
     padding: 7px 16px;
-    font-weight: 700;
+    font-weight: 600;
 }}
 
 QPushButton#primaryButton:hover {{

@@ -10,6 +10,9 @@ from utils.safe_fs import ensure_path_allowed, resolve_path, unquote_path
 
 
 class Shell:
+    _DOLLAR_PATTERN = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
+    _PERCENT_PATTERN = re.compile(r"%([^%]+)%")
+
     def __init__(
         self,
         start_dir: Path | None = None,
@@ -138,17 +141,18 @@ class Shell:
         suffix = f" {parts[1]}" if len(parts) > 1 else ""
         return alias_value + suffix
 
+    def _replace_var(self, match):
+        key = match.group(1)
+        return self.ctx.variables.get(key, os.environ.get(key, ""))
+
     def _expand_vars(self, value: str) -> str:
-        def dollar_replace(match):
-            key = match.group(1)
-            return self.ctx.variables.get(key, os.environ.get(key, ""))
+        if "$" not in value and "%" not in value:
+            return value
 
-        def percent_replace(match):
-            key = match.group(1)
-            return self.ctx.variables.get(key, os.environ.get(key, ""))
-
-        value = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", dollar_replace, value)
-        value = re.sub(r"%([^%]+)%", percent_replace, value)
+        if "$" in value:
+            value = self._DOLLAR_PATTERN.sub(self._replace_var, value)
+        if "%" in value:
+            value = self._PERCENT_PATTERN.sub(self._replace_var, value)
         return value
 
     def _handle_redirect(self, parsed: ParsedCommand, result: CommandResult) -> CommandResult:

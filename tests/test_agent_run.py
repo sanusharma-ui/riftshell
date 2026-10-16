@@ -185,6 +185,41 @@ class OrbitLoopUITests(unittest.TestCase):
             render.assert_called_once()
         done.assert_called_once()
 
+    def test_incremental_replies_keep_markdown_and_literal_user_input(self):
+        self.panel._append("You", "<b>literal</b> **input**")
+        self.panel._stream("Orbit", "## Result\n\n**Formatted** reply with `code`.")
+        plain = self.panel.conversation.toPlainText()
+        self.assertIn("<b>literal</b> **input**", plain)
+        self.assertIn("Formatted reply with code.", plain)
+        self.assertNotIn("**Formatted**", plain)
+        self.assertNotIn("## Result", plain)
+
+    def test_final_reply_unlocks_ui_before_worker_cleanup(self):
+        self.panel._set_thinking(True)
+        self.panel.stop_button.setEnabled(True)
+        self.panel._show_plan(AgentAction("respond", "Finished."))
+        self.assertTrue(self.panel.input.isEnabled())
+        self.assertFalse(self.panel.thinking_timer.isActive())
+        self.assertFalse(self.panel.stop_button.isEnabled())
+
+    def test_stop_unlocks_input_and_ignores_old_worker_after_new_task(self):
+        old = OrbitWorker(Mock(), "old task", self.panel, task=self.panel.task)
+        old.planned.connect(self.panel._show_plan)
+        old.failed.connect(self.panel._show_failure)
+        self.panel.worker = old
+        self.panel._set_thinking(True)
+        self.panel.stop_task()
+        self.assertTrue(self.panel.input.isEnabled())
+        self.assertFalse(self.panel.thinking_timer.isActive())
+        self.panel.task = AgentRun("new task")
+        before = list(self.panel.messages)
+        old.planned.emit(AgentAction("shell", command="files"))
+        old.failed.emit("late failure")
+        self.assertEqual(self.panel.messages, before)
+        self.assertEqual(self.emitted, [])
+        self.assertFalse(self.panel.task.stopped)
+        self.panel._planning_finished(old)
+
     def test_retry_status_is_ignored_after_stop(self):
         worker = OrbitWorker(Mock(), "task", task=self.panel.task)
         self.panel.worker = worker

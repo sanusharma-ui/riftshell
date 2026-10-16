@@ -25,6 +25,10 @@ class CommandRegistry:
         self._metadata: dict[str, CommandMetadata] = {}
         self._active_source = "core"
         self._active_plugin: str | None = None
+        self._cache_dirty = True
+        self._cached_all_names: list[str] = []
+        self._cached_catalog_entries: list[str] = []
+        self._cached_list_metadata: list[CommandMetadata] = []
 
     def register(
         self,
@@ -55,19 +59,14 @@ class CommandRegistry:
 
         for alias in aliases:
             self._commands[alias] = command
+            
+        self._cache_dirty = True
 
     def get(self, name: str):
         return self._commands.get(name.lower())
 
     def list_commands(self):
-        seen = set()
-        result = []
-        for name in self._primary_names:
-            if name in seen:
-                continue
-            seen.add(name)
-            result.append(self._commands[name])
-        return result
+        return [self._commands[name] for name in self._primary_names]
 
     def metadata_for(self, name: str) -> CommandMetadata | None:
         command = self.get(name)
@@ -75,25 +74,38 @@ class CommandRegistry:
             return None
         return self._metadata.get(command.name.lower())
 
-    def list_metadata(self) -> list[CommandMetadata]:
-        return [
+    def _update_caches(self):
+        if not self._cache_dirty:
+            return
+            
+        self._cached_list_metadata = [
             self._metadata[name]
             for name in self._primary_names
             if name in self._metadata
         ]
-
-    def catalog_entries(self) -> list[str]:
+        
         entries = []
-        for meta in self.list_metadata():
+        for meta in self._cached_list_metadata:
             alias_text = f" aliases: {', '.join(meta.aliases)};" if meta.aliases else ""
             source_text = f" source: plugin:{meta.plugin};" if meta.plugin else " source: core;"
             entries.append(
                 f"{meta.usage};{alias_text}{source_text} {meta.description}".strip()
             )
-        return entries
+        self._cached_catalog_entries = entries
+        self._cached_all_names = sorted(set(self._commands.keys()))
+        self._cache_dirty = False
+
+    def list_metadata(self) -> list[CommandMetadata]:
+        self._update_caches()
+        return self._cached_list_metadata
+
+    def catalog_entries(self) -> list[str]:
+        self._update_caches()
+        return self._cached_catalog_entries
 
     def all_names(self):
-        return sorted(set(self._commands.keys()))
+        self._update_caches()
+        return self._cached_all_names
 
     @contextmanager
     def plugin_scope(self, plugin_name: str) -> Iterator[None]:

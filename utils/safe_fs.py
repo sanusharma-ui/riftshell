@@ -136,38 +136,51 @@ def tree_view(path: Path, max_depth: int = 4) -> str:
 def find_names(start: Path, needle: str, folders_only: bool = False) -> list[str]:
     results = []
     needle = needle.lower()
+    _SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.next', 'dist', '.tox', '.mypy_cache', '.pytest_cache'}
 
     if not start.exists():
         return results
 
     for p in start.rglob("*"):
+        if any(part in _SKIP_DIRS for part in p.parts):
+            continue
         if folders_only and not p.is_dir():
             continue
         if needle in p.name.lower():
             results.append(str(p))
+            if len(results) >= 500:
+                break
     return results
 
 
 def find_text(start: Path, needle: str) -> list[str]:
     results = []
     needle = needle.lower()
+    _SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.next', 'dist', '.tox', '.mypy_cache', '.pytest_cache'}
+    _MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 
     if not start.exists():
         return results
 
     for p in start.rglob("*"):
+        if any(part in _SKIP_DIRS for part in p.parts):
+            continue
         if not p.is_file():
             continue
         try:
-            text = p.read_text(encoding="utf-8", errors="ignore")
+            if p.stat().st_size > _MAX_FILE_SIZE:
+                continue
+        except OSError:
+            continue
+        try:
+            with open(p, encoding="utf-8", errors="ignore") as f:
+                for i, line in enumerate(f, start=1):
+                    if needle in line.lower():
+                        results.append(f"{p} [{i}]: {line.strip()}")
+                        if len(results) >= 200:
+                            return results
         except Exception:
             continue
-
-        for i, line in enumerate(text.splitlines(), start=1):
-            if needle in line.lower():
-                results.append(f"{p} [{i}]: {line.strip()}")
-                if len(results) >= 200:
-                    return results
     return results
 
 
