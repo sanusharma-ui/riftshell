@@ -61,7 +61,8 @@ class AgentRunTests(unittest.TestCase):
 
     def test_natural_query_reaches_model_instead_of_static_routing(self):
         planner = AgentPlanner(make_config(Path.cwd()), ["files"], [])
-        planner._gemini = SequencedGemini({"action": "respond", "message": "Here is what a file system does."})
+        planner._gemini = SequencedGemini({"action": "respond", "message": "Here is what a file system does."},
+                                         workspace_routing=False)
         action = planner.plan("Tell me how file systems work")
         self.assertEqual(action.action, "respond")
         self.assertEqual(len(planner._gemini.prompts), 1)
@@ -239,6 +240,7 @@ class OrbitLoopUITests(unittest.TestCase):
         planner = AgentPlanner(make_config(Path.cwd()), ["run"], [])
         planner.provider_runtime = ProviderRuntime(clock=clock, sleep=clock.sleep)
         planner._call_provider = Mock(side_effect=[
+            '{"action":"inspect","paths":[],"message":""}',
             RateLimitError(headers={"retry-after": "1"}),
             '{"action":"shell","command":"run python check.py","message":"Check project"}',
         ])
@@ -247,7 +249,7 @@ class OrbitLoopUITests(unittest.TestCase):
         worker.planned.connect(self.panel._show_plan)
         with patch("ui.main_window.load_desktop_config", return_value=make_config(Path.cwd())):
             worker.run()
-        self.assertEqual(planner._call_provider.call_count, 2)
+        self.assertEqual(planner._call_provider.call_count, 3)
         self.assertEqual(self.emitted, [])
         self.assertEqual(self.panel.pending_action.command, "run python check.py")
         self.panel.approve()

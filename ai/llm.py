@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Callable
 
 from ai.actions import AgentAction
+from ai.conversation import conversation_action
 from ai.command_intent import IntentExtractor, valid_candidate
 from ai.semantic_intent import HybridIntentExtractor
 from ai.config import AIConfig
 from ai.modes import OrbitMode, OutputBudgetError, PromptBudgetError, estimated_tokens, fit_text
 from ai.provider_runtime import PROVIDER_RUNTIME, ProviderRuntime
+from ai.query_intent import QueryIntent, classify_query
 from ai.workspace_reader import WorkspaceInspection, inspect_workspace_paths
 from core.parser import CommandParser
 from core.registry import CommandMetadata
@@ -124,13 +126,22 @@ class MemoryManager:
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
 
-    def format_for_prompt(self, turns: int | None = None) -> str:
+    def format_for_prompt(self, turns: int | None = None, *, token_budget: int | None = None) -> str:
         history = self.load()
         if turns is not None:
             starts = [index for index, msg in enumerate(history) if msg.get("role") == "user"]
             history = history[starts[max(0, len(starts) - turns)]:] if turns > 0 and starts else []
         if not history:
             return "No previous memory."
+        if token_budget is not None:
+            # Keep the role and an excerpt from each recent message. Cropping
+            # the combined transcript can otherwise retain only the tail of
+            # one long assistant reply and lose the user's follow-up context.
+            history = history[-max(1, token_budget // 16):]
+            share = max(1, token_budget // len(history) - 1)
+            return "\n".join(fit_text(
+                f"{msg['role'].capitalize()}: {_memory_content(msg['role'], msg['content'])}", share,
+            ) for msg in history)
         return "\n".join(f"{msg['role'].capitalize()}: {_memory_content(msg['role'], msg['content'])}"
                          for msg in history)
 
@@ -254,6 +265,21 @@ class AgentPlanner:
         self._inspection_passes = 0
         self._incomplete_context = False
         self._task_origin_dir = self.current_dir_provider() if self.current_dir_provider else self.config.workspace_root
+        explicit_command = user_text.strip().lower().startswith("/cmd ") or (
+            user_text.strip().lower() in {name.lower() for name in self.command_names}
+        )
+        route = QueryIntent()
+        if not explicit_command and self._model_routing_enabled():
+            started = perf_counter()
+            route = classify_query(user_text)
+            self.provider_runtime.record("query_route", kind=route.kind, score=route.score,
+                                         margin=route.margin, elapsed_seconds=perf_counter() - started)
+        conversation_attempted = False
+        if route.kind == "conversation":
+            conversation_attempted = True
+            answer = self._answer_conversation(user_text)
+            if answer is not None:
+                return self._remember_action(user_text, answer)
         # Complete rule matches and validated local semantic matches avoid cloud planning.
         # A miss adds no prompt text or extra provider request to normal chat.
         extracted = self.intent_extractor.extract(user_text)
@@ -269,10 +295,18 @@ class AgentPlanner:
             action = AgentAction("shell", command=candidate.command, message=candidate.message)
             return self._remember_action(user_text, self._validate_action(action))
 
+        # Similarity measures topic as well as intent. Even a high workspace
+        # score can describe a knowledge question (e.g. what RAM means).
+        # No validated command means a compact answer-or-handoff first, never
+        # an automatic jump to the catalog or permissive inspection regexes.
+        if (not conversation_attempted and not extracted.candidates
+                and not explicit_command and self._model_routing_enabled()):
+            conversation_attempted = True
+            answer = self._answer_conversation(user_text)
+            if answer is not None:
+                return self._remember_action(user_text, answer)
+
         direct = self._fallback_plan(user_text)
-        explicit_command = user_text.strip().lower().startswith("/cmd ") or (
-            user_text.strip().lower() in {name.lower() for name in self.command_names}
-        )
         explicit_screenshot = bool(re.fullmatch(
             r"(?:please\s+)?(?:take|capture)\s+(?:a\s+)?(?:screenshot|screen shot)[.!?]?",
             user_text.strip(), re.IGNORECASE,
@@ -314,6 +348,25 @@ class AgentPlanner:
         if action.action == "inspect":
             action = self._complete_inspection(user_text, action, preferred_provider=provider)
         return self._remember_action(user_text, self._validate_action(action))
+
+    def _answer_conversation(self, user_text: str) -> AgentAction | None:
+        from ai.prompt_builder import build_conversation_prompt
+
+        action, errors, _ = self._request_model_action(
+            build_conversation_prompt(self, user_text), conversation=True,
+        )
+        if action is None:
+            details = " | ".join(errors) or "No configured provider is available."
+            return AgentAction("respond", self._failure_message(
+                errors, f"AI providers are temporarily unavailable.\n{details}"))
+        if action.action != "respond":
+            # A compact prompt has no command schema or workspace evidence.
+            # Discard ALL proposed effects and re-plan through the original path.
+            # This one bounded routing decision is not a workspace planning
+            # step; retain the user's full task budget after the handoff.
+            self._planning_calls = max(0, self._planning_calls - 1)
+            return None
+        return AgentAction("respond", action.message)
 
     def continue_task(self, objective: str, observations: list[dict]) -> AgentAction:
         try:
@@ -364,6 +417,8 @@ class AgentPlanner:
         self,
         prompt: str,
         preferred_provider: str | None = None,
+        *,
+        conversation: bool = False,
     ) -> tuple[AgentAction | None, list[str], str | None]:
         errors: list[str] = []
         if estimated_tokens(prompt) > self.mode.prompt_tokens:
@@ -399,15 +454,33 @@ class AgentPlanner:
                 if self.progress:
                     self.progress(f"Waiting for {provider.title()}…")
                 try:
-                    text = self._call_provider(provider, prompt)
-                    action = AgentAction.from_payload(_extract_json(text))
+                    text = (self._call_provider(provider, prompt, conversation=True) if conversation
+                            else self._call_provider(provider, prompt))
+                    action = (conversation_action(text) if conversation
+                              else AgentAction.from_payload(_extract_json(text)))
+                    if action is None:
+                        raise RuntimeError("The model returned no readable answer.")
                     runtime.record("provider", provider=provider, elapsed_seconds=perf_counter() - started,
                                    prompt_chars=len(prompt), estimated_prompt_tokens=estimated_tokens(prompt),
                                    output_token_limit=self.mode.output_tokens, mode=self.mode.name, outcome="success")
                     failures.pop(provider, None)
                     return action, list(failures.values()), provider
                 except OutputBudgetError as exc:
-                    # An incomplete envelope must never become an executable action.
+                    if conversation:
+                        # Reading text is not executing an action. Retain visible
+                        # answer content, but never promote truncated effects.
+                        reply = conversation_action(exc.partial_text, truncated=True)
+                        runtime.record("provider", provider=provider, elapsed_seconds=perf_counter() - started,
+                                       prompt_chars=len(prompt), output_token_limit=self.mode.output_tokens,
+                                       mode=self.mode.name, outcome="partial_answer" if reply else "empty_at_limit")
+                        if reply is not None:
+                            return reply, list(failures.values()), provider
+                        # A reasoning model can spend the whole ceiling without
+                        # producing visible text. Try only configured fallbacks,
+                        # using the same cap, rather than showing thought text.
+                        failures[provider] = f"{provider.title()}: the model used its response budget without producing a readable answer."
+                        continue
+                    # Executable action JSON remains strict even if it looks complete.
                     return None, [str(exc)], provider
                 except Exception as exc:
                     cooldown = runtime.record_failure(key, exc)
@@ -642,35 +715,42 @@ class AgentPlanner:
             "ollama": bool(self._ollama_model),
         }.get(provider, False)
 
-    def _call_provider(self, provider: str, prompt: str) -> str:
+    def _call_provider(self, provider: str, prompt: str, *, conversation: bool = False) -> str:
         self._ensure_provider(provider)
         if provider == "gemini":
-            return self._call_gemini(prompt)
+            return self._call_gemini(prompt, conversation=conversation)
         if provider == "groq":
-            return self._call_groq(prompt)
+            return self._call_groq(prompt, conversation=conversation)
         if provider == "ollama":
-            return self._call_ollama(prompt)
+            return self._call_ollama(prompt, conversation=conversation)
         raise ValueError(f"Unsupported AI provider: {provider}")
 
-    def _call_gemini(self, prompt: str) -> str:
+    def _call_gemini(self, prompt: str, *, conversation: bool = False) -> str:
         if not self._gemini_key:
             raise RuntimeError("GEMINI_API_KEY is not configured.")
         if self._gemini is None:
             detail = f" ({self._gemini_setup_error})" if self._gemini_setup_error else ""
             raise RuntimeError(f"Gemini client is unavailable{detail}.")
         response = self._gemini.generate_content(prompt, generation_config={
-            "response_mime_type": "application/json", "max_output_tokens": self.mode.output_tokens,
+            "response_mime_type": "text/plain" if conversation else "application/json",
+            "max_output_tokens": self.mode.output_tokens,
         })
         for candidate in getattr(response, "candidates", ()):
             reason = getattr(candidate, "finish_reason", None)
             if reason == 2 or getattr(reason, "name", "") == "MAX_TOKENS":
-                raise OutputBudgetError(self._output_budget_message())
+                # The SDK's .text accessor can raise if MAX_TOKENS produced no
+                # visible parts. Do not mistake that for a transport failure.
+                try:
+                    partial = response.text or ""
+                except (ValueError, AttributeError):
+                    partial = ""
+                raise OutputBudgetError(self._output_budget_message(), partial_text=partial if isinstance(partial, str) else "")
         text = getattr(response, "text", "") or ""
         if not text.strip():
             raise RuntimeError("Gemini returned an empty response.")
         return text
 
-    def _call_groq(self, prompt: str) -> str:
+    def _call_groq(self, prompt: str, *, conversation: bool = False) -> str:
         if not self._groq_key:
             raise RuntimeError("GROQ_API_KEY is not configured.")
         if self._groq is None:
@@ -679,26 +759,32 @@ class AgentPlanner:
         completions = self._groq.chat.completions
         raw_api = getattr(completions, "with_raw_response", None)
         create = raw_api.create if raw_api is not None else completions.create
+        extra_body = {"max_completion_tokens": self.mode.output_tokens}
+        if conversation and self._groq_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
+            # These models count reasoning against the completion ceiling.
+            # Use documented model capabilities, not unsupported flags on all models.
+            extra_body.update(reasoning_effort="low" if self.mode.compact_prompt else "medium",
+                              include_reasoning=False)
         response = create(
             messages=[{"role": "system", "content": prompt}],
             model=self._groq_model,
             temperature=0.1,
             # extra_body also supports the installed older Groq SDKs whose
             # typed create signature predates max_completion_tokens.
-            extra_body={"max_completion_tokens": self.mode.output_tokens},
-            response_format={"type": "json_object"},
+            extra_body=extra_body,
+            response_format={"type": "text" if conversation else "json_object"},
         )
         if raw_api is not None:
             self.provider_runtime.record_headers(self._provider_key("groq"), response.headers)
             response = response.parse()
-        if getattr(response.choices[0], "finish_reason", None) == "length":
-            raise OutputBudgetError(self._output_budget_message())
         text = response.choices[0].message.content or ""
+        if getattr(response.choices[0], "finish_reason", None) == "length":
+            raise OutputBudgetError(self._output_budget_message(), partial_text=text)
         if not text.strip():
             raise RuntimeError("Groq returned an empty response.")
         return text
 
-    def _call_ollama(self, prompt: str) -> str:
+    def _call_ollama(self, prompt: str, *, conversation: bool = False) -> str:
         if not self._ollama_model:
             raise RuntimeError("OLLAMA_MODEL is not configured.")
 
@@ -707,7 +793,7 @@ class AgentPlanner:
             "model": self._ollama_model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
+            **({} if conversation else {"format": "json"}),
             "options": {"temperature": 0.1, "num_predict": self.mode.output_tokens},
         }).encode("utf-8")
         request = urllib.request.Request(
@@ -733,9 +819,9 @@ class AgentPlanner:
             raise RuntimeError("Ollama returned an invalid HTTP response.") from exc
         if response_payload.get("error"):
             raise RuntimeError(str(response_payload["error"]))
-        if response_payload.get("done_reason") == "length":
-            raise OutputBudgetError(self._output_budget_message())
         text = str(response_payload.get("response", ""))
+        if response_payload.get("done_reason") == "length":
+            raise OutputBudgetError(self._output_budget_message(), partial_text=text)
         if not text.strip():
             raise RuntimeError("Ollama returned an empty response.")
         return text

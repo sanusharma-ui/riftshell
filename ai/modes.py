@@ -115,4 +115,7 @@ class PromptBudgetError(ValueError):
 
 
 class OutputBudgetError(ValueError):
-    pass
+    def __init__(self, message: str, *, partial_text: str = ""):
+        super().__init__(message)
+        # Visible final-answer content only; never internal reasoning tokens.
+        self.partial_text = partial_text

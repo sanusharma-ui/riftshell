@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from ai.actions import AgentAction, FileWrite
+from ai.conversation import WORKSPACE_HANDOFF
 from ai.code_writer import apply_file_writes, preview_file_writes
 from ai.llm import AgentPlanner
 from ai.workspace_reader import inspect_workspace_paths
@@ -17,18 +18,28 @@ class CapturingGemini:
     def __init__(self, payload):
         self.payload = payload
         self.prompts = []
+        self.routing_prompts = []
 
     def generate_content(self, prompt, **kwargs):
+        if WORKSPACE_HANDOFF in prompt:
+            self.routing_prompts.append(prompt)
+            return SimpleNamespace(text=WORKSPACE_HANDOFF)
         self.prompts.append(prompt)
         return SimpleNamespace(text=json.dumps(self.payload))
 
 
 class SequencedGemini:
-    def __init__(self, *payloads):
+    """Workspace provider fixture; record triage separately from task prompts."""
+    def __init__(self, *payloads, workspace_routing=True):
         self.payloads = list(payloads)
         self.prompts = []
+        self.routing_prompts = []
+        self.workspace_routing = workspace_routing
 
     def generate_content(self, prompt, **kwargs):
+        if self.workspace_routing and WORKSPACE_HANDOFF in prompt:
+            self.routing_prompts.append(prompt)
+            return SimpleNamespace(text=WORKSPACE_HANDOFF)
         self.prompts.append(prompt)
         payload = self.payloads.pop(0)
         return SimpleNamespace(text=json.dumps(payload))

@@ -26,7 +26,7 @@ QUOTED = re.compile(r'''"[^"\r\n]*"|(?<!\w)'[^'\r\n]*'(?!\w)''')
 LITERAL = re.compile(r'''(?<!\w)(?:[A-Za-z]:[\\/][^\s]+|https?://[^\s]+|\S*[\\/]\S+|\S+\.[A-Za-z0-9]{1,8}\b|\d+(?:\.\d+)?)(?!\w)''')
 BLOCK = re.compile(
     r"\b(?:no|not|never|dont|don't|cannot|can't|should|shouldn't|wouldn't|couldn't|"
-    r"explain|describe|summarize|teach|meaning|means|example|examples|"
+    r"explain|describe|summarize|teach|meaning|means|definition|overview|about|example|examples|"
     r"if|unless|except|excluding|without|instead|but|then|also|otherwise|maybe|perhaps|"
     r"recursive|recursively|hidden|descending|ascending|largest|smallest|newest|oldest|"
     r"larger|smaller|older|newer|force|forcefully|overwrite|trash|recycle|"
@@ -91,6 +91,12 @@ def guarded_request(text):
     visible = re.sub(r"\bbetween\s+\d+\s+and\s+\d+\b", " range ", visible, flags=re.I)
     visible = LITERAL.sub(" literal ", visible)
     if BLOCK.search(visible) or re.search(r"\b\w+n't\b", visible, re.I) or not REQUEST_START.search(request):
+        return None
+    # Definition-style questions need conversational reasoning. Topic
+    # similarity alone must never turn "what are ...?" into execution.
+    # A reference to actual local state can still be a command request.
+    if (re.match(r"what(?:'s|\s+(?:[a-z]+ly\s+)?(?:is|are))\b", visible, re.I)
+            and not re.search(r"\b(?:my|our|this|these|here|current|currently|today|now)\b", visible, re.I)):
         return None
     if re.match(r"define\b", visible, re.I) and not re.search(r"\b(?:alias|shortcut|variable)\b", visible, re.I):
         return None

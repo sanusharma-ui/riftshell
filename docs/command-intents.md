@@ -8,6 +8,10 @@ provider. Matches use the existing action, safety, approval, and terminal path.
 
 ```text
 User request
+  -> explicit command names / /cmd keep their direct route
+  -> local MiniLM query intent (meaning, not an exact-question list)
+      confident conversation -> small answer-only prompt -> reply
+      other / uncertain      -> command extraction below
   -> normalize polite framing (preserve literal path contents)
   -> indexed phrases / compiled whole-request grammars
       unique rule match  -> registered-command / argument validation -> Orbit action
@@ -17,11 +21,14 @@ User request
                          -> score / margin / capability validation
       confident match    -> Orbit action -> safety / approval -> terminal -> result
       ambiguous match    -> Orbit reasoning with unconfirmed candidates
-      no match           -> existing conversation / inspection / code-writing flow
+      no match           -> small answer-or-workspace-handoff prompt
+          general question -> reply from knowledge
+          workspace needed -> existing inspection / planning / code-writing flow
 ```
 
-No match is silent: no extra AI call, command warning, or additional prompt text.
-The normal Orbit conversation can still use the configured model. Multi-step
+No match is silent: no command warning or command catalog is added to chat.
+A general question uses one successful answer request, with no separate cloud
+classification request. Multi-step
 requests remain in the existing result-driven planning loop. Single-step local
 actions set `continue_after_result=False`; completion uses the actual command
 result without a second model call.
@@ -42,10 +49,59 @@ a cloud API key are not needed for extraction.
 
 There are no automatic downloads during chat. Model initialization and capability
 embeddings are cached per process. The first semantic request pays the initial
-load cost; exact rule matches do not load the model. Missing/broken model assets
+load cost. Explicit bare commands and `/cmd` bypass query classification; natural
+language requests can load the query router even if they later match a rule.
+The command extractor itself still keeps exact rule matches ahead of semantic
+command ranking. Missing/broken model assets
 or dependencies leave the original rules and normal reasoning path available.
 Restart after setup or after changing `RIFT_SEMANTIC_INTENTS=0` (rules only).
 Packaged apps must include `assets/intent-model/`; see the README build command.
+
+## General questions and unfamiliar wording
+
+`ai/query_intent.py` uses the existing offline encoder to compare the complete
+request with contrasting conversation, workspace and follow-up examples. These
+are semantic reference data, not a whitelist, keyword map or stored answers.
+The model and reference embeddings are cached. Weak or conflicting scores,
+overlong input and missing model assets return `uncertain` without truncating
+the request or preventing a reply. Similarity scores are not probabilities.
+
+Confident general queries skip both command extractors. Other queries retain
+the existing validated local command fast path. If no command is established,
+**all unfamiliar topics use the same small answer-or-handoff prompt**, even if
+MiniLM associated the topic with computers. The selected generative provider
+answers general questions directly from knowledge and bounded conversation
+history, without the command catalog, terminal state or workspace contents.
+Conversation uses plain text/Markdown and a reserved workspace-handoff marker;
+it does not require a complete executable JSON envelope to display an answer.
+Definition and explanation framings are also guarded against semantic automatic
+execution, independently of the topic being discussed.
+
+If local evidence or an action is needed, the compact response hands control to
+the existing workspace planner. Any proposed commands, paths or file changes in
+that compact response are discarded; they cannot execute. Such tasks can cost
+one additional small routing request before inspection/planning. This bounded
+handoff does not consume a workspace planning step. Existing execution results,
+approvals, path validation, output caps and inspection budgets still apply.
+Provider failures never trigger a second attempt with a heavier prompt.
+
+The selected output cap still applies. When a provider stops at that cap during
+conversation, visible answer text is retained with a short continuation notice.
+An incomplete action envelope or handoff marker cannot trigger execution. If
+no visible answer was produced (for example, the cap was spent on reasoning),
+only the already configured provider fallbacks are eligible, using the same
+cap; forced-provider mode never switches providers. Workspace action responses
+stopped at the cap are still rejected, even if their JSON looks complete.
+
+For Groq's GPT-OSS models, compact conversation requests use `reasoning_effort=low`
+and `include_reasoning=false`; expanded profiles use medium reasoning. These
+supported options are sent only to those models, not to unrelated providers.
+See [Groq reasoning settings](https://console.groq.com/docs/reasoning).
+
+This removes unnecessary prompt overhead; it cannot replenish a provider's
+per-minute/daily quota or guarantee every future semantic classification.
+Configured provider fallback, cooldown and cancellation remain unchanged. MiniLM
+routes intent; it is not the model that generates knowledge answers.
 
 ## Supported examples
 
@@ -217,6 +273,8 @@ review still inspect the original command string.
 ```powershell
 python -m pytest tests/test_command_intent.py tests/test_agent_run.py tests/test_workspace_agent.py tests/test_ai_providers.py -q -p no:cacheprovider
 python -m pytest tests/test_semantic_intent.py -q -p no:cacheprovider
+python -m pytest tests/test_query_routing.py -q -p no:cacheprovider
+python -m pytest tests/test_conversation_output.py -q -p no:cacheprovider
 python -m pytest -q -p no:cacheprovider
 ```
 
@@ -230,6 +288,9 @@ catalog, negative/modified requests, cloud bypass, approvals and real shell
 operations. They explicitly skip when the model is absent; mocked checks are
 not a substitute for the real-model run.
 Live desktop latency and provider response times require a separate manual run.
+Query routing tests use real local MiniLM on held-out English/Hinglish questions
+and mocked answer providers to verify small prompts, a single answer request,
+no unintended inspection/execution, bounded history and safe workspace handoff.
 The exact `show me folders` request is covered through extraction, planner,
 desktop worker, real folder filtering, and input unlock without continuation.
 Worker tests isolate desktop settings and credentials; they do not measure

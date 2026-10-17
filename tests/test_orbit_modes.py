@@ -171,12 +171,13 @@ class ModeBudgetTests(unittest.TestCase):
             content = "print('keep this')\n" * 1000
             (root / "main.py").write_text(content, encoding="utf-8")
             planner = self.planner(workspace_root=root, gemini_api_key="test", ai_provider="gemini")
-            planner._call_provider = Mock()
+            planner._call_provider = Mock(return_value='{"action":"inspect","paths":[],"message":""}')
             action = planner.plan("Fix main.py")
             self.assertEqual(action.action, "respond")
             self.assertIn("partial file content", action.message)
             self.assertEqual((root / "main.py").read_text(encoding="utf-8"), content)
-            planner._call_provider.assert_not_called()
+            planner._call_provider.assert_called_once()
+            self.assertNotIn("print('keep this')", planner._call_provider.call_args.args[1])
 
     def test_inspector_caps_each_file(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as folder:
@@ -206,10 +207,10 @@ class ModeBudgetTests(unittest.TestCase):
             finish_reason="length", message=SimpleNamespace(content='{"action":"shell","command":"files"}'))]))
         planner._groq = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
         planner._gemini = Mock()
-        action = planner.plan("Please check the project dependencies")
-        self.assertEqual(action.action, "respond")
-        self.assertIn("output limit", action.message)
-        self.assertNotIn("unavailable", action.message)
+        action, errors, _ = planner._request_model_action("Please check the project dependencies")
+        self.assertIsNone(action)
+        self.assertIn("output limit", errors[0])
+        self.assertNotIn("unavailable", errors[0])
         self.assertEqual(create.call_args.kwargs["extra_body"]["max_completion_tokens"], 768)
         planner._gemini.generate_content.assert_not_called()
 
@@ -218,9 +219,9 @@ class ModeBudgetTests(unittest.TestCase):
         response = FakeHTTPResponse()
         response.body = json.dumps({"response": '{"action":', "done_reason": "length"}).encode()
         with patch("ai.llm.urllib.request.urlopen", return_value=response) as call:
-            action = planner.plan("Explain dependency injection")
-        self.assertEqual(action.action, "respond")
-        self.assertIn("output limit", action.message)
+            action, errors, _ = planner._request_model_action("Prepare the requested action")
+        self.assertIsNone(action)
+        self.assertIn("output limit", errors[0])
         payload = json.loads(call.call_args.args[0].data)
         self.assertEqual(payload["options"]["num_predict"], 768)
 

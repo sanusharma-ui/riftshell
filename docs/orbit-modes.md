@@ -32,6 +32,17 @@ workspace, exact-path, untrusted-content and approval constraints. A short reque
 still gets a short answer in High mode. No mode turns Orbit into an autonomous
 development engine.
 
+General conversation uses a separate small plain-text prompt in every mode. It includes
+the chosen output ceiling and bounded recent conversation, without the command
+catalog or workspace/terminal context. An unfamiliar general question can be
+answered in the same request that decides whether workspace access is needed.
+A workspace handoff adds at most one small routing request before normal task
+planning; that routing request does not consume a workspace planning step.
+Prompt/output ceilings and provider quota cooldowns apply to both paths.
+Chat asks for a complete concise explanation with room left for internal
+reasoning. It preserves visible text if the provider stops at the cap and marks
+the answer as unfinished. It never interprets that partial text as an action.
+
 Context packing prioritizes execution evidence and labelled file excerpts over
 older history. Reading is capped per file and per task, including related-file
 inspections. Oversized context is visibly marked in the model prompt. Stored
@@ -40,7 +51,7 @@ catalog entries are retained so executable syntax is never cut in half.
 
 Output caps are passed to all providers: Groq `max_completion_tokens` (through
 `extra_body` for compatibility with older installed SDKs), Gemini
-`max_output_tokens`, and Ollama `num_predict`. A provider response stopped by the
+`max_output_tokens`, and Ollama `num_predict`. A workspace action response stopped by the
 output limit is discarded before action execution and does not cause automatic
 fallback with a larger budget. Existing files are not offered as full replacements
 when their inspection context was truncated. Choose a narrower edit or increase
