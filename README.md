@@ -263,7 +263,7 @@ From the repository root, build the distributable folder:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/setup_intent_model.py
-.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name RiftShell --collect-submodules keyring.backends --add-data "plugins;plugins" --add-data "assets/intent-model;assets/intent-model" main.py
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name RiftShell --icon "assets/icon.ico" --collect-submodules keyring.backends --add-data "plugins;plugins" --add-data "assets/intent-model;assets/intent-model" --add-data "assets/icon.ico;assets" main.py
 ```
 
 Share the **whole** `dist\RiftShell` folder as a ZIP. The launch file is
