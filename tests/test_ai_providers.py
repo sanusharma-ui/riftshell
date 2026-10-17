@@ -15,7 +15,7 @@ class FakeGemini:
         self.calls = 0
         self.message = message
 
-    def generate_content(self, _prompt):
+    def generate_content(self, _prompt, **kwargs):
         self.calls += 1
         payload = {"action": "respond", "message": self.message}
         return SimpleNamespace(text=json.dumps(payload))

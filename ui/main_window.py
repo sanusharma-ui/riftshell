@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+from dataclasses import replace
 from time import perf_counter
 from pathlib import Path
 from urllib.parse import urlparse
@@ -20,7 +21,7 @@ from core.base import CommandResult
 from core.native_terminal import native_dependency_error
 from ai.agent_run import AgentRun
 from ai.config import AIConfig
-from ai.desktop_settings import load_desktop_config, remove_api_key, save_api_key, saved_key_exists
+from ai.desktop_settings import load_desktop_config, load_mode_preferences, remove_api_key, save_api_key, saved_key_exists
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
 from ai.provider_runtime import PROVIDER_RUNTIME
@@ -168,7 +169,9 @@ class OrbitWorker(QThread):
         try:
             from ai.llm import AgentPlanner
 
-            config = load_desktop_config()
+            config = self.task.planner.config if self.task and self.task.planner else load_desktop_config()
+            if self.task and self.task.mode and not self.task.planner:
+                config = replace(config, orbit_mode=self.task.mode)
             planner = self.task.planner if self.task and self.task.planner else AgentPlanner(
                 config=config,
                 command_names=self.shell.registry.all_names(),
@@ -180,6 +183,8 @@ class OrbitWorker(QThread):
                 native_context_provider=getattr(self.shell, "native_context_provider", None),
             )
             if self.task:
+                if not self.task.planner:
+                    self.task.max_steps = planner.mode.max_steps
                 self.task.planner = planner
             planner.progress = self.progress.emit
             action = (planner.continue_task(self.prompt, self.task.observations)
@@ -820,6 +825,17 @@ class OrbitPanel(QFrame):
         header.addStretch()
         header.addWidget(self.thinking_indicator)
         layout.addLayout(header)
+        mode_row = QHBoxLayout()
+        self.mode_selector = QComboBox()
+        self.mode_selector.setToolTip("Choose the budget for your next Orbit task")
+        self.mode_selector.currentIndexChanged.connect(self._select_mode)
+        mode_button = QPushButton("Modes...")
+        mode_button.clicked.connect(self._edit_modes)
+        mode_row.addWidget(QLabel("Mode"))
+        mode_row.addWidget(self.mode_selector, 1)
+        mode_row.addWidget(mode_button)
+        layout.addLayout(mode_row)
+        self._reload_modes()
         layout.addWidget(self.status)
         layout.addWidget(self.conversation, 1)
         layout.addWidget(self.input)
@@ -830,6 +846,37 @@ class OrbitPanel(QFrame):
         self.approve_button.clicked.connect(self.approve)
         self.reject_button.clicked.connect(self.dismiss)
         self.stop_button.clicked.connect(self.stop_task)
+
+    def _reload_modes(self):
+        self.mode_selector.blockSignals(True)
+        self.mode_selector.clear()
+        try:
+            modes, selected = load_mode_preferences()
+            for mode in modes:
+                self.mode_selector.addItem(mode.name, mode.name)
+                self.mode_selector.setItemData(self.mode_selector.count() - 1,
+                    f"~{mode.prompt_tokens} prompt tokens; {mode.output_tokens} output tokens; "
+                    f"{mode.max_files} files; {mode.max_steps} planning decisions", Qt.ToolTipRole)
+            self.mode_selector.setCurrentIndex(self.mode_selector.findData(selected.name))
+        except ValueError as exc:
+            self.status.setText(str(exc))
+        finally:
+            self.mode_selector.blockSignals(False)
+
+    def _select_mode(self, index):
+        if index >= 0:
+            settings = QSettings("RiftShell", "RiftShell")
+            settings.setValue("ai/mode", self.mode_selector.itemData(index))
+            settings.sync()
+
+    def _edit_modes(self):
+        from ui.orbit_modes import OrbitModesDialog
+        try:
+            dialog = OrbitModesDialog(self)
+            if dialog.exec() == QDialog.Accepted:
+                self._reload_modes()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Orbit modes", str(exc))
 
     def _set_thinking(self, thinking: bool):
         if thinking:
@@ -877,10 +924,15 @@ class OrbitPanel(QFrame):
                 self._append("Orbit", "The proposed action was dismissed. Nothing was changed.")
                 return
 
+        try:
+            _, mode = load_mode_preferences()
+        except ValueError as exc:
+            self._append("Orbit", str(exc))
+            return
         self._append("You", prompt)
         self.input.clear()
         self.dismiss()
-        self.task = AgentRun(prompt)
+        self.task = AgentRun(prompt, max_steps=mode.max_steps, mode=mode)
         self.task_session = session
         self.task_cwd = session.shell.ctx.cwd
         self.stop_button.setEnabled(True)

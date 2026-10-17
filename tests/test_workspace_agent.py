@@ -18,7 +18,7 @@ class CapturingGemini:
         self.payload = payload
         self.prompts = []
 
-    def generate_content(self, prompt):
+    def generate_content(self, prompt, **kwargs):
         self.prompts.append(prompt)
         return SimpleNamespace(text=json.dumps(self.payload))
 
@@ -28,7 +28,7 @@ class SequencedGemini:
         self.payloads = list(payloads)
         self.prompts = []
 
-    def generate_content(self, prompt):
+    def generate_content(self, prompt, **kwargs):
         self.prompts.append(prompt)
         payload = self.payloads.pop(0)
         return SimpleNamespace(text=json.dumps(payload))

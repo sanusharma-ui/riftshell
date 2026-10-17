@@ -5,6 +5,7 @@ import hashlib
 from dataclasses import dataclass, field
 
 from ai.actions import AgentAction
+from ai.modes import OrbitMode
 
 
 @dataclass
@@ -12,6 +13,7 @@ class AgentRun:
     objective: str
     max_steps: int = 8
     planner: object = None
+    mode: OrbitMode | None = None
     observations: list[dict] = field(default_factory=list)
     pending: AgentAction | None = None
     stopped: bool = False

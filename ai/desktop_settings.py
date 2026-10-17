@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings
 
 from ai.config import AIConfig
+from ai.modes import decode_modes, select_mode
 
 
 SERVICE = "RiftShell Orbit"
@@ -38,6 +39,9 @@ def remove_api_key(provider: str) -> None:
 def load_desktop_config() -> AIConfig:
     config = AIConfig.from_env()
     settings = QSettings("RiftShell", "RiftShell")
+    if settings.contains("ai/modes") or settings.contains("ai/mode"):
+        modes, mode = load_mode_preferences(config, settings)
+        config = replace(config, orbit_modes=modes, orbit_mode=mode)
     if not settings.contains("ai/provider"):
         return config
 
@@ -56,3 +60,12 @@ def load_desktop_config() -> AIConfig:
         workspace_root=Path(settings.value("ai/workspace_root", str(config.workspace_root), type=str)).expanduser().resolve(strict=False),
         allow_outside_workspace=settings.value("ai/allow_outside_workspace", config.allow_outside_workspace, type=bool),
     )
+
+
+def load_mode_preferences(config=None, settings=None):
+    """Read non-secret mode preferences without accessing the credential store."""
+    config = config or AIConfig.from_env()
+    settings = settings or QSettings("RiftShell", "RiftShell")
+    modes = decode_modes(settings.value("ai/modes", "", type=str)) if settings.contains("ai/modes") else config.orbit_modes
+    mode = select_mode(modes, settings.value("ai/mode", config.orbit_mode.name, type=str))
+    return modes, mode

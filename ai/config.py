@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from ai.modes import OrbitMode, default_modes, modes_from_env
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -105,6 +107,8 @@ class AIConfig:
     allow_outside_workspace: bool
     approval_timeout_minutes: int
     command_output_limit: int
+    orbit_mode: OrbitMode = field(default_factory=OrbitMode)
+    orbit_modes: tuple[OrbitMode, ...] = field(default_factory=default_modes)
 
     @classmethod
     def from_env(cls) -> "AIConfig":
@@ -117,7 +121,10 @@ class AIConfig:
         except Exception:
             workspace_root = DEFAULT_WORKSPACE_ROOT
 
+        modes, mode = modes_from_env()
         return cls(
+            orbit_modes=modes,
+            orbit_mode=mode,
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
             telegram_allowed_user_ids=_parse_user_ids(os.getenv("TELEGRAM_ALLOWED_USER_IDS")),
             telegram_allow_unlisted_users=_parse_bool(

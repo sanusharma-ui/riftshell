@@ -109,13 +109,21 @@ or approved file write, the model receives the actual result and chooses the nex
 necessary step or explains the outcome. Natural-language conversation uses the
 configured model; explicit commands and offline shortcuts remain available.
 
-Each task allows up to eight execution steps and blocks identical repeated
-actions. Related-file analysis permits up to three inspection passes. Every new
+Each task uses the selected Orbit mode's execution and planning limits and blocks
+identical repeated actions. Balanced starts with four steps and two inspection passes;
+High starts with eight steps and three passes. Every new
 risky command and every file change still requires its own approval. Tasks stay
 attached to their original terminal tab. **Stop task** prevents further steps;
 an in-flight provider request or an already approved atomic file write may finish.
 Task state is currently in memory and does not resume after restarting the app.
 This execution loop is desktop-only; the optional Telegram flow is unchanged.
+
+Choose **Balanced** or **High** from the Orbit panel's **Mode** selector. Open
+**Modes...** to edit prompt/output budgets, history, file limits and planning
+limits, or duplicate a profile to create your own. Balanced is the default for
+concise shell assistance; High allows deeper explanations when you choose it.
+Modes never switch automatically. See [Orbit modes](docs/orbit-modes.md) for
+defaults, internal behaviour and optional JSON configuration.
 
 The PySide6 workspace includes:
 
@@ -234,7 +242,7 @@ In `auto` mode, Orbit tries configured providers in the specified order, skippin
 
 Orbit shares quota cooldowns across turns in the same process, scoped to provider, credential and model. It reads Groq quota headers and provider retry hints. If no provider succeeds, a short rate limit can trigger one generation retry, with at most 15 seconds of total cooldown waiting per task. The desktop shows a cancellable countdown. Confirmed daily exhaustion does not trigger this automatic retry. A generic quota error does not identify whether the limit is daily; unknown retry delays use a 60-second cooldown. Cooldowns are cleared when the app exits and cannot account for other apps using the same organization/project quota.
 
-Provider failure details are kept out of subsequent conversation prompts; the user request and a short failure status remain. Existing saved error records are compacted when constructing prompts without rewriting the history file. Continuation inspections include execution evidence without duplicating the complete base prompt. Command definitions, safety rules, user constraints, inspected source, model choices and output limits are preserved. Completed replies render immediately instead of replaying a typing animation.
+Provider failure details are kept out of subsequent conversation prompts; the user request and a short failure status remain. Existing saved error records are compacted when constructing prompts without rewriting the history file. Continuation inspections include execution evidence without duplicating the complete base prompt. Selected mode budgets bound history, file excerpts, catalog entries and provider output. Safety instructions and the current user request are preserved; a request that cannot fit is rejected locally with an explanation. Completed replies render immediately instead of replaying a typing animation.
 
 For local diagnosis, `ai.provider_runtime.PROVIDER_RUNTIME.diagnostics()` returns the latest 100 timing/status events **inside the running process**. Events include provider calls, quota waits, planning, execution, rendering and input readiness. Provider errors redact configured API keys; prompts, generated answers and command output are not recorded by the diagnostics code. Events also go to the `ai.provider_runtime` Python logger at `DEBUG` level if a developer enables it. These timings are diagnostic evidence, not a guarantee of live provider speed or answer quality.
 

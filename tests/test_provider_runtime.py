@@ -205,7 +205,7 @@ class ProviderRecoveryTests(unittest.TestCase):
         self.assertIsNone(planner._request_model_action("task")[0])
         planner._call_provider.assert_not_called()
 
-    def test_raw_groq_headers_are_read_without_changing_generation_parameters(self):
+    def test_raw_groq_headers_are_read_with_the_selected_output_budget(self):
         planner = self.planner(ai_provider="groq")
         response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
             content='{"action":"respond","message":"complete answer"}'))])
@@ -218,6 +218,7 @@ class ProviderRecoveryTests(unittest.TestCase):
         self.assertEqual(action.message, "complete answer")
         self.assertEqual(create.call_args.kwargs["messages"][0]["content"], "full context")
         self.assertNotIn("max_tokens", create.call_args.kwargs)
+        self.assertEqual(create.call_args.kwargs["extra_body"]["max_completion_tokens"], planner.mode.output_tokens)
         self.assertEqual(self.runtime.cooldown(planner._provider_key("groq")).remaining, 30)
 
     def test_installed_groq_sdk_raw_response_and_rate_limit_with_offline_transport(self):
@@ -245,6 +246,7 @@ class ProviderRecoveryTests(unittest.TestCase):
             self.assertEqual(planner._request_model_action("next prompt")[0].message, "SDK fallback")
         self.assertEqual(len(requests), 2)
         self.assertEqual(requests[0]["messages"][0]["content"], "full unchanged prompt")
+        self.assertEqual(requests[0]["max_completion_tokens"], planner.mode.output_tokens)
         self.assertEqual(self.runtime.cooldown(planner._provider_key("groq")).remaining, 12)
 
     def test_installed_google_exception_retry_info_is_respected(self):

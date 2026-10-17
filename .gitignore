@@ -41,3 +41,8 @@ assets/intent-model/
 .idea/
 .DS_Store
 Thumbs.db
+
+build/
+dist/
+.venv-build/
+*.zip

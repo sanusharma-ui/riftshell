@@ -92,8 +92,8 @@ class ProviderRuntime:
     """Shared by desktop turns; credentials are hashed and never logged.
 
     Limits are scoped to provider, credential and model. Other processes/keys may
-    share server quota, so server 429s remain authoritative. No guessed tokenizer
-    budget is used to discard context or block a potentially valid request.
+    share server quota, so server 429s remain authoritative. User-selected prompt
+    budgets are managed by the planner; this class never guesses remaining quota.
     """
     def __init__(self, clock=None, sleep=None):
         self.clock = clock or time.monotonic

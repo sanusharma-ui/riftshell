@@ -56,6 +56,7 @@ class WorkspaceInspection:
     content: str
     files: tuple[str, ...]
     warnings: tuple[str, ...] = ()
+    truncated_files: tuple[str, ...] = ()
 
 
 def inspect_workspace_paths(
@@ -66,6 +67,8 @@ def inspect_workspace_paths(
     allow_outside_workspace: bool,
     max_files: int = 16,
     max_chars: int = 80_000,
+    max_file_chars: int | None = None,
+    exclude_files: tuple[str, ...] = (),
 ) -> WorkspaceInspection:
     """Read bounded, non-sensitive workspace context for a model analysis pass."""
     workspace_root = workspace_root.resolve(strict=False)
@@ -74,9 +77,10 @@ def inspect_workspace_paths(
     sections: list[str] = []
     inspected: list[str] = []
     warnings: list[str] = []
+    truncated: list[str] = []
     remaining = max_chars
 
-    for path_text in requested[:8]:
+    for path_text in requested[:max_files]:
         target = _resolve_target(path_text, current_dir)
         if not allow_outside_workspace and not _is_relative_to(target, workspace_root):
             warnings.append(f"Blocked path outside the AI workspace: {target}")
@@ -85,11 +89,13 @@ def inspect_workspace_paths(
             warnings.append(f"Path not found: {target}")
             continue
         if target.is_file():
+            if str(target.resolve(strict=False)) in exclude_files:
+                continue
             remaining = _append_file(
-                target, workspace_root, sections, inspected, warnings, remaining
+                target, workspace_root, sections, inspected, warnings, remaining, max_file_chars, truncated
             )
         elif target.is_dir():
-            tree = _directory_tree(target, workspace_root)
+            tree = _directory_tree(target, workspace_root, max_entries=min(220, max(12, max_chars // 100)))
             tree_section = f"### Directory structure: {_display_path(target, workspace_root)}\n{tree}"
             if len(tree_section) <= remaining:
                 sections.append(tree_section)
@@ -97,8 +103,14 @@ def inspect_workspace_paths(
             for candidate in _candidate_files(target):
                 if len(inspected) >= max_files or remaining <= 0:
                     break
+                resolved = candidate.resolve(strict=False)
+                if str(resolved) in exclude_files:
+                    continue
+                if not allow_outside_workspace and not _is_relative_to(resolved, workspace_root):
+                    warnings.append(f"Blocked path outside the AI workspace: {candidate}")
+                    continue
                 remaining = _append_file(
-                    candidate, workspace_root, sections, inspected, warnings, remaining
+                    candidate, workspace_root, sections, inspected, warnings, remaining, max_file_chars, truncated
                 )
         if len(inspected) >= max_files or remaining <= 0:
             break
@@ -113,7 +125,8 @@ def inspect_workspace_paths(
     content = "\n\n".join(sections)
     if warnings:
         content += "\n\n### Inspection notes\n" + "\n".join(f"- {item}" for item in warnings)
-    return WorkspaceInspection(content=content, files=tuple(inspected), warnings=tuple(warnings))
+    return WorkspaceInspection(content=content, files=tuple(inspected), warnings=tuple(warnings),
+                               truncated_files=tuple(truncated))
 
 
 def _resolve_target(path_text: str, current_dir: Path) -> Path:
@@ -156,6 +169,8 @@ def _append_file(
     inspected: list[str],
     warnings: list[str],
     remaining: int,
+    max_file_chars: int | None = None,
+    truncated: list[str] | None = None,
 ) -> int:
     display = _display_path(path, workspace_root)
     if display in inspected:
@@ -167,7 +182,10 @@ def _append_file(
         warnings.append(f"Skipped binary file: {display}")
         return remaining
     try:
-        raw = path.read_bytes()
+        # Bound the read itself, not just the text sent to the provider.
+        cap = min(remaining, max_file_chars) if max_file_chars is not None else remaining
+        with path.open("rb") as source:
+            raw = source.read(max(0, cap) * 4 + 1)
     except OSError as exc:
         warnings.append(f"Could not read {display}: {exc}")
         return remaining
@@ -177,12 +195,14 @@ def _append_file(
 
     text = raw.decode("utf-8", errors="replace")
     header = f"### File: {display}\n"
-    allowance = max(0, remaining - len(header))
+    allowance = max(0, min(cap, remaining - len(header)))
     if allowance <= 0:
         return 0
     if len(text) > allowance:
         text = text[: max(0, allowance - 80)] + "\n...[file truncated by RiftShell]"
         warnings.append(f"Truncated large file: {display}")
+        if truncated is not None:
+            truncated.append(str(path.resolve(strict=False)))
     sections.append(header + text)
     inspected.append(display)
     return max(0, remaining - len(header) - len(text))
@@ -241,7 +261,9 @@ def _candidate_files(root: Path) -> list[Path]:
 
     def priority(path: Path) -> tuple[int, int, str]:
         name = path.name.lower()
-        preferred = 0 if name in PREFERRED_PROJECT_FILES or name.startswith("readme") else 1
+        preferred = (0 if name.startswith("readme") else 1 if name in {
+            "package.json", "pyproject.toml", "cargo.toml", "requirements.txt"
+        } else 2 if name in PREFERRED_PROJECT_FILES else 3)
         depth = len(path.relative_to(root).parts)
         return preferred, depth, str(path).lower()
 
