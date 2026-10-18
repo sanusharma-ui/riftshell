@@ -36,6 +36,9 @@ logs/
 # Downloaded, checksum-verified local intent model (scripts/setup_intent_model.py)
 assets/intent-model/
 
+# Original demo recording; README uses the compressed riftshell_final.mp4
+/assets/riftshell_final (1).mp4
+
 # IDE and OS files
 .vscode/
 .idea/

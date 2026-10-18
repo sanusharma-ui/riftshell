@@ -24,6 +24,16 @@ It is not trying to hide the shell behind a chatbot. RiftShell keeps commands, o
 > [!NOTE]
 > RiftShell is under active development. The current build is ideal for local experimentation, development workflows, and extending through plugins.
 
+## Watch RiftShell in action
+
+See the desktop workspace in a **1 minute 39 second working demo** before diving into the features or setting up the project.
+
+[![RiftShell working demo playing on a loop — terminal and Orbit AI workspace](assets/riftshell-demo.gif)](assets/riftshell_final.mp4)
+
+**[▶ Watch the demo](assets/riftshell_final.mp4)** · [Quick start](#quick-start) · [Desktop experience](#desktop-experience)
+
+*The 12-second preview above plays automatically as a silent loop. Click it to watch the full 1:39 demo with audio.*
+
 ## Why RiftShell Orbit?
 
 | Capability | What it gives you |
