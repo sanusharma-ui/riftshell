@@ -28,11 +28,9 @@ It is not trying to hide the shell behind a chatbot. RiftShell keeps commands, o
 
 See the desktop workspace in a **1 minute 39 second working demo** before diving into the features or setting up the project.
 
-[![RiftShell working demo playing on a loop — terminal and Orbit AI workspace](assets/riftshell-demo.gif)](assets/riftshell_final.mp4)
+<video src="https://github.com/sanusharma-ui/riftshell/raw/refs/heads/main/assets/riftshell_final.mp4" controls autoplay muted loop playsinline width="100%" aria-label="RiftShell full working demo"></video>
 
-**[▶ Watch the demo](assets/riftshell_final.mp4)** · [Quick start](#quick-start) · [Desktop experience](#desktop-experience)
-
-*The 12-second preview above plays automatically as a silent loop. Click it to watch the full 1:39 demo with audio.*
+**[▶ Open the full demo — 1:39](assets/riftshell_final.mp4?raw=true)** · [Quick start](#quick-start) · [Desktop experience](#desktop-experience)
 
 ## Why RiftShell Orbit?
 
