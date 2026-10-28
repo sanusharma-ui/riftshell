@@ -30,13 +30,13 @@ THEMES: dict[str, Theme] = {
         key="vscode-dark-plus",
         display_name="VS Code Dark+ (Default)",
         aliases=("default", "dark+", "dark-plus", "vscode", "vs-code", "vs-code-dark-plus"),
-        background="#141619",
-        surface="#1b1e22",
-        surface_alt="#24282e",
-        border="#343a42",
+        background="#17191d",
+        surface="#1e2126",
+        surface_alt="#282d35",
+        border="#30353e",
         text="#e2e5e9",
         muted="#929ba6",
-        accent="#8aadd4",
+        accent="#79a9e8",
         accent_alt="#b6c5d6",
         output="#ced3da",
         error="#f48771",
@@ -232,15 +232,15 @@ QMainWindow {{
 QWidget {{
     background-color: {theme.background};
     color: {theme.text};
-    font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 10pt;
+    font-family: "Segoe UI";
+    font-size: 9pt;
 }}
 
 QLabel {{
     background-color: transparent;
     color: {theme.muted};
     font-size: 9.5pt;
-    font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: "Segoe UI";
 }}
 
 QTextEdit {{
@@ -278,7 +278,7 @@ QListWidget {{
 }}
 
 QListWidget::item {{
-    padding: 8px 10px;
+    padding: 6px 8px;
     border-radius: 6px;
     margin: 1px 0px;
     border: 1px solid transparent;
@@ -369,15 +369,78 @@ QFrame#sidebar QLabel, QFrame#inspector QLabel, QFrame#terminalHeader QLabel {{
 }}
 
 QFrame#terminalHeader {{
-    border-radius: 6px;
+    border: none;
+    border-bottom: 1px solid {theme.border};
+    border-radius: 0;
     background-color: {theme.surface};
 }}
+QFrame#inspector {{
+    background-color: {theme.background};
+    border: none;
+    border-left: 1px solid {theme.border};
+    border-radius: 0;
+}}
+QFrame#actionReview, QFrame#orbitWelcome, QStackedWidget#orbitBody {{ background-color: {theme.background}; border: none; }}
+QFrame#actionReview QPushButton {{ padding: 6px 8px; font-size: 9pt; }}
+QFrame#orbitHeader {{ background-color: {theme.surface}; border: none; border-bottom: 1px solid {theme.border}; }}
+QLabel#orbitHeading {{ font-size: 10pt; font-weight: 600; color: #d8dfe8; }}
+QLabel#orbitSubtitle {{ font-size: 7pt; color: {theme.muted}; }}
+QLabel#thinkingStatus {{ font-size: 7pt; color: {theme.accent}; }}
+QFrame#orbitComposer, QFrame#terminalComposer {{
+    background-color: {theme.surface};
+    border: 1px solid {theme.border};
+    border-radius: 8px;
+}}
+QFrame#terminalComposer {{
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid {theme.border};
+}}
+QFrame#orbitComposer {{
+    background-color: {theme.surface};
+    border: none;
+    border-top: 1px solid {theme.border};
+    border-radius: 0;
+}}
+QLabel#promptMark {{ color: {theme.accent}; font-size: 12pt; font-weight: 600; }}
+QLabel#welcomeTitle {{ color: #d8dfe8; font-size: 17pt; font-weight: 600; }}
+QLabel#orbitWelcomeCopy {{ color: {theme.muted}; font-size: 9pt; }}
+QLabel#orbitStatus {{
+    color: {theme.muted}; font-size: 8pt; padding: 10px 16px;
+    border-bottom: 1px solid {theme.border};
+}}
+QLabel#remoteStatus {{
+    border-top: 1px solid {theme.border};
+    padding-top: 12px;
+    font-size: 8pt;
+}}
+QPushButton#promptChip {{
+    text-align: left;
+    background-color: {theme.background};
+    border: 1px solid {theme.border};
+    padding: 12px;
+    color: #c4ceda;
+    font-weight: 400;
+    font-size: 9pt;
+}}
+QPushButton#promptChip:hover {{ border-color: {theme.accent}; }}
+QListWidget#sessionList {{ border: none; padding: 0; background: transparent; }}
+QListWidget#sessionList::item {{ padding: 8px; margin: 0; }}
+QListWidget#sessionList::item:selected {{
+    background-color: {theme.surface_alt};
+    border: 1px solid {theme.border};
+    border-left: 2px solid {theme.accent};
+}}
+QPushButton#tabAdd {{ background: transparent; border: none; padding: 4px; }}
+QPushButton#tabAdd:hover {{ background: {theme.surface_alt}; }}
+QLineEdit#orbitInput {{ background: {theme.background}; padding: 8px; border-radius: 6px; }}
 
 QLineEdit#commandInput {{
     background-color: {theme.surface};
     border-radius: 6px;
-    padding: 10px 12px;
-    min-height: 24px;
+    padding: 6px 8px;
+    min-height: 20px;
+    border: none;
 }}
 
 QLineEdit#commandInput:focus {{
@@ -387,10 +450,11 @@ QLineEdit#commandInput:focus {{
 
 QTextEdit#orbitConversation {{
     background-color: {theme.background};
+    color: #d8dfe8;
     border: none;
-    border-radius: 6px;
-    padding: 14px;
-    font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    border-radius: 0;
+    padding: 12px 8px;
+    font-family: "Segoe UI";
     font-size: 10.5pt;
 }}
 
@@ -418,7 +482,7 @@ QPushButton:focus {{
 
 QLabel#brand {{
     color: {theme.text};
-    font-size: 16pt;
+    font-size: 14pt;
     font-weight: 600;
     letter-spacing: -0.3px;
 }}
@@ -484,7 +548,7 @@ QPushButton#navButton {{
     border: 1px solid transparent;
     border-radius: 7px;
     text-align: left;
-    padding: 8px 10px;
+    padding: 6px 8px;
     color: {theme.muted};
     font-size: 9.5pt;
     font-weight: 500;
@@ -498,14 +562,14 @@ QPushButton#navButton:hover {{
 
 QPushButton#navButton:checked, QPushButton#navButton:pressed {{
     background-color: {theme.surface_alt};
-    border-color: {theme.accent};
+    border-color: {theme.border};
     color: {theme.accent_alt};
     font-weight: 600;
 }}
 
 QTabWidget::pane {{
-    border: 1px solid {theme.border};
-    border-radius: 8px;
+    border: none;
+    border-radius: 0;
     background-color: {theme.surface};
     margin-top: -1px;
 }}
@@ -515,10 +579,10 @@ QTabBar::tab {{
     color: {theme.muted};
     border: 1px solid {theme.border};
     border-bottom: none;
-    border-top-left-radius: 7px;
-    border-top-right-radius: 7px;
-    padding: 8px 14px;
-    margin-right: 3px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    padding: 8px 16px;
+    margin-right: 0;
     font-size: 9.5pt;
     font-weight: 500;
 }}

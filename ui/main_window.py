@@ -7,13 +7,13 @@ from time import perf_counter
 from pathlib import Path
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QSettings, QThread, Signal, QStringListModel, QTimer
+from PySide6.QtCore import Qt, QEvent, QSettings, QThread, Signal, QStringListModel, QTimer
 from PySide6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
-    QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
+    QSizePolicy, QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from core.shell import Shell
@@ -27,6 +27,8 @@ from ai.safety import SafetyPolicy
 from ai.provider_runtime import PROVIDER_RUNTIME
 from ui.themes import build_stylesheet, get_theme, list_themes
 from ui.terminal_output import TerminalOutput
+from ui.icons import icon
+from ui.orbit_presentation import message_html, terminal_reply
 
 
 def pending_action_reply(text: str) -> str | None:
@@ -450,7 +452,7 @@ class TerminalSession(QWidget):
         self.native = None
         self._active_native = False
         self.active_command = ""
-        self.name_label = QLabel(title)
+        self.name_label = QLabel(title, self)
         self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
         self.path_label = QLabel(f"{shell.ctx.cwd}")
         self.path_label.setObjectName("sessionPath")
@@ -459,8 +461,11 @@ class TerminalSession(QWidget):
         header = QFrame()
         header.setObjectName("terminalHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 8, 12, 8)
-        header_layout.addWidget(self.name_label)
+        header_layout.setContentsMargins(8, 4, 8, 4)
+        header_layout.setSpacing(8)
+        self.name_label.hide()
+        self.path_label.setMinimumWidth(0)
+        self.path_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         header_layout.addWidget(self.path_label, 1)
         header_layout.addWidget(self.state_label)
         self.console = TerminalOutput()
@@ -489,8 +494,18 @@ class TerminalSession(QWidget):
         self.cancel_button.setEnabled(False)
         self.clear_button = QPushButton("Clear")
         self.copy_button = QPushButton("Copy")
-        bottom = QHBoxLayout()
+        composer = QFrame()
+        composer.setObjectName("terminalComposer")
+        bottom = QHBoxLayout(composer)
+        bottom.setContentsMargins(8, 8, 8, 8)
         bottom.setSpacing(8)
+        prompt = QLabel(">_")
+        prompt.setObjectName("promptMark")
+        bottom.addWidget(prompt)
+        self.run_button.setFixedWidth(64)
+        self.cancel_button.setFixedWidth(72)
+        self.clear_button.setIcon(icon("clear"))
+        self.copy_button.setIcon(icon("copy"))
         bottom.addWidget(self.input, 1)
         bottom.addWidget(self.run_button)
         bottom.addWidget(self.cancel_button)
@@ -498,11 +513,11 @@ class TerminalSession(QWidget):
         header_layout.insertWidget(3, self.copy_button)
         self.copy_button.setToolTip("Copy selected text, or all output")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         layout.addWidget(header)
         layout.addWidget(self.console_stack, 1)
-        layout.addLayout(bottom)
+        layout.addWidget(composer)
         self.run_button.clicked.connect(self.run_command)
         self.input.returnPressed.connect(self.run_command)
         self.cancel_button.clicked.connect(self.request_cancel)
@@ -617,6 +632,8 @@ class TerminalSession(QWidget):
         return get_theme(self.preferences["theme"])
 
     def append_html(self, text: str, color: str, label: str = ""):
+        if label == "Orbit":
+            text = terminal_reply(text)
         self.console.append_output(text, color, label, self._theme().accent)
 
     def append_system(self, text: str):
@@ -763,6 +780,33 @@ class TerminalSession(QWidget):
         return False
 
 
+class ActionReview(QFrame):
+    """Present existing action controls only when their enabled state allows use."""
+
+    def __init__(self, buttons, parent=None):
+        super().__init__(parent)
+        self.setObjectName("actionReview")
+        self.buttons = buttons
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 8, 16, 8)
+        layout.setSpacing(8)
+        label = QLabel("ACTION REVIEW")
+        label.setObjectName("sectionTitle")
+        layout.addWidget(label)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        for button in buttons:
+            row.addWidget(button)
+            button.installEventFilter(self)
+        layout.addLayout(row)
+        self.setVisible(any(button.isEnabled() for button in buttons))
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.EnabledChange:
+            self.setVisible(any(button.isEnabled() for button in self.buttons))
+        return super().eventFilter(watched, event)
+
+
 class OrbitPanel(QFrame):
     action_requested = Signal(object, bool, object)
     output_ready = Signal(object, str)
@@ -782,10 +826,10 @@ class OrbitPanel(QFrame):
         self.continue_timer = QTimer(self)
         self.continue_timer.setSingleShot(True)
         self.continue_timer.timeout.connect(self._continue_task)
-        heading = QLabel("ORBIT AI")
-        heading.setObjectName("sectionTitle")
+        heading = QLabel("Orbit")
+        heading.setObjectName("orbitHeading")
         self.thinking_indicator = QLabel("")
-        self.thinking_indicator.setObjectName("statusPill")
+        self.thinking_indicator.setObjectName("thinkingStatus")
         self.thinking_timer = QTimer(self)
         self.thinking_timer.timeout.connect(self._advance_thinking_indicator)
         self.thinking_frame = 0
@@ -803,10 +847,14 @@ class OrbitPanel(QFrame):
         self.conversation = QTextEdit()
         self.conversation.setObjectName("orbitConversation")
         self.conversation.setReadOnly(True)
-        self.conversation.setMinimumHeight(200)
+        self.conversation.setMinimumHeight(96)
+        self.conversation.document().setIndentWidth(16)
+        self.conversation.document().setDefaultStyleSheet("p { margin-top: 8px; margin-bottom: 12px; } pre { white-space: pre-wrap; }")
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Ask Orbit: 'explain code', 'show files'…")
-        self.plan_button = QPushButton("Ask Orbit")
+        self.input.setPlaceholderText("Ask Orbit anything...")
+        self.input.setObjectName("orbitInput")
+        self.plan_button = QPushButton("Send")
+        self.plan_button.setFixedWidth(64)
         self.plan_button.setObjectName("primaryButton")
         self.approve_button = QPushButton("Approve")
         self.approve_button.setEnabled(False)
@@ -814,38 +862,102 @@ class OrbitPanel(QFrame):
         self.reject_button.setEnabled(False)
         self.stop_button = QPushButton("Stop")
         self.stop_button.setEnabled(False)
-        actions = QHBoxLayout()
-        actions.addWidget(self.approve_button)
-        actions.addWidget(self.reject_button)
-        actions.addWidget(self.stop_button)
+        self.action_review = ActionReview([
+            self.approve_button, self.reject_button, self.stop_button,
+        ])
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
-        header = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        header_frame = QFrame()
+        header_frame.setObjectName("orbitHeader")
+        header_frame.setFixedHeight(38)
+        header = QHBoxLayout(header_frame)
+        header.setContentsMargins(16, 0, 16, 0)
+        header.setSpacing(8)
+        orbit_mark = QLabel()
+        orbit_mark.setPixmap(icon("orbit").pixmap(24, 24))
+        header.addWidget(orbit_mark)
         header.addWidget(heading)
+        subtitle = QLabel("/  WORKSPACE ASSISTANT")
+        subtitle.setObjectName("orbitSubtitle")
+        header.addWidget(subtitle)
         header.addStretch()
         header.addWidget(self.thinking_indicator)
-        layout.addLayout(header)
+        layout.addWidget(header_frame)
         mode_row = QHBoxLayout()
         self.mode_selector = QComboBox()
+        self.mode_selector.setMinimumContentsLength(8)
+        self.mode_selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.mode_selector.setToolTip("Choose the budget for your next Orbit task")
         self.mode_selector.currentIndexChanged.connect(self._select_mode)
-        mode_button = QPushButton("Modes...")
+        mode_button = QPushButton()
+        mode_button.setIcon(icon("settings"))
+        mode_button.setFixedWidth(32)
+        mode_button.setToolTip("Edit Orbit modes")
+        mode_button.setAccessibleName("Edit Orbit modes")
         mode_button.clicked.connect(self._edit_modes)
         mode_row.addWidget(QLabel("Mode"))
         mode_row.addWidget(self.mode_selector, 1)
         mode_row.addWidget(mode_button)
-        layout.addLayout(mode_row)
         self._reload_modes()
+        self.status.setObjectName("orbitStatus")
         layout.addWidget(self.status)
-        layout.addWidget(self.conversation, 1)
-        layout.addWidget(self.input)
-        layout.addWidget(self.plan_button)
-        layout.addLayout(actions)
+        self.chat_stack = QStackedWidget()
+        self.welcome = QFrame()
+        self.welcome.setObjectName("orbitWelcome")
+        welcome_layout = QVBoxLayout(self.welcome)
+        welcome_layout.setContentsMargins(24, 24, 24, 24)
+        welcome_layout.setSpacing(8)
+        welcome_layout.addSpacing(32)
+        welcome_title = QLabel("Work from here.")
+        welcome_title.setObjectName("welcomeTitle")
+        welcome_title.setWordWrap(True)
+        welcome_layout.addWidget(welcome_title)
+        welcome_copy = QLabel("Understand the workspace. Review a command.\nKeep working in your terminal.")
+        welcome_copy.setObjectName("orbitWelcomeCopy")
+        welcome_copy.setWordWrap(True)
+        welcome_layout.addWidget(welcome_copy)
+        welcome_layout.addSpacing(16)
+        for title, glyph, prompt in [
+            ("Explore this workspace", "extensions", "Explain the structure of this workspace"),
+            ("Find a shell command", "terminal", "How do I list files in RiftShell?"),
+            ("Understand an error", "search", "Help me understand this error: "),
+        ]:
+            chip = QPushButton(title)
+            chip.setObjectName("promptChip")
+            chip.setIcon(icon(glyph))
+            chip.setToolTip(prompt)
+            chip.clicked.connect(lambda checked=False, text=prompt: self._fill_prompt(text))
+            welcome_layout.addWidget(chip)
+        welcome_layout.addStretch(3)
+        self.chat_stack.addWidget(self.welcome)
+        self.chat_stack.addWidget(self.conversation)
+        self.chat_stack.setObjectName("orbitBody")
+        layout.addWidget(self.chat_stack, 1)
+        layout.addWidget(self.action_review)
+        composer = QFrame()
+        composer.setObjectName("orbitComposer")
+        composer_layout = QVBoxLayout(composer)
+        composer_layout.setContentsMargins(16, 12, 16, 12)
+        composer_layout.setSpacing(8)
+        entry_row = QHBoxLayout()
+        entry_row.setSpacing(8)
+        entry_row.addWidget(self.input, 1)
+        entry_row.addWidget(self.plan_button)
+        composer_layout.addLayout(entry_row)
+        composer_layout.addLayout(mode_row)
+        layout.addWidget(composer)
         self.plan_button.clicked.connect(self.create_plan)
         self.input.returnPressed.connect(self.create_plan)
         self.approve_button.clicked.connect(self.approve)
         self.reject_button.clicked.connect(self.dismiss)
         self.stop_button.clicked.connect(self.stop_task)
+
+    def _fill_prompt(self, text):
+        # Suggestions populate the existing composer; sending stays explicit.
+        if self.input.isEnabled():
+            self.input.setText(text)
+            self.input.setFocus()
 
     def _reload_modes(self):
         self.mode_selector.blockSignals(True)
@@ -1078,40 +1190,23 @@ class OrbitPanel(QFrame):
             text = text.replace(char, f"\\{char}")
         return text
 
-    def _render_conversation(self):
-        # Fast path: only render newly added messages incrementally
-        rendered = getattr(self, '_last_rendered_count', 0)
-        total = len(self.messages)
+    def _message_markup(self, label, text):
+        theme = get_theme(getattr(self.window(), "preferences", {}).get("theme"))
+        return message_html(label, text, theme)
 
-        if rendered == 0 or rendered > total:
-            # Full re-render needed (first time or after reset)
-            blocks = []
-            for label, text in self.messages:
-                body = self._escape_user_markdown(text) if label == "You" else text
-                blocks.append(f"**{label}**\n\n{body}")
-            self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
-            self._last_rendered_count = total
-        elif total > rendered:
-            # Incremental: append only new messages
+    def _render_conversation(self):
+        self.chat_stack.setCurrentIndex(1 if self.messages else 0)
+        rendered = getattr(self, "_last_rendered_count", 0)
+        total = len(self.messages)
+        if rendered == 0 or rendered >= total:
+            self.conversation.setHtml("".join(self._message_markup(label, text)
+                                             for label, text in self.messages))
+        else:
             cursor = self.conversation.textCursor()
             cursor.movePosition(QTextCursor.End)
             for label, text in self.messages[rendered:]:
-                body = self._escape_user_markdown(text) if label == "You" else text
-                cursor.insertBlock()
-                cursor.insertMarkdown(f"---\n\n**{label}**\n\n{body}")
-            self._last_rendered_count = total
-        else:
-            # Same count but content may have changed (streaming update)
-            # Only re-render the last message block
-            if total > 0:
-                label, text = self.messages[-1]
-                body = self._escape_user_markdown(text) if label == "You" else text
-                blocks = []
-                for l, t in self.messages:
-                    b = self._escape_user_markdown(t) if l == "You" else t
-                    blocks.append(f"**{l}**\n\n{b}")
-                self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
-
+                cursor.insertHtml(self._message_markup(label, text))
+        self._last_rendered_count = total
         cursor = self.conversation.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.conversation.setTextCursor(cursor)
@@ -1318,7 +1413,7 @@ class MainWindow(QMainWindow):
 
     def _build_workspace(self):
         root = QSplitter(Qt.Horizontal)
-        root.setHandleWidth(5)
+        root.setHandleWidth(4)
         root.setChildrenCollapsible(False)
         self.setCentralWidget(root)
         root.addWidget(self._build_sidebar())
@@ -1331,10 +1426,25 @@ class MainWindow(QMainWindow):
         root.addWidget(self.tabs)
         self.orbit = OrbitPanel(self.current_session)
         self.orbit.setMinimumWidth(320)
+        self.tabs.setMinimumWidth(420)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setDrawBase(False)
+        self.tabs.tabBar().setElideMode(Qt.ElideRight)
+        new_tab = QPushButton()
+        new_tab.setIcon(icon("plus"))
+        new_tab.setObjectName("tabAdd")
+        new_tab.setFixedSize(32, 32)
+        new_tab.setToolTip("New terminal (Ctrl+Shift+T)")
+        new_tab.setAccessibleName("New terminal")
+        new_tab.clicked.connect(self.new_session)
+        self.tabs.setCornerWidget(new_tab)
         self.orbit.action_requested.connect(self._run_orbit_action)
         self.orbit.output_ready.connect(self._show_orbit_output)
         root.addWidget(self.orbit)
-        root.setSizes([260, 880, 300])
+        root.setStretchFactor(0, 0)
+        root.setStretchFactor(1, 1)
+        root.setStretchFactor(2, 0)
+        root.setSizes([200, 880, 352])
         self.root_splitter = root
         self.status_label = QLabel()
         self.statusBar().addWidget(self.status_label, 1)
@@ -1345,50 +1455,61 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("sidebar")
-        panel.setMinimumWidth(230)
-        panel.setMaximumWidth(320)
+        panel.setMinimumWidth(184)
+        panel.setMaximumWidth(240)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 18, 16, 16)
+        layout.setContentsMargins(12, 16, 12, 16)
         layout.setSpacing(8)
         brand = QLabel("RiftShell")
         brand.setObjectName("brand")
         layout.addWidget(brand)
-        subtitle = QLabel("DEVELOPER WORKSPACE")
+        subtitle = QLabel("TERMINAL WORKSPACE")
         subtitle.setObjectName("eyebrow")
         layout.addWidget(subtitle)
-        layout.addSpacing(14)
-        self.new_button = QPushButton("+  New Terminal")
+        layout.addSpacing(8)
+        self.new_button = QPushButton("New terminal")
+        self.new_button.setIcon(icon("plus"))
         self.new_button.setObjectName("primaryButton")
         self.new_button.clicked.connect(self.new_session)
         layout.addWidget(self.new_button)
-        for label, callback in [
-            ("Command Palette", self.open_palette), ("Command History", self.show_history),
-            ("Command Explorer", self.show_command_explorer), ("Workspace Settings", self.open_settings),
+        for label, glyph, callback in [
+            ("Command palette", "search", self.open_palette), ("History", "history", self.show_history),
+            ("Commands", "commands", self.show_command_explorer), ("Settings", "settings", self.open_settings),
         ]:
             button = QPushButton(label)
+            button.setIcon(icon(glyph))
             button.setObjectName("navButton")
             button.clicked.connect(callback)
             layout.addWidget(button)
-        layout.addSpacing(14)
+        layout.addSpacing(8)
         sessions_title = QLabel("SESSIONS")
         sessions_title.setObjectName("sectionTitle")
         layout.addWidget(sessions_title)
         self.session_list = QListWidget()
-        self.session_list.setMaximumHeight(180)
+        self.session_list.setObjectName("sessionList")
+        self.session_list.setMinimumHeight(100)
+        self.session_list.setSpacing(4)
+        self.session_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.session_list.setTextElideMode(Qt.ElideRight)
         self.session_list.itemClicked.connect(self._activate_session_item)
         self.session_list.itemDoubleClicked.connect(self._rename_session_item)
-        layout.addWidget(self.session_list)
+        layout.addWidget(self.session_list, 1)
         plugins_title = QLabel("EXTENSIONS")
         plugins_title.setObjectName("sectionTitle")
         layout.addWidget(plugins_title)
         self.plugin_summary = QLabel()
         self.plugin_summary.setWordWrap(True)
         layout.addWidget(self.plugin_summary)
-        plugins_button = QPushButton("Manage Extensions")
+        plugins_button = QPushButton("Extensions")
+        plugins_button.setIcon(icon("extensions"))
         plugins_button.setObjectName("navButton")
         plugins_button.clicked.connect(self.show_plugins)
         layout.addWidget(plugins_button)
-        layout.addStretch()
+        remote = QLabel("Telegram  /  Status unavailable")
+        remote.setObjectName("remoteStatus")
+        remote.setWordWrap(True)
+        remote.setToolTip("Telegram runs separately. Its connection state is not exposed to this desktop window.")
+        layout.addWidget(remote)
         hint = QLabel("Ctrl+K  Command palette\nCtrl+Shift+T  New terminal")
         hint.setWordWrap(True)
         hint.setObjectName("sessionPath")
@@ -1458,12 +1579,14 @@ class MainWindow(QMainWindow):
                 continue
             status_dot = "●" if tab.is_busy else "○"
             item = QListWidgetItem(f"{status_dot}  {tab.title}")
+            item.setIcon(icon("terminal"))
             item.setData(Qt.UserRole, index)
             item.setToolTip(str(tab.shell.ctx.cwd))
             self.session_list.addItem(item)
             if tab is session:
                 self.session_list.setCurrentItem(item)
             self.tabs.setTabText(index, tab.title)
+            self.tabs.setTabIcon(index, icon("terminal"))
         self.session_list.blockSignals(False)
         if session:
             plugins = session.shell.ctx.plugins
@@ -1626,6 +1749,8 @@ class MainWindow(QMainWindow):
             if session := self.tabs.widget(index):
                 session.shell.ctx.current_theme = self.theme.key
                 session.apply_preferences(self.preferences)
+        self.orbit._last_rendered_count = 0
+        self.orbit._render_conversation()
         self._refresh_workspace()
 
     def show_plugins(self):
