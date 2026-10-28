@@ -6,6 +6,7 @@ from dataclasses import replace
 from time import perf_counter
 from pathlib import Path
 from urllib.parse import urlparse
+from weakref import WeakSet
 
 from PySide6.QtCore import Qt, QEvent, QSettings, QThread, Signal, QStringListModel, QTimer
 from PySide6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor
@@ -495,6 +496,7 @@ class TerminalSession(QWidget):
         self.clear_button = QPushButton("Clear")
         self.copy_button = QPushButton("Copy")
         composer = QFrame()
+        self.composer = composer
         composer.setObjectName("terminalComposer")
         bottom = QHBoxLayout(composer)
         bottom.setContentsMargins(8, 8, 8, 8)
@@ -798,6 +800,7 @@ class ActionReview(QFrame):
         for button in buttons:
             row.addWidget(button)
             button.installEventFilter(self)
+        row.addStretch(1)
         layout.addLayout(row)
         self.setVisible(any(button.isEnabled() for button in buttons))
 
@@ -847,6 +850,7 @@ class OrbitPanel(QFrame):
         self.conversation = QTextEdit()
         self.conversation.setObjectName("orbitConversation")
         self.conversation.setReadOnly(True)
+        self.conversation.setPlaceholderText("Orbit is ready. Continue in the input bar below.")
         self.conversation.setMinimumHeight(96)
         self.conversation.document().setIndentWidth(16)
         self.conversation.document().setDefaultStyleSheet("p { margin-top: 8px; margin-bottom: 12px; } pre { white-space: pre-wrap; }")
@@ -870,7 +874,7 @@ class OrbitPanel(QFrame):
         layout.setSpacing(0)
         header_frame = QFrame()
         header_frame.setObjectName("orbitHeader")
-        header_frame.setFixedHeight(38)
+        header_frame.setFixedHeight(48)
         header = QHBoxLayout(header_frame)
         header.setContentsMargins(16, 0, 16, 0)
         header.setSpacing(8)
@@ -884,7 +888,12 @@ class OrbitPanel(QFrame):
         header.addStretch()
         header.addWidget(self.thinking_indicator)
         layout.addWidget(header_frame)
-        mode_row = QHBoxLayout()
+        mode_controls = QWidget()
+        mode_controls.setObjectName("orbitModeControls")
+        mode_controls.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        mode_row = QHBoxLayout(mode_controls)
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(8)
         self.mode_selector = QComboBox()
         self.mode_selector.setMinimumContentsLength(8)
         self.mode_selector.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
@@ -899,53 +908,82 @@ class OrbitPanel(QFrame):
         mode_row.addWidget(QLabel("Mode"))
         mode_row.addWidget(self.mode_selector, 1)
         mode_row.addWidget(mode_button)
+        self.mode_selector.setMaximumWidth(180)
+        header.addWidget(mode_controls, 0, Qt.AlignRight)
         self._reload_modes()
         self.status.setObjectName("orbitStatus")
         layout.addWidget(self.status)
         self.chat_stack = QStackedWidget()
+        self._welcome_visible = True
         self.welcome = QFrame()
         self.welcome.setObjectName("orbitWelcome")
-        welcome_layout = QVBoxLayout(self.welcome)
-        welcome_layout.setContentsMargins(24, 24, 24, 24)
-        welcome_layout.setSpacing(8)
-        welcome_layout.addSpacing(32)
-        welcome_title = QLabel("Work from here.")
+        welcome_page = QVBoxLayout(self.welcome)
+        welcome_page.setContentsMargins(24, 16, 24, 16)
+        welcome_page.addStretch(1)
+        welcome_card = QWidget()
+        welcome_card.setObjectName("orbitWelcomeCard")
+        welcome_card.setMaximumWidth(680)
+        welcome_layout = QVBoxLayout(welcome_card)
+        welcome_layout.setContentsMargins(0, 0, 0, 0)
+        welcome_layout.setSpacing(16)
+        welcome_mark = QLabel()
+        welcome_mark.setPixmap(icon("orbit", 160).pixmap(160, 160))
+        welcome_mark.setAlignment(Qt.AlignCenter)
+        welcome_layout.addWidget(welcome_mark)
+        welcome_title = QLabel("Welcome, boss.\nI'm your Orbit.")
         welcome_title.setObjectName("welcomeTitle")
         welcome_title.setWordWrap(True)
+        welcome_title.setAlignment(Qt.AlignCenter)
         welcome_layout.addWidget(welcome_title)
-        welcome_copy = QLabel("Understand the workspace. Review a command.\nKeep working in your terminal.")
+        welcome_copy = QLabel("Ask a question, explore your workspace, or plan your next command.")
         welcome_copy.setObjectName("orbitWelcomeCopy")
         welcome_copy.setWordWrap(True)
+        welcome_copy.setAlignment(Qt.AlignCenter)
         welcome_layout.addWidget(welcome_copy)
-        welcome_layout.addSpacing(16)
+        suggestions = QHBoxLayout()
+        suggestions.setSpacing(8)
         for title, glyph, prompt in [
-            ("Explore this workspace", "extensions", "Explain the structure of this workspace"),
-            ("Find a shell command", "terminal", "How do I list files in RiftShell?"),
-            ("Understand an error", "search", "Help me understand this error: "),
+            ("Explore workspace", "extensions", "Explain the structure of this workspace"),
+            ("Find a command", "terminal", "How do I list files in RiftShell?"),
+            ("Explain an error", "search", "Help me understand this error: "),
         ]:
             chip = QPushButton(title)
             chip.setObjectName("promptChip")
             chip.setIcon(icon(glyph))
             chip.setToolTip(prompt)
             chip.clicked.connect(lambda checked=False, text=prompt: self._fill_prompt(text))
-            welcome_layout.addWidget(chip)
-        welcome_layout.addStretch(3)
+            suggestions.addWidget(chip)
+        welcome_layout.addLayout(suggestions)
+        centered = QHBoxLayout()
+        centered.addStretch()
+        centered.addWidget(welcome_card, 1)
+        centered.addStretch()
+        welcome_page.addLayout(centered)
+        welcome_page.addStretch(1)
         self.chat_stack.addWidget(self.welcome)
-        self.chat_stack.addWidget(self.conversation)
+        self.conversation_page = QWidget()
+        self.conversation_page.setObjectName("orbitConversationPage")
+        conversation_layout = QHBoxLayout(self.conversation_page)
+        conversation_layout.setContentsMargins(16, 0, 16, 0)
+        conversation_layout.addStretch()
+        self.conversation.setMaximumWidth(960)
+        conversation_layout.addWidget(self.conversation, 1)
+        conversation_layout.addStretch()
+        self.chat_stack.addWidget(self.conversation_page)
         self.chat_stack.setObjectName("orbitBody")
         layout.addWidget(self.chat_stack, 1)
         layout.addWidget(self.action_review)
         composer = QFrame()
+        self.composer = composer
         composer.setObjectName("orbitComposer")
         composer_layout = QVBoxLayout(composer)
-        composer_layout.setContentsMargins(16, 12, 16, 12)
+        composer_layout.setContentsMargins(8, 8, 8, 8)
         composer_layout.setSpacing(8)
         entry_row = QHBoxLayout()
         entry_row.setSpacing(8)
         entry_row.addWidget(self.input, 1)
         entry_row.addWidget(self.plan_button)
         composer_layout.addLayout(entry_row)
-        composer_layout.addLayout(mode_row)
         layout.addWidget(composer)
         self.plan_button.clicked.connect(self.create_plan)
         self.input.returnPressed.connect(self.create_plan)
@@ -958,6 +996,11 @@ class OrbitPanel(QFrame):
         if self.input.isEnabled():
             self.input.setText(text)
             self.input.setFocus()
+
+    def set_welcome_visible(self, visible: bool):
+        """Change only the displayed page; keep conversation and task state intact."""
+        self._welcome_visible = visible
+        self.chat_stack.setCurrentIndex(0 if visible else 1)
 
     def _reload_modes(self):
         self.mode_selector.blockSignals(True)
@@ -1195,7 +1238,9 @@ class OrbitPanel(QFrame):
         return message_html(label, text, theme)
 
     def _render_conversation(self):
-        self.chat_stack.setCurrentIndex(1 if self.messages else 0)
+        if self.messages:
+            self._welcome_visible = False
+        self.chat_stack.setCurrentIndex(0 if self._welcome_visible else 1)
         rendered = getattr(self, "_last_rendered_count", 0)
         total = len(self.messages)
         if rendered == 0 or rendered >= total:
@@ -1412,6 +1457,8 @@ class MainWindow(QMainWindow):
         return value if isinstance(value, list) else []
 
     def _build_workspace(self):
+        self._orbit_welcomed_sessions = WeakSet()
+        self._orbit_display_session = None
         root = QSplitter(Qt.Horizontal)
         root.setHandleWidth(4)
         root.setChildrenCollapsible(False)
@@ -1423,7 +1470,14 @@ class MainWindow(QMainWindow):
         self.tabs.setDocumentMode(True)
         self.tabs.currentChanged.connect(self._refresh_workspace)
         self.tabs.tabCloseRequested.connect(self.close_session_at)
-        root.addWidget(self.tabs)
+        workspace = QWidget()
+        workspace_layout = QVBoxLayout(workspace)
+        workspace_layout.setContentsMargins(0, 0, 0, 0)
+        workspace_layout.setSpacing(0)
+        self.workspace_stack = QStackedWidget()
+        self.workspace_stack.addWidget(self.tabs)
+        workspace_layout.addWidget(self.workspace_stack, 1)
+        root.addWidget(workspace)
         self.orbit = OrbitPanel(self.current_session)
         self.orbit.setMinimumWidth(320)
         self.tabs.setMinimumWidth(420)
@@ -1440,11 +1494,32 @@ class MainWindow(QMainWindow):
         self.tabs.setCornerWidget(new_tab)
         self.orbit.action_requested.connect(self._run_orbit_action)
         self.orbit.output_ready.connect(self._show_orbit_output)
-        root.addWidget(self.orbit)
+        self.workspace_stack.addWidget(self.orbit)
+        dock = QFrame()
+        dock.setObjectName("inputDock")
+        dock_layout = QHBoxLayout(dock)
+        dock_layout.setContentsMargins(8, 0, 16, 0)
+        dock_layout.setSpacing(8)
+        self.input_stack = QStackedWidget()
+        self.input_stack.setObjectName("sharedInput")
+        # Reuse the original editors and connections. Only one composer is
+        # visible, so history, completion, drafts and enabled states stay owned
+        # by their existing terminal/Orbit controllers.
+        self.input_stack.addWidget(self.orbit.composer)
+        dock_layout.addWidget(self.input_stack, 1)
+        self.orbit_toggle = QPushButton("Orbit")
+        self.orbit_toggle.setObjectName("orbitToggle")
+        self.orbit_toggle.setIcon(icon("orbit"))
+        self.orbit_toggle.setCheckable(True)
+        self.orbit_toggle.setFixedSize(96, 36)
+        self.orbit_toggle.setToolTip("Switch to Orbit")
+        self.orbit_toggle.setAccessibleName("Toggle Orbit workspace")
+        self.orbit_toggle.clicked.connect(self.toggle_orbit)
+        dock_layout.addWidget(self.orbit_toggle)
+        workspace_layout.addWidget(dock)
         root.setStretchFactor(0, 0)
         root.setStretchFactor(1, 1)
-        root.setStretchFactor(2, 0)
-        root.setSizes([200, 880, 352])
+        root.setSizes([200, 1240])
         self.root_splitter = root
         self.status_label = QLabel()
         self.statusBar().addWidget(self.status_label, 1)
@@ -1536,8 +1611,11 @@ class MainWindow(QMainWindow):
         session.session_changed.connect(self._refresh_workspace)
         session.close_requested.connect(self.close_session)
         session.command_completed.connect(lambda command, result, source=session: self._on_terminal_command_complete(source, command, result))
+        self._set_workspace_view(False)
+        self.input_stack.addWidget(session.composer)
         self.tabs.setCurrentIndex(self.tabs.addTab(session, session.title))
         self._refresh_workspace()
+        self._set_workspace_view(False)
         session.input.setFocus()
 
     def current_session(self) -> TerminalSession | None:
@@ -1564,6 +1642,11 @@ class MainWindow(QMainWindow):
         if index < 0:
             return
         self.tabs.removeTab(index)
+        self.input_stack.removeWidget(session.composer)
+        session.composer.setParent(session)
+        self._orbit_welcomed_sessions.discard(session)
+        if self._orbit_display_session is session:
+            self._orbit_display_session = None
         session.deleteLater()
         if self.tabs.count() == 0:
             self.new_session()
@@ -1571,6 +1654,13 @@ class MainWindow(QMainWindow):
 
     def _refresh_workspace(self, *_):
         session = self.current_session()
+        if session:
+            if self.workspace_stack.currentWidget() is self.orbit:
+                if session is not self._orbit_display_session:
+                    self._show_orbit_session(session)
+                self.input_stack.setCurrentWidget(self.orbit.composer)
+            else:
+                self.input_stack.setCurrentWidget(session.composer)
         self.session_list.blockSignals(True)
         self.session_list.clear()
         for index in range(self.tabs.count()):
@@ -1627,6 +1717,7 @@ class MainWindow(QMainWindow):
         if session:
             if session.is_busy:
                 return
+            self._set_workspace_view(False)
             session.input.setText(command + " ")
             session.input.setFocus()
 
@@ -1778,7 +1869,25 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def toggle_orbit(self):
-        self.orbit.setVisible(not self.orbit.isVisible())
+        self._set_workspace_view(self.workspace_stack.currentWidget() is not self.orbit)
+
+    def _show_orbit_session(self, session):
+        self.orbit.set_welcome_visible(session not in self._orbit_welcomed_sessions)
+        self._orbit_welcomed_sessions.add(session)
+        self._orbit_display_session = session
+
+    def _set_workspace_view(self, orbit_visible: bool):
+        """Switch presentation without stopping, resubmitting or resetting work."""
+        session = self.current_session()
+        if session is None:
+            return
+        self.workspace_stack.setCurrentWidget(self.orbit if orbit_visible else self.tabs)
+        self.input_stack.setCurrentWidget(self.orbit.composer if orbit_visible else session.composer)
+        self.orbit_toggle.setChecked(orbit_visible)
+        self.orbit_toggle.setToolTip("Back to terminal" if orbit_visible else "Switch to Orbit")
+        if orbit_visible:
+            self._show_orbit_session(session)
+        (self.orbit.input if orbit_visible else session.input).setFocus()
 
     def _show_orbit_output(self, session, text):
         if self.tabs.indexOf(session) >= 0:

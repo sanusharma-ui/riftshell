@@ -1,7 +1,7 @@
 import os
 import re
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from ui.themes import THEMES, build_stylesheet, get_theme
 
 
@@ -40,17 +40,18 @@ class WorkspacePresentationTests(unittest.TestCase):
             button.setEnabled(False)
             self.assertTrue(self.panel.action_review.isHidden())
 
-    def test_chat_preserves_literal_input_markdown_and_welcome_reset(self):
+    def test_chat_preserves_literal_input_markdown_without_replaying_welcome(self):
         self.panel._append("You", "<b>literal</b> **input**")
         self.panel._append("Orbit", "## Result\n\n**Formatted** reply with `code`.")
-        self.assertIs(self.panel.chat_stack.currentWidget(), self.panel.conversation)
+        self.assertIs(self.panel.chat_stack.currentWidget(), self.panel.conversation_page)
         plain = self.panel.conversation.toPlainText()
         self.assertIn("<b>literal</b> **input**", plain)
         self.assertIn("Formatted reply with code.", plain)
         self.assertEqual(plain.count("Formatted reply"), 1)
         self.panel.messages.clear()
         self.panel._render_conversation()
-        self.assertIs(self.panel.chat_stack.currentWidget(), self.panel.welcome)
+        self.assertIs(self.panel.chat_stack.currentWidget(), self.panel.conversation_page)
+
 
     def test_escaped_directory_list_renders_as_list_without_changing_source(self):
         raw = r"**Contents of `D:\test`:**\n\n- Directories:\n  - anime_api\n  - coffee_shop\n  - node_notes\n- Files:\n  - archive.zip (21,113,481 B)\n"
@@ -95,6 +96,116 @@ class WorkspacePresentationTests(unittest.TestCase):
             self.panel._append("Orbit", response)
             self.assertIn(command, self.panel.conversation.toPlainText())
             self.assertIn(command, terminal_reply(response))
+
+
+class SharedWorkspaceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication(["ui-tests", "-platform", "offscreen"])
+
+    def setUp(self):
+        from ui.main_window import MainWindow
+        settings = Mock()
+        settings.value.side_effect = lambda key, default=None, **kwargs: default
+        self.native_patch = patch("ui.main_window.native_dependency_error", return_value="UI test: no transport")
+        self.native_patch.start()
+        self.addCleanup(self.native_patch.stop)
+        with patch("ui.main_window.QSettings", return_value=settings):
+            self.window = MainWindow()
+        self.window.show()
+        self.app.processEvents()
+
+    def tearDown(self):
+        self.window.close()
+        self.window.deleteLater()
+        self.app.processEvents()
+
+    def test_one_visible_input_and_welcome_only_once_per_terminal(self):
+        window = self.window
+        first = window.current_session()
+        self.assertEqual(window.root_splitter.count(), 2)
+        self.assertTrue(first.input.isVisible())
+        self.assertFalse(window.orbit.input.isVisible())
+        window.orbit_toggle.click()
+        self.assertFalse(first.input.isVisible())
+        self.assertTrue(window.orbit.input.isVisible())
+        self.assertIs(window.orbit.chat_stack.currentWidget(), window.orbit.welcome)
+        for _ in range(3):
+            window.orbit_toggle.click()
+            window.orbit_toggle.click()
+            self.assertIs(window.orbit.chat_stack.currentWidget(), window.orbit.conversation_page)
+        window.new_session()
+        second = window.current_session()
+        window.toggle_orbit()
+        self.assertIs(window.orbit.chat_stack.currentWidget(), window.orbit.welcome)
+        window.tabs.setCurrentWidget(first)
+        self.assertIs(window.orbit.chat_stack.currentWidget(), window.orbit.conversation_page)
+        window.tabs.setCurrentWidget(second)
+        self.assertIs(window.orbit.chat_stack.currentWidget(), window.orbit.conversation_page)
+
+    def test_switch_preserves_drafts_cwd_task_chat_and_disabled_controls(self):
+        window = self.window
+        session = window.current_session()
+        cwd = session.shell.ctx.cwd
+        session.input.setText("files ")
+        window.orbit.input.setText("Explain this workspace")
+        window.orbit._append("You", "Existing question")
+        task = Mock()
+        window.orbit.task = task
+        window.orbit.task_session = session
+        session._set_running(True)
+        window.orbit._set_thinking(True)
+        window.orbit.approve_button.setEnabled(True)
+        for _ in range(4):
+            window.toggle_orbit()
+            self.assertTrue(window.orbit_toggle.isEnabled())
+        self.assertEqual(session.input.text(), "files ")
+        self.assertEqual(window.orbit.input.text(), "Explain this workspace")
+        self.assertEqual(session.shell.ctx.cwd, cwd)
+        self.assertEqual(window.orbit.messages, [("You", "Existing question")])
+        self.assertIs(window.orbit.task, task)
+        self.assertIs(window.orbit.task_session, session)
+        task.stop.assert_not_called()
+        self.assertFalse(session.input.isEnabled())
+        self.assertFalse(window.orbit.input.isEnabled())
+        self.assertTrue(window.orbit.approve_button.isEnabled())
+        window.orbit._set_thinking(False)
+        session._set_running(False)
+        window.orbit.task = None
+
+    def test_tab_close_releases_composer_and_command_selection_returns_to_terminal(self):
+        window = self.window
+        first = window.current_session()
+        window.new_session()
+        second = window.current_session()
+        window.toggle_orbit()
+        window._insert_command("files")
+        self.assertIs(window.workspace_stack.currentWidget(), window.tabs)
+        self.assertEqual(second.input.text(), "files ")
+        self.assertEqual(first.input.text(), "")
+        window.close_session(second)
+        self.assertEqual(window.input_stack.count(), 2)  # Orbit + remaining terminal
+        self.assertIs(window.input_stack.currentWidget(), first.composer)
+
+    def test_toggle_keeps_existing_conversation_scroll_and_command_history(self):
+        window = self.window
+        session = window.current_session()
+        session.input.set_history(["files", "help"])
+        window.toggle_orbit()
+        window.orbit._append("Orbit", "\n\n".join(f"Paragraph {i}" for i in range(100)))
+        self.app.processEvents()
+        scroll = window.orbit.conversation.verticalScrollBar()
+        scroll.setValue(scroll.maximum() // 2)
+        position = scroll.value()
+        messages = list(window.orbit.messages)
+        window.toggle_orbit()
+        window.toggle_orbit()
+        self.app.processEvents()
+        self.assertEqual(scroll.value(), position)
+        self.assertEqual(window.orbit.messages, messages)
+        self.assertEqual(session.input.history, ["files", "help"])
+
 
 
 class UIModernizationTests(unittest.TestCase):

@@ -4,7 +4,7 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 
-def icon(name: str) -> QIcon:
+def icon(name: str, size: int = 24) -> QIcon:
     paths = {
         "terminal": '<path d="m4 6 6 6-6 6m9 0h7"/>',
         "plus": '<path d="M12 5v14M5 12h14"/>',
@@ -30,7 +30,7 @@ def icon(name: str) -> QIcon:
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
            'viewBox="0 0 24 24" fill="none" stroke="#9baec4" stroke-width="1.6" '
            'stroke-linecap="round" stroke-linejoin="round">' + paths[name] + '</svg>')
-    pixmap = QPixmap(48, 48)
+    pixmap = QPixmap(size * 2, size * 2)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
     QSvgRenderer(QByteArray(svg.encode())).render(painter)

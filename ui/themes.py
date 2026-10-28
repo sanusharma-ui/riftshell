@@ -377,12 +377,12 @@ QFrame#terminalHeader {{
 QFrame#inspector {{
     background-color: {theme.background};
     border: none;
-    border-left: 1px solid {theme.border};
     border-radius: 0;
 }}
 QFrame#actionReview, QFrame#orbitWelcome, QStackedWidget#orbitBody {{ background-color: {theme.background}; border: none; }}
 QFrame#actionReview QPushButton {{ padding: 6px 8px; font-size: 9pt; }}
 QFrame#orbitHeader {{ background-color: {theme.surface}; border: none; border-bottom: 1px solid {theme.border}; }}
+QWidget#orbitModeControls {{ background-color: transparent; }}
 QLabel#orbitHeading {{ font-size: 10pt; font-weight: 600; color: #d8dfe8; }}
 QLabel#orbitSubtitle {{ font-size: 7pt; color: {theme.muted}; }}
 QLabel#thinkingStatus {{ font-size: 7pt; color: {theme.accent}; }}
@@ -402,9 +402,30 @@ QFrame#orbitComposer {{
     border-top: 1px solid {theme.border};
     border-radius: 0;
 }}
+QFrame#inputDock {{
+    background-color: {theme.surface};
+    border: none;
+    border-top: 1px solid {theme.border};
+}}
+QStackedWidget#sharedInput {{ background-color: {theme.surface}; border: none; }}
+QFrame#inputDock QFrame#terminalComposer, QFrame#inputDock QFrame#orbitComposer {{
+    border: none;
+    border-radius: 0;
+}}
+QPushButton#orbitToggle {{
+    background-color: {theme.background};
+    border: 1px solid {theme.border};
+    padding: 6px 10px;
+    color: {theme.muted};
+}}
+QPushButton#orbitToggle:hover, QPushButton#orbitToggle:checked {{
+    background-color: {theme.surface_alt};
+    border-color: {theme.accent};
+    color: {theme.accent_alt};
+}}
 QLabel#promptMark {{ color: {theme.accent}; font-size: 12pt; font-weight: 600; }}
-QLabel#welcomeTitle {{ color: #d8dfe8; font-size: 17pt; font-weight: 600; }}
-QLabel#orbitWelcomeCopy {{ color: {theme.muted}; font-size: 9pt; }}
+QLabel#welcomeTitle {{ color: #d8dfe8; font-size: 28pt; font-weight: 600; }}
+QLabel#orbitWelcomeCopy {{ color: {theme.muted}; font-size: 10pt; }}
 QLabel#orbitStatus {{
     color: {theme.muted}; font-size: 8pt; padding: 10px 16px;
     border-bottom: 1px solid {theme.border};
