@@ -46,13 +46,37 @@ def message_html(label: str, text: str, theme) -> str:
     markup = document.toHtml().split("<body", 1)[1].split(">", 1)[1].rsplit("</body>", 1)[0]
     markup = markup.replace('<pre style="', f'<pre style="background-color:{theme.surface_alt};')
     foreground = "#d8dfe8"  # Readable prose even with neon terminal palettes.
-    role = "YOU" if label == "You" else escape(label.upper())
-    background = theme.surface if label == "You" else theme.background
+    orbit_cyan = getattr(theme, "orbit_accent", "#38bdf8")
+
+    if label == "You":
+        role = "YOU"
+        role_color = "#93c5fd"
+        background = theme.surface
+        border_style = f"border: 1px solid {theme.border}; border-radius: 8px;"
+        extra_card = ""
+    else:
+        role = escape(label.upper())
+        role_color = orbit_cyan
+        background = theme.surface_alt
+        border_style = (
+            f"border-left: 3px solid {orbit_cyan}; border-top: 1px solid {theme.border}; "
+            f"border-right: 1px solid {theme.border}; border-bottom: 1px solid {theme.border}; "
+            f"border-radius: 8px;"
+        )
+        extra_card = ""
+        if text.startswith("Completed:"):
+            cmd = text.split("\n", 1)[0].replace("Completed:", "").strip()
+            extra_card = (
+                f'<p style="margin-top: 8px; font-size: 8.5pt;">'
+                f'<a href="terminal://jump/{escape(cmd)}" style="color: {orbit_cyan}; text-decoration: none;">'
+                f'<b>&#8594; View in terminal</b></a></p>'
+            )
+
     return (
-        f'<table width="100%" cellspacing="0" cellpadding="12" bgcolor="{background}">'
+        f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" style="{border_style}">'
         f'<tr><td style="color:{foreground};">'
-        f'<p style="font-family:Segoe UI;font-size:8pt;color:#95a8c0;margin-bottom:10px;">'
-        f'<b>{role}</b></p>{markup}</td></tr></table>'
+        f'<p style="font-family:Segoe UI;font-size:8pt;color:{role_color};font-weight:bold;margin-bottom:8px;">'
+        f'{role}</p>{markup}{extra_card}</td></tr></table>'
         '<p style="font-size:4pt;margin:0;"><br /></p>'
     )
 

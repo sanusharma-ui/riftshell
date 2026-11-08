@@ -837,9 +837,26 @@ class AgentPlanner:
             return errors[0]
         return fallback
 
+    # Navigation commands whose successful execution changes the tracked location.
+    _NAV_COMMANDS = {"cd", "goto", "chdir", "up", "home"}
+
     def _remember_action(self, user_text: str, action: AgentAction) -> AgentAction:
         self.memory.add("user", user_text)
-        summary = f"Proposed action (execution not confirmed): {action.action}; Command: {action.command or '(none)'}; Response: {action.message}"
+        # For navigation shell actions, record the actual live directory so that
+        # subsequent prompts (e.g. "where") never infer location from stale memory.
+        nav_note = ""
+        if (
+            action.action == "shell"
+            and action.command
+            and action.command.strip().split()[0].lower() in self._NAV_COMMANDS
+            and self.current_dir_provider
+        ):
+            nav_note = f"; Live directory after navigation: {self.current_dir_provider()}"
+        summary = (
+            f"Proposed action (execution not confirmed): {action.action}; "
+            f"Command: {action.command or '(none)'}; Response: {action.message}"
+            + nav_note
+        )
         self.memory.add("assistant", summary)
         return action
 

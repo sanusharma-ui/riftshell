@@ -131,7 +131,9 @@ class ConversationRoutingTests(unittest.TestCase):
         for mode in default_modes():
             with self.subTest(mode=mode.name):
                 planner = planner_for_test(orbit_mode=mode)
-                planner.current_dir_provider = Mock(side_effect=AssertionError("directory read"))
+                # current_dir_provider IS now called (safely, with try/except) to inject the
+                # live directory so the AI never guesses location from stale memory.
+                # native_context_provider and last_output_provider must still never be read.
                 planner.native_context_provider = Mock(side_effect=AssertionError("native context"))
                 planner.last_output_provider = Mock(side_effect=AssertionError("terminal read"))
                 rows = [{"role": role, "content": f"turn-{i}: " + "long history " * 500}
@@ -145,6 +147,9 @@ class ConversationRoutingTests(unittest.TestCase):
                 self.assertIn(f"Hard output ceiling: {mode.output_tokens}", prompt)
                 self.assertLessEqual(estimated_tokens(prompt), mode.prompt_tokens)
                 self.assertEqual(len(rows), 40)
+                # The live directory hint must be present so the AI does not
+                # fabricate location from stale conversation history.
+                self.assertIn("current directory is", prompt)
 
 
 # Intentionally separate from the routing examples; new topics, technical
@@ -185,7 +190,7 @@ class RealQueryRoutingTests(unittest.TestCase):
                 planner._call_provider.assert_called_once()
                 prompt = planner._call_provider.call_args.args[1]
                 self.assertNotIn("Available Commands & Aliases", prompt)
-                self.assertLess(estimated_tokens(prompt), 600)
+                self.assertLess(estimated_tokens(prompt), 660)  # +~50 for live dir context
                 self.assertEqual(planner._inspection_passes, 0)
 
     def test_semantic_conversation_bypasses_both_command_extractors(self):
