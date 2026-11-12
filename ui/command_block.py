@@ -142,7 +142,7 @@ class CommandBlockWidget(QFrame):
         header_layout.addWidget(self.status_icon)
 
         # Prompt symbol PROMPT_GLYPH
-        self.prompt_label = QLabel("\u276f")
+        self.prompt_label = QLabel(PROMPT_GLYPH)
         self.prompt_label.setObjectName("commandBlockPrompt")
         self.prompt_label.setStyleSheet(f"color: {self.theme.accent}; font-weight: bold; font-size: 11pt;")
         header_layout.addWidget(self.prompt_label)
@@ -353,7 +353,7 @@ class CommandBlocksArea(QScrollArea):
     def toPlainText(self) -> str:
         lines = []
         for block in self.blocks:
-            lines.append(f"\u276f {block.command}")
+            lines.append(f"{PROMPT_GLYPH} {block.command}")
             if block.output_text:
                 lines.append(block.output_text)
         return "\n".join(lines)

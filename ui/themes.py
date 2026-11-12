@@ -33,21 +33,24 @@ THEMES: dict[str, Theme] = {
         key="vscode-dark-plus",
         display_name="VS Code Dark+ (Default)",
         aliases=("default", "dark+", "dark-plus", "vscode", "vs-code", "vs-code-dark-plus"),
-        background="#17191d",
-        surface="#1e2126",
-        surface_alt="#282d35",
-        border="#30353e",
-        text="#e2e5e9",
-        muted="#929ba6",
-        accent="#79a9e8",
-        accent_alt="#b6c5d6",
-        output="#ced3da",
-        error="#f48771",
-        selection="#264f78",
-        button="#2d2d30",
-        button_hover="#38383c",
-        button_pressed="#222225",
+        background="#0A0C10",
+        surface="#0F1218",
+        surface_alt="#161B24",
+        border="#1F2633",
+        text="#E6EDF3",
+        muted="#848D9C",
+        accent="#5EEAD4",
+        accent_alt="#38BDF8",
+        output="#E2E8F0",
+        error="#F87171",
+        selection="#1E293B",
+        button="#161B24",
+        button_hover="#1E2533",
+        button_pressed="#0F1218",
         console_glow="#000000",
+        success="#4ADE80",
+        orbit_accent="#B4A2F8",
+        orbit_purple="#A78BFA",
     ),
     "tokyo-night": Theme(
         key="tokyo-night",
@@ -350,7 +353,12 @@ QStatusBar {{
     color: {theme.muted};
     border-top: 1px solid {theme.border};
     font-size: 8.5pt;
-    padding: 3px 10px;
+    padding: 2px 12px;
+    min-height: 26px;
+}}
+
+QStatusBar::item {{
+    border: none;
 }}
 
 QFrame#sidebar, QFrame#inspector, QFrame#terminalHeader {{
@@ -360,11 +368,48 @@ QFrame#sidebar, QFrame#inspector, QFrame#terminalHeader {{
 }}
 
 QFrame#sidebar {{
+    background-color: {theme.surface};
     border-radius: 0;
     border-top: 0;
     border-bottom: 0;
     border-left: 0;
     border-right: 1px solid {theme.border};
+}}
+
+QPushButton#brandBadge {{
+    background-color: {theme.accent};
+    border: none;
+    border-radius: 9px;
+    padding: 0px;
+}}
+
+QPushButton#brandBadge:hover {{
+    background-color: {theme.accent_alt};
+    border: none;
+}}
+
+QPushButton#railButton {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 0px;
+}}
+
+QPushButton#railButton:hover {{
+    background-color: {theme.surface_alt};
+    border-color: {theme.border};
+}}
+
+QPushButton#railButton:checked {{
+    background-color: {theme.surface_alt};
+    border-color: {theme.border};
+}}
+
+QLabel#brandMark {{
+    background-color: {theme.surface_alt};
+    border: 1px solid {theme.border};
+    border-radius: 9px;
+    padding: 5px;
 }}
 
 QFrame#sidebar QLabel, QFrame#inspector QLabel, QFrame#terminalHeader QLabel {{
@@ -375,62 +420,166 @@ QFrame#terminalHeader {{
     border: none;
     border-bottom: 1px solid {theme.border};
     border-radius: 0;
-    background-color: {theme.surface};
+    background-color: {theme.background};
 }}
+
+QLabel#branchBadge {{
+    background-color: {theme.surface_alt};
+    color: {theme.accent};
+    border: 1px solid {theme.border};
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 8pt;
+    font-weight: 600;
+}}
+
 QFrame#inspector {{
     background-color: {theme.background};
     border: none;
+    border-left: 1px solid {theme.border};
     border-radius: 0;
 }}
-QFrame#actionReview, QFrame#orbitWelcome, QStackedWidget#orbitBody {{ background-color: {theme.background}; border: none; }}
-QFrame#actionReview QPushButton {{ padding: 6px 8px; font-size: 9pt; }}
-QFrame#orbitHeader {{ background-color: {theme.surface}; border: none; border-bottom: 1px solid {theme.border}; }}
+QFrame#actionReview {{
+    background-color: {theme.surface};
+    border: none;
+    border-top: 1px solid {theme.border};
+}}
+QFrame#orbitWelcome, QStackedWidget#orbitBody {{
+    background-color: {theme.background};
+    border: none;
+}}
+QFrame#actionReview QPushButton {{ padding: 5px 12px; font-size: 8.5pt; }}
+QFrame#orbitHeader {{
+    background-color: {theme.surface};
+    border: none;
+    border-bottom: 1px solid {theme.border};
+}}
 QWidget#orbitModeControls {{ background-color: transparent; }}
-QLabel#orbitHeading {{ font-size: 10pt; font-weight: 600; color: #d8dfe8; }}
-QLabel#orbitSubtitle {{ font-size: 7pt; color: {theme.muted}; }}
-QLabel#thinkingStatus {{ font-size: 7pt; color: {theme.accent}; }}
+QLabel#orbitHeading {{ font-size: 10pt; font-weight: 600; color: {theme.text}; }}
+QLabel#orbitSubtitle {{ font-size: 8.5pt; color: {theme.muted}; }}
+QLabel#thinkingStatus {{ font-size: 7.5pt; color: {theme.orbit_accent}; font-weight: 600; }}
+QPushButton#orbitCloseButton, QPushButton#orbitModeSettings {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 3px;
+    color: {theme.muted};
+}}
+QPushButton#orbitCloseButton:hover, QPushButton#orbitModeSettings:hover {{
+    background-color: {theme.surface_alt};
+    border-color: {theme.border};
+    color: {theme.text};
+}}
+QFrame#orbitQuickBar {{
+    background-color: {theme.background};
+    border: none;
+    border-top: 1px solid {theme.border};
+}}
+QPushButton#orbitQuickChip {{
+    background-color: {theme.surface};
+    color: {theme.muted};
+    border: 1px solid {theme.border};
+    border-radius: 13px;
+    padding: 5px 12px;
+    font-size: 8.5pt;
+    font-weight: 500;
+}}
+QPushButton#orbitQuickChip:hover {{
+    background-color: {theme.surface_alt};
+    border-color: {theme.orbit_accent};
+    color: {theme.text};
+}}
 QFrame#orbitComposer, QFrame#terminalComposer {{
     background-color: {theme.surface};
     border: 1px solid {theme.border};
-    border-radius: 8px;
+    border-radius: 12px;
 }}
-QFrame#terminalComposer {{
-    border-radius: 0;
-    border: none;
-    border-top: 1px solid {theme.border};
+QFrame#terminalComposer:focus-within {{
+    border-color: {theme.accent};
 }}
-QFrame#orbitComposer {{
-    background-color: {theme.surface};
-    border: none;
-    border-top: 1px solid {theme.border};
-    border-radius: 0;
+QFrame#orbitComposer:focus-within {{
+    border-color: {theme.orbit_accent};
 }}
 QFrame#inputDock {{
-    background-color: {theme.surface};
+    background-color: {theme.background};
     border: none;
-    border-top: 1px solid {theme.border};
 }}
-QStackedWidget#sharedInput {{ background-color: {theme.surface}; border: none; }}
-QFrame#inputDock QFrame#terminalComposer, QFrame#inputDock QFrame#orbitComposer {{
-    border: none;
-    border-radius: 0;
-}}
-QPushButton#orbitToggle {{
+QStackedWidget#sharedInput {{ background-color: transparent; border: none; }}
+QFrame#modeSegment {{
     background-color: {theme.background};
     border: 1px solid {theme.border};
-    padding: 6px 10px;
+    border-radius: 8px;
+}}
+QPushButton#modeTabActive {{
+    background-color: {theme.surface_alt};
+    color: {theme.text};
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+}}
+QPushButton#modeTabActive:hover {{
+    background-color: {theme.surface_alt};
+    color: {theme.text};
+}}
+QPushButton#modeTabInactive {{
+    background-color: transparent;
     color: {theme.muted};
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 8.5pt;
+    font-weight: 500;
+}}
+QPushButton#modeTabInactive:hover {{
+    background-color: {theme.surface_alt};
+    color: {theme.text};
+}}
+QLabel#shortcutHint {{
+    color: {theme.muted};
+    font-size: 8pt;
+    padding-right: 4px;
+}}
+QLabel#composerOrbitChip {{
+    background-color: {theme.surface_alt};
+    color: {theme.orbit_accent};
+    border: 1px solid {theme.orbit_accent};
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 8pt;
+    font-weight: 600;
+}}
+QLabel#composerHint {{
+    color: {theme.muted};
+    font-size: 8pt;
+}}
+QPushButton#orbitToggle {{
+    background-color: {theme.surface_alt};
+    border: 1px solid {theme.border};
+    border-radius: 7px;
+    padding: 4px 10px;
+    color: {theme.text};
+    font-size: 8.5pt;
+    font-weight: 600;
 }}
 QPushButton#orbitToggle:hover, QPushButton#orbitToggle:checked {{
     background-color: {theme.surface_alt};
-    border-color: {theme.accent};
-    color: {theme.accent_alt};
+    border-color: {theme.orbit_accent};
+    color: {theme.orbit_accent};
 }}
 QLabel#promptMark {{ color: {theme.accent}; font-size: 12pt; font-weight: 600; }}
-QLabel#welcomeTitle {{ color: #d8dfe8; font-size: 28pt; font-weight: 600; }}
-QLabel#orbitWelcomeCopy {{ color: {theme.muted}; font-size: 10pt; }}
+QWidget#orbitWelcomeCard {{
+    background-color: {theme.surface};
+    border: 1px solid {theme.border};
+    border-radius: 14px;
+    padding: 22px;
+}}
+QLabel#welcomeTitle {{ color: {theme.text}; font-size: 18pt; font-weight: 650; letter-spacing: -0.3px; }}
+QLabel#orbitWelcomeCopy {{ color: {theme.muted}; font-size: 9pt; }}
 QLabel#orbitStatus {{
-    color: {theme.muted}; font-size: 8pt; padding: 10px 16px;
+    color: {theme.muted}; font-size: 8pt; padding: 5px 14px;
+    background-color: {theme.background};
     border-bottom: 1px solid {theme.border};
 }}
 QLabel#remoteStatus {{
@@ -440,14 +589,19 @@ QLabel#remoteStatus {{
 }}
 QPushButton#promptChip {{
     text-align: left;
-    background-color: {theme.background};
+    background-color: {theme.surface_alt};
     border: 1px solid {theme.border};
-    padding: 12px;
-    color: #c4ceda;
-    font-weight: 400;
+    border-radius: 9px;
+    padding: 9px 12px;
+    color: {theme.text};
+    font-weight: 500;
     font-size: 9pt;
 }}
-QPushButton#promptChip:hover {{ border-color: {theme.accent}; }}
+QPushButton#promptChip:hover {{
+    background-color: {theme.button_hover};
+    border-color: {theme.orbit_accent};
+    color: {theme.text};
+}}
 QListWidget#sessionList {{ border: none; padding: 0; background: transparent; }}
 QListWidget#sessionList::item {{ padding: 8px; margin: 0; }}
 QListWidget#sessionList::item:selected {{
@@ -455,21 +609,48 @@ QListWidget#sessionList::item:selected {{
     border: 1px solid {theme.border};
     border-left: 2px solid {theme.accent};
 }}
-QPushButton#tabAdd {{ background: transparent; border: none; padding: 4px; }}
-QPushButton#tabAdd:hover {{ background: {theme.surface_alt}; }}
-QLineEdit#orbitInput {{ background: {theme.background}; padding: 8px; border-radius: 6px; }}
+QPushButton#tabAdd {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px;
+    color: {theme.muted};
+}}
+QPushButton#tabAdd:hover {{
+    background: {theme.surface_alt};
+    border-color: {theme.border};
+    color: {theme.text};
+}}
+QLineEdit#orbitInput {{
+    background-color: transparent;
+    padding: 6px 8px;
+    border: none;
+    color: {theme.text};
+}}
+QLineEdit#orbitInput:focus {{
+    background-color: transparent;
+    border: none;
+}}
 
 QLineEdit#commandInput {{
-    background-color: {theme.surface};
+    background-color: transparent;
     border-radius: 6px;
     padding: 6px 8px;
     min-height: 20px;
     border: none;
+    color: {theme.text};
+}}
+
+QLabel#terminalMark {{
+    background-color: {theme.surface_alt};
+    border: 1px solid {theme.border};
+    border-radius: 6px;
+    padding: 4px;
 }}
 
 QLineEdit#commandInput:focus {{
-    border-color: {theme.accent};
-    background-color: {theme.surface_alt};
+    border: none;
+    background-color: transparent;
 }}
 
 QTextEdit#orbitConversation {{
@@ -477,26 +658,30 @@ QTextEdit#orbitConversation {{
     color: #d8dfe8;
     border: none;
     border-radius: 0;
-    padding: 12px 8px;
+    padding: 12px 6px;
     font-family: "Segoe UI";
-    font-size: 10.5pt;
+    font-size: 10pt;
 }}
 
 QTextEdit#terminalOutput {{
     background-color: {theme.background};
     border: none;
-    padding: 12px 14px;
+    padding: 14px 18px;
 }}
 
 QFrame#terminalHeader QPushButton {{
-    background-color: transparent;
-    border-color: transparent;
+    background-color: {theme.surface_alt};
+    border: 1px solid {theme.border};
+    border-radius: 6px;
     color: {theme.muted};
-    padding: 5px 9px;
+    padding: 4px 11px;
+    font-size: 8.5pt;
+    font-weight: 500;
 }}
 
 QFrame#terminalHeader QPushButton:hover {{
-    background-color: {theme.surface_alt};
+    background-color: {theme.button_hover};
+    border-color: {theme.accent};
     color: {theme.text};
 }}
 
@@ -591,23 +776,29 @@ QPushButton#navButton:checked, QPushButton#navButton:pressed {{
     font-weight: 600;
 }}
 
-QTabWidget::pane {{
+QTabWidget#workspaceTabs::pane {{
     border: none;
     border-radius: 0;
+    background-color: {theme.background};
+}}
+
+QTabWidget#workspaceTabs::tab-bar {{
+    alignment: left;
+}}
+
+QTabBar {{
     background-color: {theme.surface};
-    margin-top: -1px;
+    border-bottom: 1px solid {theme.border};
 }}
 
 QTabBar::tab {{
-    background: {theme.background};
+    background: transparent;
     color: {theme.muted};
-    border: 1px solid {theme.border};
-    border-bottom: none;
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-    padding: 8px 16px;
-    margin-right: 0;
-    font-size: 9.5pt;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 5px 12px;
+    margin: 5px 2px 5px 4px;
+    font-size: 9pt;
     font-weight: 500;
 }}
 
@@ -617,10 +808,9 @@ QTabBar::tab:hover {{
 }}
 
 QTabBar::tab:selected {{
-    background: {theme.surface};
+    background: {theme.surface_alt};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-bottom: 2px solid {theme.accent};
     font-weight: 600;
 }}
 
@@ -910,6 +1100,10 @@ QFrame#sharedInputBar {{
     padding: 2px 6px;
 }}
 
+QFrame#terminalComposer, QFrame#orbitComposer {{
+    min-height: 46px;
+}}
+
 QFrame#sharedInputBar:focus-within {{
     border-color: {theme.accent};
 }}
@@ -946,12 +1140,17 @@ QPushButton#unifiedSend {{
     background-color: {theme.accent};
     color: {theme.background};
     border: none;
-    border-radius: 6px;
-    padding: 5px 10px;
+    border-radius: 8px;
+    padding: 4px;
 }}
 
 QPushButton#unifiedSend:hover {{
     background-color: {theme.accent_alt};
+}}
+
+QPushButton#unifiedSend:disabled {{
+    background-color: {theme.surface_alt};
+    color: {theme.muted};
 }}
 
 QPushButton#unifiedCancel {{
@@ -975,10 +1174,10 @@ QComboBox#modeChipDropdown {{
     color: {theme.text};
     border: 1px solid {theme.border};
     border-radius: 6px;
-    padding: 3px 8px;
-    font-size: 8.5pt;
+    padding: 2px 8px;
+    font-size: 8pt;
     font-weight: 500;
-    min-height: 22px;
+    min-height: 20px;
 }}
 
 QComboBox#modeChipDropdown:hover {{
@@ -994,43 +1193,46 @@ QFrame#approvalCard {{
 }}
 
 QPushButton#approvalRun {{
-    background-color: {theme.accent};
+    background-color: {theme.orbit_accent};
     color: {theme.background};
-    border: 1px solid {theme.accent};
-    border-radius: 6px;
+    border: 1px solid {theme.orbit_accent};
+    border-radius: 7px;
     padding: 5px 14px;
     font-weight: 600;
     font-size: 8.5pt;
 }}
 
 QPushButton#approvalRun:hover {{
-    background-color: {theme.accent_alt};
+    background-color: {theme.orbit_purple};
+    border-color: {theme.orbit_purple};
+    color: {theme.background};
 }}
 
 QPushButton#approvalEdit {{
     background-color: {theme.surface_alt};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 5px 12px;
     font-size: 8.5pt;
 }}
 
 QPushButton#approvalEdit:hover {{
-    border-color: {theme.accent};
+    border-color: {theme.orbit_accent};
 }}
 
-QPushButton#approvalSkip {{
-    background-color: transparent;
+QPushButton#approvalSkip, QPushButton#approvalStop {{
+    background-color: {theme.surface_alt};
     color: {theme.muted};
     border: 1px solid {theme.border};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 5px 12px;
     font-size: 8.5pt;
 }}
 
-QPushButton#approvalSkip:hover {{
-    background-color: {theme.surface_alt};
+QPushButton#approvalSkip:hover, QPushButton#approvalStop:hover {{
+    background-color: {theme.button_hover};
+    border-color: {theme.border};
     color: {theme.text};
 }}
 """

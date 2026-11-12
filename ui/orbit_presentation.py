@@ -44,40 +44,45 @@ def message_html(label: str, text: str, theme) -> str:
     if label != "You" and text.startswith("Completed:"):
         document.setPlainText(text)
     markup = document.toHtml().split("<body", 1)[1].split(">", 1)[1].rsplit("</body>", 1)[0]
-    markup = markup.replace('<pre style="', f'<pre style="background-color:{theme.surface_alt};')
+    markup = markup.replace(
+        '<pre style="',
+        f'<pre style="background-color:{theme.background};border:1px solid {theme.border};'
+        f'border-radius:8px;padding:8px 10px;',
+    )
     foreground = "#d8dfe8"  # Readable prose even with neon terminal palettes.
-    orbit_cyan = getattr(theme, "orbit_accent", "#38bdf8")
+    orbit_accent = getattr(theme, "orbit_accent", "#b4a2f8")
 
     if label == "You":
-        role = "YOU"
-        role_color = "#93c5fd"
-        background = theme.surface
-        border_style = f"border: 1px solid {theme.border}; border-radius: 8px;"
-        extra_card = ""
-    else:
-        role = escape(label.upper())
-        role_color = orbit_cyan
-        background = theme.surface_alt
-        border_style = (
-            f"border-left: 3px solid {orbit_cyan}; border-top: 1px solid {theme.border}; "
-            f"border-right: 1px solid {theme.border}; border-bottom: 1px solid {theme.border}; "
-            f"border-radius: 8px;"
+        return (
+            '<table width="100%" cellspacing="0" cellpadding="0">'
+            '<tr><td width="16%"></td><td align="right">'
+            f'<table cellspacing="0" cellpadding="10" bgcolor="{theme.surface_alt}" '
+            f'style="border: 1px solid {theme.border}; border-radius: 12px;">'
+            f'<tr><td align="left" style="color:{foreground};">{markup}</td></tr>'
+            '</table></td></tr></table>'
+            '<p style="font-size:4pt;margin:0;"><br /></p>'
         )
-        extra_card = ""
-        if text.startswith("Completed:"):
-            cmd = text.split("\n", 1)[0].replace("Completed:", "").strip()
-            extra_card = (
-                f'<p style="margin-top: 8px; font-size: 8.5pt;">'
-                f'<a href="terminal://jump/{escape(cmd)}" style="color: {orbit_cyan}; text-decoration: none;">'
-                f'<b>&#8594; View in terminal</b></a></p>'
-            )
+
+    extra_card = ""
+    if text.startswith("Completed:"):
+        cmd = text.split("\n", 1)[0].replace("Completed:", "").strip()
+        extra_card = (
+            f'<p style="margin-top: 8px; font-size: 8.5pt;">'
+            f'<a href="terminal://jump/{escape(cmd)}" style="color: {orbit_accent}; text-decoration: none;">'
+            f'<b>&#8594; View in terminal</b></a></p>'
+        )
+    header_html = ""
+    if label != "Orbit":
+        header_html = (
+            f'<p style="font-family:Segoe UI;font-size:8pt;color:{orbit_accent};'
+            f'font-weight:bold;margin-bottom:6px;">{escape(label.upper())}</p>'
+        )
 
     return (
-        f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" style="{border_style}">'
-        f'<tr><td style="color:{foreground};">'
-        f'<p style="font-family:Segoe UI;font-size:8pt;color:{role_color};font-weight:bold;margin-bottom:8px;">'
-        f'{role}</p>{markup}{extra_card}</td></tr></table>'
-        '<p style="font-size:4pt;margin:0;"><br /></p>'
+        f'<table width="100%" cellspacing="0" cellpadding="12" bgcolor="{theme.surface}" '
+        f'style="border: 1px solid {theme.border}; border-radius: 12px;">'
+        f'<tr><td style="color:{foreground};">{header_html}{markup}{extra_card}</td></tr></table>'
+        '<p style="font-size:5pt;margin:0;"><br /></p>'
     )
 
 

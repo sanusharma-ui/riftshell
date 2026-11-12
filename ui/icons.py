@@ -38,8 +38,11 @@ def icon(name: str, size: int = 24, color: str | None = None) -> QIcon:
         "folder": '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
         "sidebar": '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
         "cancel": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6m0-6 6 6"/>',
+        "close": '<path d="m18 6-12 12M6 6l12 12"/>',
         "sparkles": '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
         "external": '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"/>',
+        "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+        "dot": '<circle cx="12" cy="12" r="5" fill="' + (color or "#9baec4") + '" stroke="none"/>',
     }
     stroke_color = color or "#9baec4"
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '

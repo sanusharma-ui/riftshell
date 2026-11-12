@@ -28,6 +28,28 @@ class TerminalOutput(QTextEdit):
             if self._pending:
                 self._output_timer.start()
 
+    def append_segments(self, segments: list[tuple[str, str, bool]]):
+        """Append one styled line made of (text, hex_color, bold) segments."""
+        if not segments:
+            return
+        while self._pending:
+            self._drain_output()
+        bar = self.verticalScrollBar()
+        at_bottom, position = bar.value() == bar.maximum(), bar.value()
+        cursor = QTextCursor(self.document())
+        cursor.movePosition(QTextCursor.End)
+        if not self.document().isEmpty():
+            cursor.insertBlock()
+        for text, color, bold in segments:
+            if not text:
+                continue
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(color))
+            if bold:
+                fmt.setFontWeight(QFont.DemiBold)
+            cursor.insertText(text, fmt)
+        bar.setValue(bar.maximum() if at_bottom else position)
+
     def _drain_output(self):
         if not self._pending:
             self._output_timer.stop()
