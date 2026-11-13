@@ -134,6 +134,21 @@ class CommandIntentTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(self.extractor.extract(text).match.command, command)
 
+    def test_drive_navigation_variants(self):
+        cases = {
+            "go to the d drive": "cd d:",
+            "go to d drive": "cd d:",
+            "navigate to c: drive": "cd c:",
+            "switch to d drive": "cd d:",
+            "change to e drive": "cd e:",
+            "d drive me jao": "cd d:",
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                result = self.extractor.extract(text)
+                self.assertEqual(result.status, "matched")
+                self.assertEqual(result.match.command, expected)
+
     def test_listing_variants_preserve_target_and_folder_filter(self):
         for text, expected in LISTING_CASES.items():
             with self.subTest(text=text):

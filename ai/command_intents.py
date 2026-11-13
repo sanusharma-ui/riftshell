@@ -129,8 +129,20 @@ BUILTIN_INTENTS = (
             ("gremote", "remotes", "I will show the Git remotes."),
         )
     ),
+    IntentRule(
+        "navigate_drive",
+        "cd",
+        "I will change this session to the requested drive.",
+        patterns=(
+            rf"(?:go|navigate|switch)\s+to\s+(?:the\s+)?(?P<drive>[a-zA-Z]):?(?:\s+drive)?",
+            rf"change\s+(?:to\s+)?(?:the\s+)?(?P<drive>[a-zA-Z]):?(?:\s+drive)",
+            rf"(?P<drive>[a-zA-Z]):?(?:\s+drive)\s*(?:mein|me)?\s*(?:jao|chalo|switch\s+karo)",
+        ),
+        arguments=("{drive}:",),
+        slots=(("drive", "path"),),
+    ),
     target_rule("navigate", "cd", "I will change this session to the requested directory.", (
-        rf"(?:go|navigate|switch)\s+to\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}",
+        rf"(?:go|navigate|switch)\s+to\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}(?:\s+folder|\s+directory)?",
         rf"change\s+(?:directory|folder)\s+to\s+{TARGET}",
         rf"{TARGET}\s+(?:folder\s+)?(?:mein|me)\s+(?:jao|chalo)",
     )),

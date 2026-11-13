@@ -1,5 +1,6 @@
 """Non-executable conversation transport, separate from workspace action JSON."""
 import json
+import re
 
 from ai.actions import AgentAction
 
@@ -9,11 +10,17 @@ WORKSPACE_HANDOFF = "[[ORBIT_WORKSPACE]]"
 
 def conversation_action(text: str, *, truncated: bool = False) -> AgentAction | None:
     """Only produce a reply or an empty handoff; never return model effects."""
-    answer = text.strip()
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    answer = cleaned if cleaned else text.strip()
     if not answer:
         return None
-    if answer.startswith("[[ORBIT_") or WORKSPACE_HANDOFF.startswith(answer):
-        return AgentAction("inspect") if answer == WORKSPACE_HANDOFF and not truncated else None
+    if WORKSPACE_HANDOFF in answer or answer.startswith("[[ORBIT_") or WORKSPACE_HANDOFF.startswith(answer):
+        return AgentAction("inspect") if not truncated else None
+
+    # If the model attempted to propose an action in conversational mode,
+    # hand off to the workspace planner instead of displaying raw envelope text.
+    if re.search(r"Proposed (?:next )?action(?: \(execution not confirmed\))?:\s*(?:shell|code_write)|^\s*Command:\s*\S", answer, re.MULTILINE | re.IGNORECASE):
+        return None if truncated else AgentAction("inspect")
 
     # Compatibility with models echoing old envelopes from conversation history.
     # Parse only complete JSON and discard every field except a reply's message.

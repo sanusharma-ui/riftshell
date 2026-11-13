@@ -329,6 +329,38 @@ class ResponseEnvelopeTests(unittest.TestCase):
 
         self.assertEqual(_extract_json(markdown), {"action": "respond", "message": markdown})
 
+    def test_think_tags_with_curly_braces_are_stripped(self):
+        payload = {"action": "shell", "command": "cd D:", "message": "Changing"}
+        raw = f"<think>I should change dir to {{user_dir}}.</think> {json.dumps(payload)}"
+        self.assertEqual(_extract_json(raw), payload)
+
+    def test_proposed_action_summary_fallback_is_parsed(self):
+        raw = "Proposed action (execution not confirmed): shell; Command: cd D:; Response: Changing"
+        self.assertEqual(_extract_json(raw), {"action": "shell", "command": "cd D:", "message": "Changing"})
+
+    def test_command_line_fallback_is_parsed(self):
+        raw = "Command: cd D:\nResponse: Changing"
+        self.assertEqual(_extract_json(raw), {"action": "shell", "command": "cd D:", "message": "Changing"})
+
+    def test_fenced_shell_command_with_crlf_is_extracted_when_known(self):
+        raw = "To change the directory to the C drive, you can use the following command:\r\n\r\n```shell\r\ncd C:\\\r\n```"
+        result = _extract_json(raw, command_names=["cd", "where", "files"])
+        self.assertEqual(result["action"], "shell")
+        self.assertEqual(result["command"], "cd C:\\")
+        self.assertIn("To change the directory", result["message"])
+
+    def test_non_shell_code_block_remains_conversational_response(self):
+        raw = "Here is a Python function:\r\n\r\n```python\r\ndef add(a, b):\r\n    return a + b\r\n```"
+        result = _extract_json(raw, command_names=["cd", "where", "files"])
+        self.assertEqual(result["action"], "respond")
+        self.assertIn("def add", result["message"])
+
+    def test_inline_command_backticks_extracted_when_known(self):
+        raw = "You can run the command `files` to list everything."
+        result = _extract_json(raw, command_names=["cd", "where", "files"])
+        self.assertEqual(result["action"], "shell")
+        self.assertEqual(result["command"], "files")
+
 
 class AssistantLanguageTests(unittest.TestCase):
     def test_prompt_enforces_professional_english_for_every_user_language(self):

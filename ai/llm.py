@@ -45,10 +45,12 @@ def _decode_json_value(text: str):
             return None
 
 
-def _extract_json(text: str) -> dict:
+def _extract_json(text: str, command_names: Iterable[str] | None = None) -> dict:
     """Return the invisible action envelope without leaking it into Orbit chat."""
     original = text.strip()
-    value = _decode_json_value(original)
+    cleaned = re.sub(r"<think>.*?</think>", "", original, flags=re.DOTALL).strip()
+    candidate_text = cleaned if cleaned else original
+    value = _decode_json_value(candidate_text)
 
     # Some models double-encode the complete action object as a JSON string.
     for _ in range(2):
@@ -60,6 +62,59 @@ def _extract_json(text: str) -> dict:
         value = decoded
 
     if not isinstance(value, dict):
+        known = {name.lower() for name in command_names} if command_names else None
+
+        # Fallback 1: Check if the model echoed the memory / action summary format
+        summary_match = re.search(
+            r"Proposed (?:next )?action(?: \(execution not confirmed\))?:\s*(?P<action>[a-zA-Z_]+);\s*(?:Command:\s*(?P<command>[^;]*?);\s*)?Response:\s*(?P<message>.*)",
+            candidate_text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if summary_match:
+            act = summary_match.group("action").lower()
+            cmd = (summary_match.group("command") or "").strip()
+            if cmd.lower() == "(none)":
+                cmd = ""
+            msg = summary_match.group("message").strip()
+            msg = re.split(r"\n+(?:Assistant|User|Orbit):", msg, flags=re.IGNORECASE)[0].strip()
+            return {"action": act, "command": cmd, "message": msg}
+
+        # Fallback 2: Check for explicit Command: <cmd> line
+        cmd_match = re.search(r"^\s*Command:\s*([^\r\n;]+)", candidate_text, re.MULTILINE | re.IGNORECASE)
+        if cmd_match:
+            cmd = cmd_match.group(1).strip().strip("`")
+            first_word = cmd.split()[0].lower() if cmd.split() else ""
+            if not known or first_word in known:
+                msg = re.sub(r"^\s*Command:\s*[^\r\n;]+[;\r\n]*", "", candidate_text, flags=re.MULTILINE | re.IGNORECASE).strip()
+                msg = re.sub(r"^(?:Response|Message):\s*", "", msg, flags=re.IGNORECASE).strip()
+                return {"action": "shell", "command": cmd, "message": msg or f"I will run `{cmd}`."}
+
+        # Fallback 3: Check for fenced code block containing command(s) (handles CRLF and LF)
+        fence_match = re.search(
+            r"```[^\r\n]*\r?\n\s*([^\r\n`]+)\s*\r?\n\s*```",
+            candidate_text,
+            re.IGNORECASE,
+        )
+        if fence_match:
+            cmd = fence_match.group(1).strip()
+            first_word = cmd.split()[0].lower() if cmd.split() else ""
+            if not known or first_word in known:
+                msg = re.split(r"```", candidate_text, maxsplit=1)[0].strip()
+                return {"action": "shell", "command": cmd, "message": msg or f"I will run `{cmd}`."}
+
+        # Fallback 4: Check for inline code backticks with a command
+        inline_match = re.search(
+            r"(?:use|run|execute|type)\s+(?:the\s+(?:following\s+)?command:?\s*)?`([a-zA-Z0-9_\-\.\:\s\\]+)`",
+            candidate_text,
+            re.IGNORECASE,
+        )
+        if inline_match:
+            cmd = inline_match.group(1).strip()
+            first_word = cmd.split()[0].lower() if cmd.split() else ""
+            if not known or first_word in known:
+                msg = candidate_text[:inline_match.start()].strip()
+                return {"action": "shell", "command": cmd, "message": msg or f"I will run `{cmd}`."}
+
         return {"action": "respond", "message": original or "No response from model."}
 
     # A common failure mode is putting another complete action envelope inside
@@ -462,7 +517,7 @@ class AgentPlanner:
                     text = (self._call_provider(provider, prompt, conversation=True) if conversation
                             else self._call_provider(provider, prompt))
                     action = (conversation_action(text) if conversation
-                              else AgentAction.from_payload(_extract_json(text)))
+                              else AgentAction.from_payload(_extract_json(text, self.command_names)))
                     if action is None:
                         raise RuntimeError("The model returned no readable answer.")
                     runtime.record("provider", provider=provider, elapsed_seconds=perf_counter() - started,
@@ -795,6 +850,11 @@ class AgentPlanner:
 
         endpoint = f"{self._ollama_base_url}/api/generate"
 
+        system_text = ""
+        user_split = "\n\nUser request:\n"
+        if user_split in prompt:
+            system_text = prompt.split(user_split, 1)[0].strip()
+
         def _post(use_format_json: bool) -> dict:
             body_dict = {
                 "model": self._ollama_model,
@@ -802,6 +862,8 @@ class AgentPlanner:
                 "stream": False,
                 "options": {"temperature": 0.1, "num_predict": self.mode.output_tokens},
             }
+            if system_text:
+                body_dict["system"] = system_text
             if use_format_json and not conversation:
                 body_dict["format"] = "json"
             req_data = json.dumps(body_dict).encode("utf-8")
@@ -860,7 +922,7 @@ class AgentPlanner:
             raise OutputBudgetError(self._output_budget_message(), partial_text=text)
         if not text.strip():
             raise RuntimeError("Ollama returned an empty response.")
-        if conversation and "<think>" in text and "</think>" in text:
+        if "<think>" in text and "</think>" in text:
             cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
             if cleaned:
                 text = cleaned

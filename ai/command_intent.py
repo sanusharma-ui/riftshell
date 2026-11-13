@@ -177,8 +177,11 @@ class RuleIntentExtractor:
     @staticmethod
     def _collect(matches: dict[str, CommandCandidate], rule: IntentRule, slots: dict[str, str]):
         try:
-            args = tuple(slots[arg[1:-1]] if arg.startswith("{") and arg.endswith("}") else arg
-                         for arg in rule.arguments)
+            args = tuple(
+                re.sub(r"\{(\w+)\}", lambda m: slots[m.group(1)], arg)
+                if "{" in arg and "}" in arg else arg
+                for arg in rule.arguments
+            )
             candidate = CommandCandidate(rule.intent, rule.command, args, rule.message)
             command = candidate.command
         except (KeyError, ValueError):
