@@ -204,10 +204,15 @@ class AgentPlanner:
         self._gemini_key = str(getattr(self.config, "gemini_api_key", "") or "").strip()
         self._groq_key = str(getattr(self.config, "groq_api_key", os.getenv("GROQ_API_KEY", "")) or "").strip()
         self._ollama_model = str(getattr(self.config, "ollama_model", os.getenv("OLLAMA_MODEL", "")) or "").strip()
-        self._ollama_base_url = str(
+        raw_ollama_url = str(
             getattr(self.config, "ollama_base_url", os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"))
             or "http://127.0.0.1:11434"
         ).strip().rstrip("/")
+        if raw_ollama_url and not (raw_ollama_url.startswith("http://") or raw_ollama_url.startswith("https://")):
+            raw_ollama_url = f"https://{raw_ollama_url}"
+        if raw_ollama_url.startswith("http://") and "ngrok" in raw_ollama_url.lower():
+            raw_ollama_url = "https://" + raw_ollama_url[len("http://"):]
+        self._ollama_base_url = raw_ollama_url
         self._ollama_timeout = max(
             1,
             int(getattr(self.config, "ollama_timeout_seconds", os.getenv("OLLAMA_TIMEOUT_SECONDS", "120")) or 120),
@@ -789,45 +794,76 @@ class AgentPlanner:
             raise RuntimeError("OLLAMA_MODEL is not configured.")
 
         endpoint = f"{self._ollama_base_url}/api/generate"
-        payload = json.dumps({
-            "model": self._ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            **({} if conversation else {"format": "json"}),
-            "options": {"temperature": 0.1, "num_predict": self.mode.output_tokens},
-        }).encode("utf-8")
-        request = urllib.request.Request(
-            endpoint,
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "RiftShell/1.0",
-                "ngrok-skip-browser-warning": "true",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self._ollama_timeout) as response:
-                body = response.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(f"Ollama returned HTTP {exc.code}: {detail or exc.reason}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(
-                f"Ollama is not reachable at {self._ollama_base_url}. Start Ollama and confirm OLLAMA_BASE_URL."
-            ) from exc
 
-        try:
-            response_payload = json.loads(body)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("Ollama returned an invalid HTTP response.") from exc
+        def _post(use_format_json: bool) -> dict:
+            body_dict = {
+                "model": self._ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.1, "num_predict": self.mode.output_tokens},
+            }
+            if use_format_json and not conversation:
+                body_dict["format"] = "json"
+            req_data = json.dumps(body_dict).encode("utf-8")
+            req = urllib.request.Request(
+                endpoint,
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "RiftShell/1.0",
+                    "ngrok-skip-browser-warning": "true",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=self._ollama_timeout) as response:
+                    body = response.read().decode("utf-8", errors="replace")
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")[:500]
+                if exc.code == 403:
+                    raise RuntimeError(
+                        f'Ollama returned HTTP 403 Forbidden. If using Google Colab via ngrok, '
+                        f'start Ollama with OLLAMA_ORIGINS="*" or run ngrok with host_header="rewrite".'
+                    ) from exc
+                if exc.code == 404 and "ngrok" in self._ollama_base_url.lower():
+                    raise RuntimeError(
+                        f"Google Colab ngrok tunnel not found (HTTP 404). Check if your Colab session is running and verify the URL."
+                    ) from exc
+                raise RuntimeError(f"Ollama returned HTTP {exc.code}: {detail or exc.reason}") from exc
+            except urllib.error.URLError as exc:
+                source = "Google Colab" if "ngrok" in self._ollama_base_url.lower() else "Localhost"
+                raise RuntimeError(
+                    f"Ollama is not reachable at {self._ollama_base_url}. Confirm your {source} Ollama service is running."
+                ) from exc
+
+            try:
+                return json.loads(body)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError("Ollama returned an invalid HTTP response.") from exc
+
+        # First try with format="json" if planning an action. If the model returns
+        # an empty response (common when grammar constraints conflict with model tokens),
+        # retry once without format="json" so ANY model configured in settings works.
+        response_payload = _post(use_format_json=True)
         if response_payload.get("error"):
             raise RuntimeError(str(response_payload["error"]))
         text = str(response_payload.get("response", ""))
+
+        if not text.strip() and not conversation:
+            response_payload = _post(use_format_json=False)
+            if response_payload.get("error"):
+                raise RuntimeError(str(response_payload["error"]))
+            text = str(response_payload.get("response", ""))
+
         if response_payload.get("done_reason") == "length":
             raise OutputBudgetError(self._output_budget_message(), partial_text=text)
         if not text.strip():
             raise RuntimeError("Ollama returned an empty response.")
+        if conversation and "<think>" in text and "</think>" in text:
+            cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+            if cleaned:
+                text = cleaned
         return text
 
     def _output_budget_message(self) -> str:

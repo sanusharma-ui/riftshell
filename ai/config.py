@@ -122,6 +122,12 @@ class AIConfig:
             workspace_root = DEFAULT_WORKSPACE_ROOT
 
         modes, mode = modes_from_env()
+        raw_ollama_url = (os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").strip().rstrip("/")
+        if raw_ollama_url and not (raw_ollama_url.startswith("http://") or raw_ollama_url.startswith("https://")):
+            raw_ollama_url = f"https://{raw_ollama_url}"
+        if raw_ollama_url.startswith("http://") and "ngrok" in raw_ollama_url.lower():
+            raw_ollama_url = "https://" + raw_ollama_url[len("http://"):]
+
         return cls(
             orbit_modes=modes,
             orbit_mode=mode,
@@ -138,7 +144,7 @@ class AIConfig:
             groq_timeout_seconds=_parse_int(os.getenv("GROQ_TIMEOUT_SECONDS"), 30, minimum=1),
             ai_provider=_parse_provider(os.getenv("AI_PROVIDER")),
             ai_provider_order=_parse_provider_order(os.getenv("AI_PROVIDER_ORDER")),
-            ollama_base_url=(os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").strip().rstrip("/"),
+            ollama_base_url=raw_ollama_url,
             ollama_model=os.getenv("OLLAMA_MODEL", "").strip(),
             ollama_timeout_seconds=_parse_int(os.getenv("OLLAMA_TIMEOUT_SECONDS"), 120, minimum=1),
             workspace_root=workspace_root,

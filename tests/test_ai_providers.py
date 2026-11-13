@@ -199,6 +199,54 @@ class ProviderSelectionTests(unittest.TestCase):
         self.assertEqual(sent_request.full_url, "https://test-colab.ngrok-free.app/api/generate")
         self.assertEqual(sent_request.headers.get("Ngrok-skip-browser-warning"), "true")
 
+    def test_ollama_generic_model_retries_without_format_if_empty(self):
+        planner = make_planner(make_config(
+            ai_provider="ollama",
+            ollama_base_url="https://test-colab.ngrok-free.app",
+            ollama_model="any-configured-model",
+        ))
+        empty_fake = FakeHTTPResponse()
+        empty_fake.body = json.dumps({"response": ""}).encode("utf-8")
+
+        success_fake = FakeHTTPResponse()
+        success_fake.body = json.dumps({
+            "response": '{"action": "respond", "message": "model answer"}'
+        }).encode("utf-8")
+
+        with patch("ai.llm.urllib.request.urlopen", side_effect=[empty_fake, success_fake]) as request:
+            result = planner._call_ollama("test prompt", conversation=False)
+
+        self.assertEqual(result, '{"action": "respond", "message": "model answer"}')
+        self.assertEqual(request.call_count, 2)
+        first_payload = json.loads(request.call_args_list[0].args[0].data.decode("utf-8"))
+        second_payload = json.loads(request.call_args_list[1].args[0].data.decode("utf-8"))
+        self.assertEqual(first_payload.get("format"), "json")
+        self.assertNotIn("format", second_payload)
+        self.assertEqual(first_payload.get("model"), "any-configured-model")
+        self.assertEqual(second_payload.get("model"), "any-configured-model")
+
+    def test_ollama_colab_403_provides_clear_instructions(self):
+        import urllib.error
+        planner = make_planner(make_config(
+            ai_provider="ollama",
+            ollama_base_url="https://test-colab.ngrok-free.app",
+            ollama_model="deepseek-r1:8b",
+        ))
+        http_error = urllib.error.HTTPError(
+            url="https://test-colab.ngrok-free.app/api/generate",
+            code=403,
+            msg="Forbidden",
+            hdrs={},
+            fp=None,
+        )
+        http_error.read = lambda: b"Forbidden"
+        with patch("ai.llm.urllib.request.urlopen", side_effect=http_error):
+            action = planner.plan("hello")
+
+        self.assertEqual(action.action, "respond")
+        self.assertIn("OLLAMA_ORIGINS", action.message)
+        self.assertIn("host_header", action.message)
+
     def test_auto_skips_unconfigured_providers(self):
         planner = make_planner(make_config(
             ai_provider="auto",

@@ -457,10 +457,11 @@ class PreferencesDialog(QDialog):
             url = self.colab_url.text().strip().rstrip("/")
             if url and not (url.startswith("http://") or url.startswith("https://")):
                 url = f"https://{url}"
-                self.colab_url.setText(url)
+            if url.startswith("http://") and "ngrok" in url.lower():
+                url = "https://" + url[len("http://"):]
             if url.endswith("/api/generate"):
                 url = url[:-len("/api/generate")].rstrip("/")
-                self.colab_url.setText(url)
+            self.colab_url.setText(url)
         else:
             url = "http://127.0.0.1:11434"
 
