@@ -148,6 +148,8 @@ def _memory_content(role: str, content: str) -> str:
         return f"The previous AI request failed{reason}. No action was executed for that request."
     if response.startswith("The previous action returned a result, but I could not plan the next step."):
         return "The previous action returned a result; AI continuation failed. The task may be unfinished."
+    if re.search(r"(?:```(?:shell|bash|cmd|powershell|sh|bat)\b|^\s*cd\s+/d\s+[a-zA-Z]:|\bto change (?:to|the) (?:directory|drive)\b)", response, re.IGNORECASE | re.MULTILINE):
+        return "Conversational assistance provided regarding workspace commands."
     return content
 
 

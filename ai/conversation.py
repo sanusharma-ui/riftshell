@@ -17,9 +17,17 @@ def conversation_action(text: str, *, truncated: bool = False) -> AgentAction | 
     if WORKSPACE_HANDOFF in answer or answer.startswith("[[ORBIT_") or WORKSPACE_HANDOFF.startswith(answer):
         return AgentAction("inspect") if not truncated else None
 
-    # If the model attempted to propose an action in conversational mode,
-    # hand off to the workspace planner instead of displaying raw envelope text.
-    if re.search(r"Proposed (?:next )?action(?: \(execution not confirmed\))?:\s*(?:shell|code_write)|^\s*Command:\s*\S", answer, re.MULTILINE | re.IGNORECASE):
+    # If the model attempted to propose an action or explain shell execution in conversational mode,
+    # hand off to the workspace planner so RiftShell can actually execute it in the terminal.
+    if re.search(
+        r"Proposed (?:next )?action(?: \(execution not confirmed\))?:\s*(?:shell|code_write)|"
+        r"^\s*Command:\s*\S|"
+        r"```(?:shell|bash|cmd|powershell|sh|bat)\b|"
+        r"^\s*cd\s+(?:/d\s+)?[a-zA-Z]:|"
+        r"\b(?:command prompt|terminal)\b.*?\b(?:run|use|type)\b",
+        answer,
+        re.MULTILINE | re.IGNORECASE,
+    ):
         return None if truncated else AgentAction("inspect")
 
     # Compatibility with models echoing old envelopes from conversation history.

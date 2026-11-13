@@ -299,6 +299,13 @@ class PromptPreservationTests(unittest.TestCase):
             self.assertNotIn("very-long-error", history[1]["content"])
             self.assertIn("No action was executed", history[1]["content"])
 
+    def test_memory_sanitizes_shell_tutorials_to_prevent_prompt_poisoning(self):
+        from ai.llm import _memory_content
+        tutorial = "To change to the D: drive from a Windows command prompt, use:\ncd /d D:\\\nThe /d option..."
+        result = _memory_content("assistant", "Proposed action (execution not confirmed): respond; Command: (none); Response: " + tutorial)
+        self.assertNotIn("cd /d D:\\", result)
+        self.assertIn("Conversational assistance provided", result)
+
     def test_continuation_inspection_does_not_duplicate_system_history_and_catalog(self):
         planner = make_planner(make_config(gemini_api_key="test-key"))
         planner._request_model_action = Mock(return_value=(

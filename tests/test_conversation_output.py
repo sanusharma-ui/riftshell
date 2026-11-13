@@ -164,3 +164,9 @@ class ConversationOutputTests(unittest.TestCase):
         planner._groq = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
         self.assertEqual(planner.plan(QUESTION).message, ANSWER)
         self.assertEqual(create.call_args.kwargs["extra_body"], {"max_completion_tokens": 768})
+
+    def test_conversational_shell_tutorial_triggers_workspace_handoff(self):
+        tutorial = "To change to the D: drive from a Windows command prompt, use:\n```shell\ncd C:\\\n```"
+        action = conversation_action(tutorial)
+        self.assertIsNotNone(action)
+        self.assertEqual(action.action, "inspect")

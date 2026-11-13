@@ -135,7 +135,7 @@ BUILTIN_INTENTS = (
         "I will change this session to the requested drive.",
         patterns=(
             rf"(?:go|navigate|switch)\s+to\s+(?:the\s+)?(?P<drive>[a-zA-Z]):?(?:\s+drive)?",
-            rf"change\s+(?:to\s+)?(?:the\s+)?(?P<drive>[a-zA-Z]):?(?:\s+drive)",
+            rf"change\s+(?:directory|folder)?\s*(?:to\s+)?(?:the\s+)?(?P<drive>[a-zA-Z]):?(?:\s+drive)",
             rf"(?P<drive>[a-zA-Z]):?(?:\s+drive)\s*(?:mein|me)?\s*(?:jao|chalo|switch\s+karo)",
         ),
         arguments=("{drive}:",),
@@ -143,8 +143,8 @@ BUILTIN_INTENTS = (
     ),
     target_rule("navigate", "cd", "I will change this session to the requested directory.", (
         rf"(?:go|navigate|switch)\s+to\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}(?:\s+folder|\s+directory)?",
-        rf"change\s+(?:directory|folder)\s+to\s+{TARGET}",
-        rf"{TARGET}\s+(?:folder\s+)?(?:mein|me)\s+(?:jao|chalo)",
+        rf"change\s+(?:directory|folder)\s+to\s+{TARGET}(?:\s+folder|\s+directory)?",
+        rf"{TARGET}\s+(?:folder\s+|directory\s+)?(?:mein|me)\s+(?:jao|chalo)",
     )),
     target_rule("list_path", "files", "I will list files in the requested directory.", (
         rf"{SHOW}{FILE_ITEMS}\s+(?:in|inside)\s+(?:the\s+)?(?:folder\s+|directory\s+)?{TARGET}",
