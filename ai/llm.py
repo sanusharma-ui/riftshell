@@ -799,7 +799,11 @@ class AgentPlanner:
         request = urllib.request.Request(
             endpoint,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "RiftShell/1.0",
+                "ngrok-skip-browser-warning": "true",
+            },
             method="POST",
         )
         try:

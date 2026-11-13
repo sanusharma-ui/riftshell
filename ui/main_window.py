@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
-    QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
+    QScrollArea, QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from core.shell import Shell
@@ -334,10 +334,16 @@ class PreferencesDialog(QDialog):
         self.provider = QComboBox()
         for label, value in (
             ("Auto (configured order)", "auto"), ("Groq", "groq"),
-            ("Gemini", "gemini"), ("Local Ollama", "ollama"),
+            ("Gemini", "gemini"), ("Ollama (Local / Colab)", "ollama"),
         ):
             self.provider.addItem(label, value)
-        self.provider.setCurrentIndex(max(0, self.provider.findData(preferences["ai_provider"])))
+        self.provider.setCurrentIndex(max(0, self.provider.findData(preferences.get("ai_provider", "auto"))))
+
+        initial_ollama_url = preferences.get("ollama_base_url", "http://127.0.0.1:11434")
+        saved_source = preferences.get("ollama_source", "")
+        if not saved_source:
+            saved_source = "colab" if "ngrok" in initial_ollama_url.lower() else "local"
+
         self.groq_key = QLineEdit()
         self.groq_key.setEchoMode(QLineEdit.Password)
         self.groq_key.setPlaceholderText("Leave blank to keep saved key")
@@ -347,9 +353,27 @@ class PreferencesDialog(QDialog):
         self.gemini_key.setPlaceholderText("Leave blank to keep saved key")
         self.gemini_remove = QCheckBox("Remove saved Gemini key")
         self.groq_model = QLineEdit(preferences["groq_model"])
-        self.ollama_url = QLineEdit(preferences["ollama_base_url"])
+
+        saved_colab_url = preferences.get("ollama_colab_url", initial_ollama_url if saved_source == "colab" else "")
+
+        self.ollama_source = QComboBox()
+        self.ollama_source.addItem("Local (localhost)", "local")
+        self.ollama_source.addItem("Google Colab (ngrok tunnel)", "colab")
+        self.ollama_source.setCurrentIndex(max(0, self.ollama_source.findData(saved_source)))
+
+        self.colab_link_label = QLabel("Colab ngrok link")
+        self.colab_url = QLineEdit(saved_colab_url)
+        self.colab_url.setPlaceholderText("Paste your Google Colab ngrok link (e.g. https://xxxx.ngrok-free.app)")
+        self._dummy_local_url = QLineEdit("http://127.0.0.1:11434")
+
+        is_colab = saved_source == "colab"
+        self.colab_link_label.setVisible(is_colab)
+        self.colab_url.setVisible(is_colab)
+
+        self.ollama_source.currentIndexChanged.connect(self._on_ollama_source_changed)
+
         self.ollama_model = QLineEdit(preferences["ollama_model"])
-        self.ollama_model.setPlaceholderText("Model installed in Ollama")
+        self.ollama_model.setPlaceholderText("Model installed in Ollama (e.g. deepseek-r1:8b)")
         self.workspace_root = QLineEdit(preferences["workspace_root"])
         browse_workspace = QPushButton("Browse")
         browse_workspace.clicked.connect(self._browse_workspace)
@@ -359,7 +383,7 @@ class PreferencesDialog(QDialog):
         self.allow_outside_workspace = QCheckBox("Allow Orbit file inspection and writes outside this folder")
         self.allow_outside_workspace.setChecked(preferences["allow_outside_workspace"])
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setSpacing(10)
         form.addRow("Theme", self.theme)
         form.addRow("Terminal font", self.font)
         form.addRow("Font size", self.font_size)
@@ -371,25 +395,52 @@ class PreferencesDialog(QDialog):
         form.addRow("Groq model", self.groq_model)
         form.addRow("Gemini API key", self.gemini_key)
         form.addRow("", self.gemini_remove)
-        form.addRow("Ollama URL", self.ollama_url)
+        form.addRow("Ollama connection", self.ollama_source)
+        form.addRow(self.colab_link_label, self.colab_url)
         form.addRow("Ollama model", self.ollama_model)
         form.addRow("Orbit workspace", workspace_row)
         form.addRow("AI file access", self.allow_outside_workspace)
+
+        scroll_content = QWidget()
+        scroll_content.setLayout(form)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(scroll_content)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 22, 22, 22)
-        layout.setSpacing(14)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
         layout.addWidget(title)
-        layout.addLayout(form)
-        layout.addStretch()
+        layout.addWidget(scroll, 1)
         layout.addWidget(buttons)
+
+        screen = QApplication.primaryScreen()
+        screen_h = screen.availableGeometry().height() if screen else 700
+        self.resize(460, min(520, int(screen_h * 0.80)))
+
+    @property
+    def ollama_url(self):
+        if self.ollama_source.currentData() == "colab":
+            return self.colab_url
+        return self._dummy_local_url
 
     def _browse_workspace(self):
         selected = QFileDialog.getExistingDirectory(self, "Choose Orbit workspace", self.workspace_root.text())
         if selected:
             self.workspace_root.setText(selected)
+
+    def _on_ollama_source_changed(self):
+        is_colab = self.ollama_source.currentData() == "colab"
+        self.colab_link_label.setVisible(is_colab)
+        self.colab_url.setVisible(is_colab)
+        if is_colab:
+            self.colab_url.setFocus()
 
     def _save(self):
         workspace_text = self.workspace_root.text().strip()
@@ -398,15 +449,37 @@ class PreferencesDialog(QDialog):
             QMessageBox.warning(self, "Orbit workspace", "Choose an existing folder for Orbit's workspace.")
             return
         workspace = workspace.resolve(strict=True)
+
         provider = self.provider.currentData()
-        url = self.ollama_url.text().strip().rstrip("/")
-        parsed = urlparse(url)
-        if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
-            QMessageBox.warning(self, "Local model", "Use a local HTTP address such as http://127.0.0.1:11434.")
-            return
-        if provider == "ollama" and not self.ollama_model.text().strip():
-            QMessageBox.warning(self, "Local model", "Enter the model name installed in Ollama.")
-            return
+        ollama_source = self.ollama_source.currentData()
+
+        if ollama_source == "colab":
+            url = self.colab_url.text().strip().rstrip("/")
+            if url and not (url.startswith("http://") or url.startswith("https://")):
+                url = f"https://{url}"
+                self.colab_url.setText(url)
+            if url.endswith("/api/generate"):
+                url = url[:-len("/api/generate")].rstrip("/")
+                self.colab_url.setText(url)
+        else:
+            url = "http://127.0.0.1:11434"
+
+        if provider == "ollama":
+            if ollama_source == "colab":
+                if not url:
+                    QMessageBox.warning(self, "Google Colab", "Enter your Google Colab ngrok URL (e.g. https://xxxx.ngrok-free.app).")
+                    self.colab_url.setFocus()
+                    return
+                parsed = urlparse(url)
+                if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                    QMessageBox.warning(self, "Google Colab", "Use a valid HTTP or HTTPS address such as https://xxxx.ngrok-free.app.")
+                    self.colab_url.setFocus()
+                    return
+            if not self.ollama_model.text().strip():
+                QMessageBox.warning(self, "Local model", "Enter the model name installed in Ollama.")
+                self.ollama_model.setFocus()
+                return
+
         try:
             for name, field, remove in (
                 ("groq", self.groq_key, self.groq_remove),
@@ -424,12 +497,16 @@ class PreferencesDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Credential storage", f"Could not save the API key: {exc}")
             return
+
         self.preferences_saved.emit({
             "theme": self.theme.currentData(), "font_family": self.font.currentText(),
             "font_size": self.font_size.value(), "confirm_risky": self.confirm.isChecked(),
             "restore_history": self.restore.isChecked(),
             "ai_provider": provider, "groq_model": self.groq_model.text().strip(),
-            "ollama_base_url": url, "ollama_model": self.ollama_model.text().strip(),
+            "ollama_source": ollama_source,
+            "ollama_base_url": url,
+            "ollama_colab_url": self.colab_url.text().strip(),
+            "ollama_model": self.ollama_model.text().strip(),
             "workspace_root": str(workspace),
             "allow_outside_workspace": self.allow_outside_workspace.isChecked(),
         })
@@ -1300,10 +1377,16 @@ class MainWindow(QMainWindow):
             # A bad developer .env must not prevent the desktop shell from opening.
             defaults = ("auto", "llama-3.3-70b-versatile", "http://127.0.0.1:11434", "",
                         str(Path.home()), False)
+        ollama_url = self.settings.value("ai/ollama_base_url", defaults[2], type=str)
+        default_source = "colab" if "ngrok" in str(ollama_url).lower() else "local"
+        ollama_source = self.settings.value("ai/ollama_source", default_source, type=str)
         return {
             "ai_provider": self.settings.value("ai/provider", defaults[0], type=str),
             "groq_model": self.settings.value("ai/groq_model", defaults[1], type=str),
-            "ollama_base_url": self.settings.value("ai/ollama_base_url", defaults[2], type=str),
+            "ollama_source": ollama_source,
+            "ollama_base_url": ollama_url,
+            "ollama_colab_url": self.settings.value("ai/ollama_colab_url", ollama_url if ollama_source == "colab" else "", type=str),
+            "ollama_local_url": self.settings.value("ai/ollama_local_url", ollama_url if ollama_source == "local" else "http://127.0.0.1:11434", type=str),
             "ollama_model": self.settings.value("ai/ollama_model", defaults[3], type=str),
             "workspace_root": self.settings.value("ai/workspace_root", defaults[4], type=str),
             "allow_outside_workspace": self.settings.value("ai/allow_outside_workspace", defaults[5], type=bool),
@@ -1602,7 +1685,8 @@ class MainWindow(QMainWindow):
     def save_preferences(self, preferences: dict):
         self.preferences = preferences
         for key, value in preferences.items():
-            if key in {"ai_provider", "groq_model", "ollama_base_url", "ollama_model",
+            if key in {"ai_provider", "groq_model", "ollama_source", "ollama_base_url",
+                       "ollama_colab_url", "ollama_local_url", "ollama_model",
                        "workspace_root", "allow_outside_workspace"}:
                 setting = "provider" if key == "ai_provider" else key
                 self.settings.setValue(f"ai/{setting}", value)

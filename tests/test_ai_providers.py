@@ -184,6 +184,21 @@ class ProviderSelectionTests(unittest.TestCase):
         self.assertIn("Ollama is not reachable", action.message)
         self.assertEqual(cloud.calls, 0)
 
+    def test_ollama_passes_ngrok_headers_for_colab(self):
+        planner = make_planner(make_config(
+            ai_provider="ollama",
+            ollama_base_url="https://test-colab.ngrok-free.app",
+            ollama_model="qwen-test",
+        ))
+        with patch("ai.llm.urllib.request.urlopen", return_value=FakeHTTPResponse("colab response")) as request:
+            action = planner.plan("Explain dependency injection")
+
+        self.assertEqual(action.action, "respond")
+        self.assertEqual(action.message, "colab response")
+        sent_request = request.call_args.args[0]
+        self.assertEqual(sent_request.full_url, "https://test-colab.ngrok-free.app/api/generate")
+        self.assertEqual(sent_request.headers.get("Ngrok-skip-browser-warning"), "true")
+
     def test_auto_skips_unconfigured_providers(self):
         planner = make_planner(make_config(
             ai_provider="auto",
