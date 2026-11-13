@@ -42,6 +42,8 @@ QUERY_EXAMPLES = {
     "workspace": (
         "List files", "Show folders", "Show the files and folders in this directory",
         "Which subdirectories exist here?", "Where am I in the terminal?",
+        "Where am I?", "Where are we?", "Which directory is this?", "What folder is this?",
+        "kaha hai hm", "hum kaha hai", "kaha hu mai", "konse folder me hai hm",
         "Go to the source folder", "Create an empty file called notes.txt",
         "Create a directory named reports", "Copy notes.txt to backup.txt",
         "Rename the file", "Delete the old log files", "Move these folders",

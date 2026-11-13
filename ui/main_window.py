@@ -1253,6 +1253,8 @@ class OrbitPanel(QFrame):
                 message = f"Completed: {command}\nThe command output is now available in the active terminal."
             self._stream("Orbit", message)
             self.status.setText("Completed. Review the terminal output for the full result.")
+            if self.task and self.task.planner and getattr(self.task.planner, "memory", None):
+                self.task.planner.memory.add("assistant", message)
             return
         detail = result.output.strip().splitlines()[0] if result.output else "The command did not complete successfully."
         self._stream("Orbit", f"The command did not complete: {command}\n{detail}\n\nSee the terminal for full details.")
