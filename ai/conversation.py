@@ -17,14 +17,17 @@ def conversation_action(text: str, *, truncated: bool = False) -> AgentAction | 
     if WORKSPACE_HANDOFF in answer or answer.startswith("[[ORBIT_") or WORKSPACE_HANDOFF.startswith(answer):
         return AgentAction("inspect") if not truncated else None
 
-    # If the model attempted to propose an action or explain shell execution in conversational mode,
+    # If the model attempted to propose an action, explain shell execution, or deflect a system query in conversational mode,
     # hand off to the workspace planner so RiftShell can actually execute it in the terminal.
     if re.search(
         r"Proposed (?:next )?action(?: \(execution not confirmed\))?:\s*(?:shell|code_write)|"
         r"^\s*Command:\s*\S|"
         r"```(?:shell|bash|cmd|powershell|sh|bat)\b|"
         r"^\s*cd\s+(?:/d\s+)?[a-zA-Z]:|"
-        r"\b(?:command prompt|terminal)\b.*?\b(?:run|use|type)\b",
+        r"\b(?:command prompt|terminal)\b.*?\b(?:run|use|type)\b|"
+        r"I don't have access to the (?:current )?system clock|"
+        r"cannot provide the exact (?:current )?date|"
+        r"by running (?:date|time|[a-zA-Z0-9_\-]+) in a terminal",
         answer,
         re.MULTILINE | re.IGNORECASE,
     ):

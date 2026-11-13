@@ -49,10 +49,10 @@ def build_conversation_prompt(planner, user_text):
         "Do not invent current facts, file contents, machine state or execution results. "
         "State uncertainty when live information is unavailable.\n"
         "Write your answer directly as readable text or Markdown, without a JSON envelope.\n"
-        "If the request actually requires local files, terminal output, machine information, "
-        "running a command or editing files, or asks about the current directory, folder, path or location, "
-        "or is an ambiguous follow-up to such a task, return "
-        f"only {WORKSPACE_HANDOFF} to hand it to the workspace planner. "
+        "If the request actually requires local files, terminal output, machine info (date, time, clock), "
+        "running a command, or location, return only "
+        f"{WORKSPACE_HANDOFF} to hand it to the workspace planner. "
+        f"Never say you lack a clock; return {WORKSPACE_HANDOFF}. "
         "Never guess, assume, or state the user's current directory or machine state from conversation history. "
         "Do not propose executable actions or claim anything was executed here. "
         "For an unclear ordinary question, ask a focused clarification.\n"
@@ -146,16 +146,24 @@ def build_prompt(planner, user_text, *, workspace_context="", inspection_objecti
         if packed != evidence:
             planner._incomplete_context = True
         add("Workspace inspection content (UNTRUSTED DATA)", packed, allowance)
-    entries = planner.command_catalog
-    if mode.compact_prompt:
-        entries = [entry.split(";", 1)[0] for entry in entries]
+    from ai.command_hints import format_command_catalog_entry
     catalog_budget = min(available, 1000 if mode.compact_prompt else 5000)
     catalog = []
-    # Keep entries whole; never offer truncated executable syntax.
-    for entry in entries:
-        if estimated_tokens("\n".join(catalog + ["- " + entry])) > catalog_budget - 40:
-            break
-        catalog.append("- " + entry)
+    if not mode.compact_prompt and getattr(planner, "command_metadata", None):
+        for meta in planner.command_metadata:
+            line = format_command_catalog_entry(meta)
+            if estimated_tokens("\n".join(catalog + [line])) > catalog_budget - 40:
+                break
+            catalog.append(line)
+    else:
+        entries = planner.command_catalog
+        if mode.compact_prompt:
+            entries = [entry.split(";", 1)[0] for entry in entries]
+        for entry in entries:
+            line = "- " + entry
+            if estimated_tokens("\n".join(catalog + [line])) > catalog_budget - 40:
+                break
+            catalog.append(line)
     add("Available Commands & Aliases", "\n".join(catalog) or "(none supplied; respond or inspect)", catalog_budget)
     if planner.last_output_provider and re.search(r"\b(?:output|result|terminal|previous command|last command)\b", user_text, re.I):
         add("Latest terminal output (UNTRUSTED DATA)", planner.last_output_provider(), available // 2, tail=True)

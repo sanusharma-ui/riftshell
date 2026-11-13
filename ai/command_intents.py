@@ -93,27 +93,54 @@ BUILTIN_INTENTS = (
     )),
     *(
         fixed(command, message, phrases,
-              (rf"{SHOW}(?:{english})[?!.]?", rf"(?:{hinglish})\s+{HSHOW}[?!.]?"), starts)
+              (rf"(?:{SHOW})?(?:{english})[?!.]?", rf"(?:{hinglish})\s+{HSHOW}[?!.]?"), (*starts, "*"))
         for command, message, phrases, english, hinglish, starts in (
-            ("processes", "I will show the running processes.", ("what is running",),
-             r"(?:running\s+)?(?:processes|tasks)", r"(?:running\s+)?processes", ("show", "list", "display", "processes", "running")),
-            ("system", "I will show system information.", ("system info", "system information"),
-             r"system\s+(?:info|information|details)", r"system\s+(?:info|details)", ("show", "list", "display", "system")),
-            ("memory", "I will show current memory usage.", ("ram usage", "memory usage"),
-             r"(?:ram|memory)\s+usage", r"(?:ram|memory)(?:\s+usage)?", ("show", "list", "display", "ram", "memory")),
-            ("disk", "I will show disk space for the current directory.", ("disk space", "disk usage"),
-             r"(?:disk|free\s+disk)\s+(?:space|usage)", r"disk\s+(?:space|usage)", ("show", "list", "display", "disk")),
-            ("drives", "I will show the available drives.", (), r"(?:available\s+)?drives", r"drives", ("show", "list", "display", "drives")),
-            ("ip", "I will show the IP configuration.", ("what is my ip address",),
-             r"(?:my\s+)?ip(?:\s+(?:address|configuration))?", r"ip(?:\s+address)?", ("show", "list", "display", "ip")),
-            ("network", "I will show network information.", (), r"network\s+(?:info|information)", r"network\s+info", ("show", "list", "display", "network")),
-            ("netstat", "I will show network connections.", (), r"(?:active|network)\s+connections", r"network\s+connections", ("show", "list", "display", "network")),
-            ("history", "I will show this terminal's command history.", (), r"(?:command\s+|terminal\s+)?history", r"(?:command\s+)?history", ("show", "list", "display", "command", "history")),
-            ("now", "I will show the current time.", ("what time is it", "abhi kitne baje hain"), r"(?:current\s+)?time", r"(?:current\s+)?time", ("show", "list", "display", "time", "current")),
-            ("today", "I will show today's date.", ("what is today's date", "aaj ki date batao"), r"(?:current\s+|today's\s+)?date", r"date", ("show", "list", "display", "date")),
-            ("me", "I will show the signed-in user.", ("who am i",), r"(?:current\s+user|my\s+username)", r"current\s+user", ("show", "list", "display", "current")),
-            ("pc", "I will show the computer name.", (), r"(?:computer|pc|machine)\s+name", r"(?:computer|pc)\s+name", ("show", "list", "display", "computer", "pc")),
-            ("uptime", "I will show the system uptime.", ("how long has the computer been on",), r"(?:system\s+)?uptime", r"uptime", ("show", "list", "display", "uptime")),
+            ("processes", "I will show the running processes.", (
+                "what is running", "running processes", "list running processes", "running tasks",
+                "active processes", "abhi kaun kaun se programs chal rahe hain",
+            ), r"(?:running\s+)?(?:processes|tasks)", r"(?:running\s+)?processes", ("show", "list", "display", "processes", "running")),
+            ("system", "I will show system information.", (
+                "system info", "system information", "full system info", "computer specifications",
+                "pc info", "pc ki poori detail bata",
+            ), r"system\s+(?:info|information|details)", r"system\s+(?:info|details)", ("show", "list", "display", "system")),
+            ("memory", "I will show current memory usage.", (
+                "ram usage", "memory usage", "ram kitni bachi hai", "check ram", "how much ram is being used",
+            ), r"(?:ram|memory)\s+usage", r"(?:ram|memory)(?:\s+usage)?", ("show", "list", "display", "ram", "memory")),
+            ("disk", "I will show disk space for the current directory.", (
+                "disk space", "disk usage", "free disk space", "how much disk space is left",
+            ), r"(?:disk|free\s+disk)\s+(?:space|usage)", r"disk\s+(?:space|usage)", ("show", "list", "display", "disk")),
+            ("drives", "I will show the available drives.", (
+                "list all drives", "show drives", "all drives", "available drives", "which drives are available",
+                "is pc me kaun kaun si drives lagi hain",
+            ), r"(?:available\s+)?drives", r"drives", ("show", "list", "display", "drives")),
+            ("ip", "I will show the IP configuration.", (
+                "what is my ip address", "my ip", "what is my ip", "ip address", "ip config", "show ip", "mera ip address kya hai",
+            ), r"(?:my\s+)?ip(?:\s+(?:address|configuration))?", r"ip(?:\s+address)?", ("show", "list", "display", "ip")),
+            ("network", "I will show network information.", (
+                "network info", "network details", "network ki detail dikha",
+            ), r"network\s+(?:info|information)", r"network\s+info", ("show", "list", "display", "network")),
+            ("netstat", "I will show network connections.", (
+                "active connections", "open ports", "network connections", "kaun se ports khule hain",
+            ), r"(?:active|network)\s+connections", r"network\s+connections", ("show", "list", "display", "network")),
+            ("history", "I will show this terminal's command history.", (
+                "command history", "terminal history", "show history",
+            ), r"(?:command\s+|terminal\s+)?history", r"(?:command\s+)?history", ("show", "list", "display", "command", "history")),
+            ("now", "I will show the current time.", (
+                "what time is it", "abhi kitne baje hain", "current time", "what is the time", "time batao", "tell me the time",
+            ), r"(?:current\s+)?time", r"(?:current\s+)?time", ("show", "list", "display", "time", "current")),
+            ("today", "I will show today's date.", (
+                "what is today's date", "aaj ki date batao", "today's date", "today date", "current date",
+                "aaj ki tareekh", "aaj ki date", "aaj kaun si date hai", "give me the date today", "tell me today's date",
+            ), r"(?:current\s+|today's\s+)?date", r"date", ("show", "list", "display", "date")),
+            ("me", "I will show the signed-in user.", (
+                "who am i", "current user", "what is my username", "my username", "main kaun sa user hu",
+            ), r"(?:current\s+user|my\s+username)", r"current\s+user", ("show", "list", "display", "current")),
+            ("pc", "I will show the computer name.", (
+                "pc name", "computer name", "machine name", "hostname", "is computer ka naam kya hai",
+            ), r"(?:computer|pc|machine)\s+name", r"(?:computer|pc)\s+name", ("show", "list", "display", "computer", "pc")),
+            ("uptime", "I will show the system uptime.", (
+                "how long has the computer been on", "system uptime", "uptime", "how long has the machine been up", "pc kab se chalu hai",
+            ), r"(?:system\s+)?uptime", r"uptime", ("show", "list", "display", "uptime")),
             ("plugins", "I will show the installed plugin status.", (), r"(?:installed\s+)?plugins", r"plugins", ("show", "list", "display", "plugins")),
             ("version", "I will show the RiftShell version.", (), r"(?:shell\s+|riftshell\s+)?version", r"(?:shell\s+)?version", ("show", "list", "display", "shell", "version")),
         )
@@ -199,4 +226,12 @@ BUILTIN_INTENTS = (
     IntentRule("ping_host", "ping", "I will ping the requested host.", patterns=(
         r"ping\s+(?P<host>[a-zA-Z0-9][a-zA-Z0-9.-]{0,252})",
     ), starts=("ping",), arguments=("{host}",), slots=(("host", "host"),)),
+    IntentRule("which_program", "which", "I will locate the executable for the requested program.", patterns=(
+        r"(?:which|whereis)\s+(?P<target>[a-zA-Z0-9_\-\.]+)",
+        r"where\s+is\s+(?P<target>[a-zA-Z0-9_\-\.]+)\s+installed",
+        r"full\s+path\s+of\s+(?P<target>[a-zA-Z0-9_\-\.]+)",
+    ), starts=("which", "whereis", "where", "full", "*"), arguments=("{target}",), slots=(("target", "path"),)),
+    fixed("random", "I will pick a random number.", (
+        "roll a dice", "roll dice", "pick a random number", "ek lucky number do",
+    )),
 )

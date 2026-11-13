@@ -43,7 +43,9 @@ REQUEST_START = re.compile(
     r"calculate|compute|evaluate|pick|choose|select|roll|wait|pause|sleep|"
     r"hash|encode|decode|convert|download|fetch|compress|zip|unzip|extract|unpack|package|"
     r"sort|order|filter|keep|omit|skip|drop|count|save|write|redisplay|"
-    r"set|assign|unset|define|use|apply|stage|add|commit|pull|push|upload|bring)\b",
+    r"set|assign|unset|define|use|apply|stage|add|commit|pull|push|upload|bring|"
+    r"today|current|date|time|now|uptime|system|ram|memory|disk|drives|ip|network|"
+    r"netstat|processes|active|who|pc|hostname|calc|random)\b",
     re.I,
 )
 RESERVED_TARGETS = frozenset((
