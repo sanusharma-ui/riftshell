@@ -17,7 +17,7 @@ from .custom_commands import (
     TailCommand, WcCommand, MemoryCommand, UptimeCommand, RunCommand, SetVarCommand,
     UnsetVarCommand, VarsCommand, AliasCommand, UnaliasCommand, FilterCommand,
     SortCommand, UniqueCommand, TakeCommand, SkipCommand, CountCommand, SaveCommand,
-    LastCommand,
+    LastCommand, UpdateCommand,
 )
 
 def build_registry() -> CommandRegistry:
@@ -95,6 +95,7 @@ def build_registry() -> CommandRegistry:
         CountCommand(),
         SaveCommand(),
         LastCommand(),
+        UpdateCommand(),
     ]:
         reg.register(cmd)
 

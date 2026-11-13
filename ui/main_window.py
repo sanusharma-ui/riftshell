@@ -27,6 +27,8 @@ from ai.safety import SafetyPolicy
 from ai.provider_runtime import PROVIDER_RUNTIME
 from ui.themes import build_stylesheet, get_theme, list_themes
 from ui.terminal_output import TerminalOutput
+from version import __version__
+from update_ui import UpdateController
 
 
 def pending_action_reply(text: str) -> str | None:
@@ -277,6 +279,7 @@ class CommandPalette(QDialog):
             ("action", "Open settings", "Theme, font and safety preferences"),
             ("action", "Toggle Orbit", "Show or hide the smart assistant panel"),
             ("action", "Show plugins", "Inspect loaded plugin status"),
+            ("action", "Check for updates", "Check for a newer RiftShell release"),
         ]
         self._entries.extend(("command", meta.name, f"{meta.usage} — {meta.description}") for meta in shell.registry.list_metadata())
         self.query.textChanged.connect(self._refresh)
@@ -803,6 +806,9 @@ class TerminalSession(QWidget):
             (self.append_output if result.success else self.append_error)(result.output)
         if result.actions.get("theme"):
             self.window().apply_theme(str(result.actions["theme"]))
+        if result.actions.get("update"):
+            if hasattr(self.window(), "update_controller"):
+                self.window().update_controller.check(silent=False)
         self.path_label.setText(f"{self.shell.ctx.cwd}")
         self.input.set_history(self.shell.ctx.history)
         if self.shell.ctx.history:
@@ -1359,15 +1365,17 @@ class MainWindow(QMainWindow):
         self.history = self._load_history() if self.preferences["restore_history"] else []
         self._orbit_execution: tuple[TerminalSession, str] | None = None
         self._orbit_write_worker: FileWriteWorker | None = None
-        self.setWindowTitle("RiftShell — Developer Workspace")
+        self.setWindowTitle(f"RiftShell v{__version__} — Developer Workspace")
         self.resize(1440, 880)
         self.setMinimumSize(1080, 680)
         self.setStyleSheet(build_stylesheet(self.theme))
         self.setFont(QFont("Segoe UI", 10))
+        self.update_controller = UpdateController(self)
         self._build_workspace()
         self._install_shortcuts()
         self.new_session()
         self._refresh_workspace()
+        QTimer.singleShot(3000, lambda: self.update_controller.check(silent=True))
 
     def _load_preferences(self) -> dict:
         try:
@@ -1450,6 +1458,7 @@ class MainWindow(QMainWindow):
         for label, callback in [
             ("Command Palette", self.open_palette), ("Command History", self.show_history),
             ("Command Explorer", self.show_command_explorer), ("Workspace Settings", self.open_settings),
+            ("Check for Updates", lambda: self.update_controller.check(silent=False)),
         ]:
             button = QPushButton(label)
             button.setObjectName("navButton")
@@ -1597,6 +1606,7 @@ class MainWindow(QMainWindow):
         callbacks = {
             "New terminal session": self.new_session, "Open settings": self.open_settings,
             "Toggle Orbit": self.toggle_orbit, "Show plugins": self.show_plugins,
+            "Check for updates": lambda: self.update_controller.check(silent=False),
         }
         if callback := callbacks.get(action):
             callback()

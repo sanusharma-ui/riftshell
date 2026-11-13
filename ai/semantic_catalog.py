@@ -65,6 +65,7 @@ SEMANTIC_INTENTS = (
         ("gpush", ("Push my commits to the Git remote", "Upload this branch's commits to the remote repository")),
         ("gremote", ("List configured Git remotes", "Which remote repositories are configured?")),
         ("hello", ("Run the hello plugin test command", "Execute the hello extension's test")),
+        ("update", ("Check online if an update is available to download and install", "Upgrade this program to the latest patch")),
     )),
     intent("theme", "List the available interface themes", "Which colour themes are available?", key="theme_list", arguments=("list",)),
     intent("theme", "Tell me the current interface theme", "Which colour theme am I using?", key="theme_current", arguments=("current",)),

@@ -21,6 +21,7 @@ import json
 
 from core.base import BaseCommand, CommandResult
 from ui.themes import get_theme, list_themes
+from version import __version__
 from utils.safe_fs import (
     resolve_path,
     unquote_path,
@@ -622,7 +623,20 @@ class VersionCommand(BaseCommand):
     usage = "version"
 
     def execute(self, ctx, args):
-        return CommandResult(output="RiftShell v1.0")
+        return CommandResult(output=f"RiftShell v{__version__}")
+
+
+class UpdateCommand(BaseCommand):
+    name = "update"
+    aliases = ["upgrade"]
+    description = "Check for a new RiftShell version and install it."
+    usage = "update"
+
+    def execute(self, ctx, args):
+        return CommandResult(
+            output="Checking for updates...",
+            actions={"update": True},
+        )
 
 
 class EchoCommand(BaseCommand):

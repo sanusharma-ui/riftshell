@@ -178,6 +178,10 @@ HINTS: dict[str, dict[str, Any]] = {
         "examples": [("shell version", "version"), ("which version of riftshell", "version"), ("ye shell ka konsa version hai?", "version")],
         "note": "Shows the RiftShell and Python versions.",
     },
+    "update": {
+        "examples": [("check for updates", "update"), ("RiftShell ka naya version check kar", "update"), ("update riftshell", "update")],
+        "note": "Checks for a newer version of RiftShell and prompts to install it. 'upgrade' is an alias.",
+    },
     "disk": {
         "examples": [("how much disk space is left", "disk"), ("disk usage of D:", "disk D:\\"), ("C drive me kitni jagah bachi?", "disk C:\\")],
         "note": "Shows free and used disk space for a drive or directory.",
