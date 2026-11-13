@@ -16,7 +16,7 @@ from typing import Callable
 
 from version import __version__
 
-MANIFEST_URL = "https://REPLACE-ME/version.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/sanusharma-ui/riftshell/main/version.json"
 
 
 def parse_version(version_str: str) -> tuple[int, ...]:
