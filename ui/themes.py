@@ -718,10 +718,87 @@ QPushButton#stopButton:hover {{
         if is_obsidian
         else f"background-color: {theme.bg};"
     )
+    if is_obsidian:
+        title_bar_bg = (
+            "background: qlineargradient(x1: 0.1, y1: 0.85, x2: 0.9, y2: 0.15, "
+            "stop: 0 #151022, stop: 0.45 #0A090F, stop: 0.75 #0C0B12, stop: 1 #181710); "
+            "border-bottom: 1px solid rgba(233, 222, 250, 0.18);"
+        )
+    elif is_ghost:
+        title_bar_bg = "background: transparent; border-bottom: 1px solid rgba(61, 224, 245, 0.12);"
+    elif is_cyber:
+        title_bar_bg = "background-color: #0C131B; border-bottom: 1px solid rgba(61, 224, 245, 0.25);"
+    else:
+        title_bar_bg = f"background-color: {theme.bg}; border-bottom: 1px solid {theme.panelBorder};"
 
     return f"""
 QMainWindow {{
     {window_background_css}
+    border: 1px solid {theme.panelBorder};
+}}
+
+QWidget#customTitleBar {{
+    {title_bar_bg}
+    min-height: 40px;
+    max-height: 40px;
+}}
+
+QLabel#titleBrand {{
+    color: {theme.text};
+    font-size: 13px;
+    font-weight: 700;
+    font-family: "Inter", "Geist", "Segoe UI Variable Text", sans-serif;
+    padding-left: 2px;
+}}
+
+QLabel#titleBadge {{
+    background: transparent;
+    color: {theme.textMuted};
+    border: none;
+    padding: 0px;
+    font-size: 11px;
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 500;
+}}
+
+QLabel#titleCenterPill {{
+    background: transparent;
+    color: {theme.textMuted};
+    border: none;
+    padding: 0px;
+    font-size: 12px;
+    font-family: "JetBrains Mono", "Cascadia Code", monospace;
+    font-weight: 500;
+}}
+
+QPushButton#titleMinBtn, QPushButton#titleMaxBtn, QPushButton#titleCloseBtn {{
+    background-color: transparent;
+    color: {theme.textMuted};
+    border: none;
+    border-radius: 0px;
+    padding: 0px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: "Segoe UI", sans-serif;
+    min-width: 48px;
+    max-width: 48px;
+    min-height: 40px;
+    max-height: 40px;
+}}
+
+QPushButton#titleMinBtn:hover, QPushButton#titleMaxBtn:hover {{
+    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.08)"};
+    color: {theme.accent};
+}}
+
+QPushButton#titleCloseBtn:hover {{
+    background-color: {theme.danger};
+    color: #FFFFFF;
+}}
+
+QPushButton#titleCloseBtn:pressed {{
+    background-color: {theme.danger};
+    color: #FFFFFF;
 }}
 
 QWidget {{

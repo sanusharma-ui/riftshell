@@ -8,10 +8,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from PySide6.QtCore import (
-    QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
+    QEasingCurve, QEvent, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
     QSettings, QStringListModel, Qt, QThread, QTimer, Signal,
 )
-from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut, QTextCursor, QTextOption
+from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QShortcut, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
@@ -142,6 +142,114 @@ def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, dur
     dialog._flip_anim = group
     dialog.show()
     group.start()
+
+
+class CustomTitleBar(QWidget):
+    def __init__(self, parent: MainWindow):
+        super().__init__(parent)
+        self.parent_window = parent
+        self.setObjectName("customTitleBar")
+        self.setFixedHeight(40)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setSpacing(8)
+
+        self.icon_label = QLabel()
+        self.icon_label.setObjectName("titleIcon")
+        self.icon_label.setFixedSize(18, 18)
+        self.icon_label.setScaledContents(True)
+        icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
+        if icon_path.exists():
+            self.icon_label.setPixmap(QPixmap(str(icon_path)))
+        layout.addWidget(self.icon_label)
+
+        self.brand_label = QLabel("RiftShell")
+        self.brand_label.setObjectName("titleBrand")
+        layout.addWidget(self.brand_label)
+
+        self.version_badge = QLabel(f"v{__version__}")
+        self.version_badge.setObjectName("titleBadge")
+        layout.addWidget(self.version_badge)
+
+        layout.addStretch(1)
+
+        self.center_pill = QLabel("DEVELOPER WORKSPACE", self)
+        self.center_pill.setObjectName("titleCenterPill")
+        self.center_pill.setAlignment(Qt.AlignCenter)
+        self.center_pill.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.center_pill.show()
+
+        self.setCursor(Qt.ArrowCursor)
+        self.min_btn = QPushButton("—")
+        self.min_btn.setObjectName("titleMinBtn")
+        self.min_btn.setToolTip("Minimize")
+        self.min_btn.setFixedSize(48, 40)
+        self.min_btn.setCursor(Qt.ArrowCursor)
+
+        self.max_btn = QPushButton("□")
+        self.max_btn.setObjectName("titleMaxBtn")
+        self.max_btn.setToolTip("Maximize / Restore")
+        self.max_btn.setFixedSize(48, 40)
+        self.max_btn.setCursor(Qt.ArrowCursor)
+
+        self.close_btn = QPushButton("×")
+        self.close_btn.setObjectName("titleCloseBtn")
+        self.close_btn.setToolTip("Close")
+        self.close_btn.setFixedSize(48, 40)
+        self.close_btn.setCursor(Qt.ArrowCursor)
+
+        layout.addWidget(self.min_btn)
+        layout.addWidget(self.max_btn)
+        layout.addWidget(self.close_btn)
+
+        self.min_btn.clicked.connect(self.parent_window.showMinimized)
+        self.max_btn.clicked.connect(self._toggle_maximize)
+        self.close_btn.clicked.connect(self.parent_window.close)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_center_pill()
+
+    def _position_center_pill(self):
+        label_width = self.center_pill.sizeHint().width()
+        label_height = self.height()
+        self.center_pill.setGeometry(
+            max(0, (self.width() - label_width) // 2),
+            0,
+            label_width,
+            label_height,
+        )
+
+    def _toggle_maximize(self):
+        if self.parent_window.isMaximized():
+            self.parent_window.showNormal()
+            self.max_btn.setText("□")
+        else:
+            self.parent_window.showMaximized()
+            self.max_btn.setText("⧉")
+
+    def update_max_icon(self, is_maximized: bool):
+        self.max_btn.setText("⧉" if is_maximized else "□")
+
+    def set_workspace_text(self, text: str):
+        self.center_pill.setText(text)
+        self.center_pill.adjustSize()
+        self._position_center_pill()
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._toggle_maximize()
+            event.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            wh = self.parent_window.windowHandle()
+            if wh and hasattr(wh, "startSystemMove"):
+                wh.startSystemMove()
+                event.accept()
+                return
+        super().mousePressEvent(event)
 
 
 class CommandInput(QLineEdit):
@@ -1496,6 +1604,7 @@ class OrbitPanel(QFrame):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.settings = QSettings("RiftShell", "RiftShell")
         self.preferences = self._load_preferences()
         self.theme = get_theme(self.preferences["theme"])
@@ -1503,6 +1612,9 @@ class MainWindow(QMainWindow):
         self._orbit_execution: tuple[TerminalSession, str] | None = None
         self._orbit_write_worker: FileWriteWorker | None = None
         self.setWindowTitle(f"RiftShell v{__version__} — Developer Workspace")
+        icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1440, 880)
         self.setMinimumSize(1080, 680)
         self.setStyleSheet(build_stylesheet(self.theme))
@@ -1548,10 +1660,10 @@ class MainWindow(QMainWindow):
         return value if isinstance(value, list) else []
 
     def _build_workspace(self):
+        self.title_bar = CustomTitleBar(self)
         root = QSplitter(Qt.Horizontal)
         root.setHandleWidth(5)
         root.setChildrenCollapsible(False)
-        self.setCentralWidget(root)
         root.addWidget(self._build_sidebar())
         self.tabs = QTabWidget()
         self.tabs.setObjectName("workspaceTabs")
@@ -1567,6 +1679,16 @@ class MainWindow(QMainWindow):
         root.addWidget(self.orbit)
         root.setSizes([260, 880, 300])
         self.root_splitter = root
+
+        container = QWidget()
+        container.setObjectName("windowContainer")
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+        container_layout.addWidget(self.title_bar)
+        container_layout.addWidget(root, 1)
+        self.setCentralWidget(container)
+
         self.status_label = QLabel()
         self.statusBar().addWidget(self.status_label, 1)
         self.safety_label = QLabel("SAFE MODE")
@@ -1709,6 +1831,10 @@ class MainWindow(QMainWindow):
             self.tabs.setTabText(index, tab.title)
         self.session_list.blockSignals(False)
         if session:
+            if hasattr(self, "title_bar"):
+                current_cwd = str(session.shell.ctx.cwd)
+                folder_name = Path(current_cwd).name or current_cwd
+                self.title_bar.set_workspace_text(f"DEVELOPER WORKSPACE  —  {folder_name}")
             plugins = session.shell.ctx.plugins
             loaded = len(plugins.loaded) if plugins else 0
             failed = len(plugins.failed) if plugins else 0
@@ -1867,6 +1993,12 @@ class MainWindow(QMainWindow):
             if session := self.tabs.widget(index):
                 session.apply_preferences(preferences)
 
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.WindowStateChange:
+            if hasattr(self, "title_bar"):
+                self.title_bar.update_max_icon(self.isMaximized())
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if getattr(self, "theme", None) and self.theme.key == "ghost":
@@ -1889,6 +2021,28 @@ class MainWindow(QMainWindow):
         self.preferences["theme"] = self.theme.key
         self.settings.setValue("appearance/theme", self.theme.key)
         self.setStyleSheet(build_stylesheet(self.theme))
+        if sys.platform == "win32":
+            try:
+                hwnd = int(self.winId())
+                dark_val = ctypes.c_int(1)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    ctypes.c_void_p(hwnd),
+                    ctypes.c_uint32(20),  # DWMWA_USE_IMMERSIVE_DARK_MODE
+                    ctypes.byref(dark_val),
+                    ctypes.sizeof(dark_val),
+                )
+                h = self.theme.bg.lstrip("#")
+                if len(h) == 6:
+                    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+                    color = ctypes.c_uint32((b << 16) | (g << 8) | r)
+                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        ctypes.c_void_p(hwnd),
+                        ctypes.c_uint32(35),  # DWMWA_CAPTION_COLOR
+                        ctypes.byref(color),
+                        ctypes.sizeof(color),
+                    )
+            except Exception:
+                pass
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 session.shell.ctx.current_theme = self.theme.key

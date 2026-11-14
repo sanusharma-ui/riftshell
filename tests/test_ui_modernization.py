@@ -78,6 +78,11 @@ class UIModernizationTests(unittest.TestCase):
             self.assertIn("QLineEdit#orbitInput", sheet)
             self.assertIn("QTextEdit#orbitConversation", sheet)
             self.assertIn("QTextEdit#terminalOutput", sheet)
+            self.assertIn("QWidget#customTitleBar", sheet)
+            self.assertIn("QPushButton#titleCloseBtn", sheet)
+            self.assertIn("QLabel#titleBrand", sheet)
+            self.assertIn("QLabel#titleBadge", sheet)
+            self.assertIn("QLabel#titleCenterPill", sheet)
             self.assertNotIn(":root", sheet)
 
     def test_no_qss_parse_warnings(self):
@@ -155,3 +160,29 @@ class UIModernizationTests(unittest.TestCase):
         anim = dlg._flip_anim
         self.assertIsNotNone(anim)
         dlg.close()
+
+    def test_custom_title_bar(self):
+        from PySide6.QtWidgets import QApplication, QMainWindow
+        from ui.main_window import CustomTitleBar
+
+        _ = QApplication.instance() or QApplication(["output-tests", "-platform", "offscreen"])
+        mw = QMainWindow()
+        tb = CustomTitleBar(mw)
+
+        self.assertEqual(tb.brand_label.text(), "RiftShell")
+        self.assertTrue(tb.version_badge.text().startswith("v"))
+        self.assertIn("DEVELOPER WORKSPACE", tb.center_pill.text())
+        tb.set_workspace_text("DEVELOPER WORKSPACE  —  riftshell")
+        self.assertEqual(tb.center_pill.text(), "DEVELOPER WORKSPACE  —  riftshell")
+
+        self.assertEqual(tb.min_btn.text(), "—")
+        self.assertEqual(tb.max_btn.text(), "□")
+        self.assertEqual(tb.close_btn.text(), "×")
+        self.assertEqual(tb.height(), 40)
+        self.assertEqual(tb.min_btn.size(), tb.max_btn.size())
+        self.assertEqual(tb.max_btn.size(), tb.close_btn.size())
+        self.assertEqual(tb.min_btn.width(), 48)
+        tb.update_max_icon(True)
+        self.assertEqual(tb.max_btn.text(), "⧉")
+        tb.update_max_icon(False)
+        self.assertEqual(tb.max_btn.text(), "□")
