@@ -15,10 +15,12 @@ from pathlib import Path
 import random
 import hashlib
 import base64
+import re
 import urllib.request
 import json
 import tempfile
 import zipfile
+import webbrowser
 
 
 from core.base import BaseCommand, CommandResult
@@ -338,22 +340,188 @@ class ReadCommand(BaseCommand):
             return CommandResult(output=f"Read error: {e}", success=False)
 
 
+WEB_SHORTCUTS = {
+    "youtube": "https://www.youtube.com",
+    "google": "https://www.google.com",
+    "github": "https://github.com",
+    "chatgpt": "https://chatgpt.com",
+    "netflix": "https://www.netflix.com",
+    "spotify": "https://open.spotify.com",
+    "facebook": "https://www.facebook.com",
+    "instagram": "https://www.instagram.com",
+    "whatsapp": "https://web.whatsapp.com",
+    "twitter": "https://x.com",
+    "x": "https://x.com",
+    "reddit": "https://www.reddit.com",
+    "gmail": "https://mail.google.com",
+    "mail": "https://mail.google.com",
+    "email": "https://mail.google.com",
+}
+
+WINDOWS_SYSTEM_APPS = {
+    "notepad": "notepad.exe",
+    "calculator": "calc.exe",
+    "calc": "calc.exe",
+    "explorer": "explorer.exe",
+    "files": "explorer.exe",
+    "file explorer": "explorer.exe",
+    "paint": "mspaint.exe",
+    "mspaint": "mspaint.exe",
+    "settings": "ms-settings:",
+    "cmd": "cmd.exe",
+    "command prompt": "cmd.exe",
+    "terminal": "powershell.exe",
+    "powershell": "powershell.exe",
+    "task manager": "taskmgr.exe",
+    "taskmgr": "taskmgr.exe",
+}
+
+
+def find_registered_app_path(name: str) -> str | None:
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+        for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            for candidate in (name, f"{name}.exe"):
+                try:
+                    k = winreg.OpenKey(root, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{candidate}")
+                    val, _ = winreg.QueryValueEx(k, "")
+                    if val:
+                        cleaned = str(val).strip("\"'")
+                        if Path(cleaned).exists():
+                            return cleaned
+                except OSError:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
 class OpenCommand(BaseCommand):
     name = "open"
-    aliases = ["start"]
-    description = "Open a file or folder."
-    usage = "open <path>"
+    aliases = ["start", "launch"]
+    description = "Open a file, folder, application, URL, or website."
+    usage = "open <path|url|app_name>"
 
     def execute(self, ctx, args):
         if not args:
-            return CommandResult(output="Usage: open <path>", success=False)
+            return CommandResult(output="Usage: open <path|url|app_name>", success=False)
 
-        target = resolve_path(ctx, args[0])
-        if not target.exists():
-            return CommandResult(output=f"Not found: {target}", success=False)
+        raw_query = " ".join(args).strip().strip("\"'")
+        first_arg = args[0].strip().strip("\"'")
 
-        os.startfile(str(target))
-        return CommandResult(output=f"Opened: {target}")
+        # 1. Local path check (preserves exact existing behavior)
+        target = resolve_path(ctx, raw_query)
+        if target.exists():
+            try:
+                os.startfile(str(target))
+                return CommandResult(output=f"Opened: {target}")
+            except Exception as e:
+                return CommandResult(output=f"Error opening {target}: {e}", success=False)
+
+        if len(args) > 1:
+            first_target = resolve_path(ctx, first_arg)
+            if first_target.exists():
+                try:
+                    os.startfile(str(first_target))
+                    return CommandResult(output=f"Opened: {first_target}")
+                except Exception as e:
+                    return CommandResult(output=f"Error opening {first_target}: {e}", success=False)
+
+        normalized = raw_query.lower()
+
+        # 2. Known web shortcut
+        if normalized in WEB_SHORTCUTS:
+            url = WEB_SHORTCUTS[normalized]
+            webbrowser.open(url)
+            return CommandResult(output=f"Opened {raw_query.title()} ({url})")
+
+        # 3. Direct URL or domain check
+        if re.match(r"^https?://", normalized) or re.match(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?(?:/[^\s]*)?$", normalized):
+            url = raw_query if raw_query.startswith(("http://", "https://")) else f"https://{raw_query}"
+            webbrowser.open(url)
+            return CommandResult(output=f"Opened URL: {url}")
+
+        # 4. Known Windows system utilities
+        if normalized in WINDOWS_SYSTEM_APPS:
+            app_target = WINDOWS_SYSTEM_APPS[normalized]
+            if app_target.startswith("ms-"):
+                webbrowser.open(app_target)
+            else:
+                options = {}
+                if os.name == "nt" and app_target in {"cmd.exe", "powershell.exe"}:
+                    options["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+                try:
+                    os.startfile(app_target)
+                except Exception:
+                    subprocess.Popen([app_target], **options)
+            return CommandResult(output=f"Opened {raw_query.title()}.")
+
+        # 5. Check Windows App Paths (Registry - Chrome, Edge, VS Code, Discord, etc.)
+        if reg_app := find_registered_app_path(normalized):
+            try:
+                os.startfile(reg_app)
+                return CommandResult(output=f"Opened application: {Path(reg_app).stem}")
+            except Exception:
+                subprocess.Popen([reg_app])
+                return CommandResult(output=f"Opened application: {Path(reg_app).stem}")
+
+        # 6. Check system PATH executables
+        if path_exec := (shutil.which(raw_query) or shutil.which(f"{raw_query}.exe")):
+            try:
+                os.startfile(path_exec)
+                return CommandResult(output=f"Opened program: {Path(path_exec).stem}")
+            except Exception:
+                subprocess.Popen([path_exec])
+                return CommandResult(output=f"Opened program: {Path(path_exec).stem}")
+
+        # 7. Search Windows Start Menu for installed apps
+        if os.name == "nt":
+            roots = []
+            for var in ("APPDATA", "PROGRAMDATA"):
+                val = os.environ.get(var)
+                if val:
+                    roots.append(Path(val) / "Microsoft" / "Windows" / "Start Menu" / "Programs")
+            candidates = []
+            for root in roots:
+                if root.is_dir():
+                    candidates.extend(
+                        p for p in root.rglob("*.lnk")
+                        if p.is_file() and not re.search(r"\b(uninstall|remove|setup|install)\b", p.stem, re.I)
+                    )
+            exact = [p for p in candidates if p.stem.casefold() == normalized]
+            matches = exact or [p for p in candidates if normalized in p.stem.casefold()]
+            if matches:
+                chosen = matches[0]
+                try:
+                    os.startfile(str(chosen))
+                    return CommandResult(output=f"Opened application: {chosen.stem}")
+                except Exception as e:
+                    return CommandResult(output=f"Failed to launch {chosen.stem}: {e}", success=False)
+
+        # 8. Fallback: Search common user folders if given a filename (e.g. report.pdf)
+        safe_exts = {".pdf", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".docx", ".xlsx", ".pptx", ".csv", ".zip"}
+        filename_cand = Path(raw_query)
+        if filename_cand.suffix.lower() in safe_exts:
+            for folder in (Path.home() / "Desktop", Path.home() / "Documents", Path.home() / "Downloads"):
+                cand = folder / raw_query
+                if cand.is_file():
+                    try:
+                        os.startfile(str(cand))
+                        return CommandResult(output=f"Opened file: {cand}")
+                    except Exception as e:
+                        return CommandResult(output=f"Error opening {cand}: {e}", success=False)
+
+        # 9. Generic Windows shell open fallback
+        if os.name == "nt":
+            try:
+                os.startfile(raw_query)
+                return CommandResult(output=f"Opened: {raw_query}")
+            except Exception:
+                pass
+
+        return CommandResult(output=f"Not found: {raw_query}. Specify an existing file/folder, URL, or installed application name.", success=False)
 
 
 class DuplicateCommand(BaseCommand):
@@ -1519,4 +1687,160 @@ class LastCommand(BaseCommand):
 
     def execute(self, ctx, args):
         return CommandResult(output=ctx.last_output or "(no previous output)")
+
+
+class BrowserCommand(BaseCommand):
+    name = "browser"
+    aliases = ["browse"]
+    description = "Control an automated browser via Playwright (open, search, control tabs, media)."
+    usage = "browser <open|search|control|tab|play|pause|click|fill|tabs|close> [args]"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(
+                output="Usage: browser <open|search|control|tab|play|pause|click|fill|tabs|close> [args]",
+                success=False,
+            )
+
+        sub = args[0].lower().strip()
+        from utils.browser import get_browser_controller, BrowserError
+
+        try:
+            ctrl = get_browser_controller()
+        except Exception as e:
+            return CommandResult(output=f"Browser error: {e}", success=False)
+
+        try:
+            if sub == "open":
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser open <url>", success=False)
+                url = " ".join(args[1:]).strip()
+                res = ctrl.open_url(url)
+                return CommandResult(output=res)
+
+            elif sub == "search":
+                if len(args) < 2:
+                    return CommandResult(
+                        output="Usage: browser search <query> [--engine google|youtube|bing|duckduckgo]",
+                        success=False,
+                    )
+                remaining = list(args[1:])
+                engine = "Google"
+                if "--engine" in remaining:
+                    idx = remaining.index("--engine")
+                    if idx + 1 < len(remaining):
+                        engine = remaining[idx + 1]
+                        remaining = remaining[:idx] + remaining[idx + 2:]
+                    else:
+                        remaining = remaining[:idx]
+                query = " ".join(remaining).strip()
+                res = ctrl.search(query, engine=engine)
+                return CommandResult(output=res)
+
+            elif sub == "control":
+                if len(args) < 2:
+                    return CommandResult(
+                        output="Usage: browser control <back|forward|refresh|new_tab|close_tab|tabs|scroll_up|scroll_down|top|bottom|play|pause>",
+                        success=False,
+                    )
+                action = args[1].lower().strip()
+                res = ctrl.control(action)
+                return CommandResult(output=res)
+
+            elif sub in {"tabs", "tablist"}:
+                res = ctrl.control("tabs")
+                return CommandResult(output=res)
+
+            elif sub == "tab":
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser tab <number>", success=False)
+                try:
+                    num = int(args[1])
+                except ValueError:
+                    return CommandResult(output="Tab index must be an integer.", success=False)
+                res = ctrl.switch_tab(num)
+                return CommandResult(output=res)
+
+            elif sub == "play":
+                if len(args) > 1 and args[1].isdigit():
+                    res = ctrl.play_result(int(args[1]))
+                else:
+                    res = ctrl.control("play")
+                return CommandResult(output=res)
+
+            elif sub == "pause":
+                res = ctrl.control("pause")
+                return CommandResult(output=res)
+
+            elif sub in {"back", "forward", "refresh", "scroll_up", "scroll_down", "top", "bottom", "new_tab", "close_tab"}:
+                res = ctrl.control(sub)
+                return CommandResult(output=res)
+
+            elif sub == "click":
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser click <button/link text>", success=False)
+                target = " ".join(args[1:]).strip()
+                res = ctrl.click_matching(target)
+                return CommandResult(output=res)
+
+            elif sub == "fill":
+                if len(args) < 3:
+                    return CommandResult(output="Usage: browser fill <ref> <text>", success=False)
+                ref = args[1]
+                val = " ".join(args[2:])
+                res = ctrl.fill_element(ref, val)
+                return CommandResult(output=res)
+
+            elif sub in {"context", "snapshot"}:
+                res = ctrl.page_context()
+                return CommandResult(output=res)
+
+            elif sub in {"close", "quit", "exit"}:
+                ctrl.close()
+                return CommandResult(output="Controlled browser closed.")
+
+            else:
+                return CommandResult(
+                    output=f"Unknown browser subcommand '{sub}'.\nUsage: browser <open|search|control|tab|play|pause|click|fill|tabs|close>",
+                    success=False,
+                )
+
+        except BrowserError as exc:
+            return CommandResult(output=f"Browser: {exc}", success=False)
+        except Exception as exc:
+            return CommandResult(output=f"Browser error: {exc}", success=False)
+
+
+class NoteCommand(BaseCommand):
+    name = "note"
+    aliases = ["notes"]
+    description = "Quickly create a timestamped note and open it in Notepad."
+    usage = "note <text to record>"
+
+    def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output="Usage: note <text to record>", success=False)
+
+        text = " ".join(args).strip()
+        if not text:
+            return CommandResult(output="Please provide note content.", success=False)
+
+        notes_dir = Path.home() / "Documents" / "RiftShell Notes"
+        try:
+            try:
+                notes_dir.mkdir(parents=True, exist_ok=True)
+            except (OSError, PermissionError):
+                notes_dir = ctx.cwd / ".riftshell_notes"
+                notes_dir.mkdir(parents=True, exist_ok=True)
+
+            now = datetime.now()
+            note_file = notes_dir / f"note-{now:%Y%m%d-%H%M%S}.txt"
+            content = f"--- RiftShell Note ---\nDate: {now:%Y-%m-%d %H:%M:%S}\n\n{text}\n"
+            note_file.write_text(content, encoding="utf-8-sig")
+
+            subprocess.Popen(["notepad.exe", str(note_file)])
+            return CommandResult(output=f"Note saved and opened in Notepad: {note_file}")
+        except Exception as exc:
+            return CommandResult(output=f"Could not create note: {exc}", success=False)
+
     

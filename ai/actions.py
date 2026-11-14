@@ -102,7 +102,7 @@ class AgentAction:
         objective = str(payload.get("objective", "")).strip()
         continue_after_result = payload.get("continue_after_result") is True
 
-        if action not in {"respond", "shell", "screenshot", "code_write", "inspect"}:
+        if action not in {"respond", "shell", "screenshot", "code_write", "inspect", "browser"}:
             action = "respond"
             message = message or "I could not map that safely."
 

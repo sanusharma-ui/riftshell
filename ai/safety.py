@@ -84,6 +84,11 @@ class SafetyPolicy:
             # The planner only emits this action for an explicit screenshot
             # request, so a second confirmation would add needless friction.
             return SafetyDecision(False, "Explicit screenshot request.", "low")
+        if action == "browser":
+            cmd = command.strip().lower()
+            if cmd.startswith("fill ") and any(k in cmd for k in ("password", "pass", "credit", "card", "token", "key")):
+                return self._approval("Browser form fill with sensitive credentials requires approval.", level="high")
+            return SafetyDecision(False, "Browser action.", "low")
         if action != "shell":
             return SafetyDecision(False, "Conversational response.", "low")
         return self.check_shell_command(command)
@@ -151,7 +156,7 @@ class SafetyPolicy:
                 if name in {
                     "alias", "duplicate", "copy", "makefile", "touch", "makefolder",
                     "mkdir", "open", "start", "save", "setvar", "let", "theme",
-                    "zip", "compress",
+                    "zip", "compress", "note", "browser",
                 }:
                     medium_reason = f"`{name}` makes a local, limited, and recoverable change."
 

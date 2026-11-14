@@ -19,7 +19,12 @@ class TelegramControlService:
     def running(self) -> bool:
         return bool(self._thread and self._thread.is_alive())
 
-    def start(self, config: AIConfig, on_error: Callable[[Exception], None] | None = None) -> None:
+    def start(
+        self,
+        config: AIConfig,
+        on_error: Callable[[Exception], None] | None = None,
+        on_command_completed: Callable[[str, object], None] | None = None,
+    ) -> None:
         problems = config.validate_for_telegram()
         if problems:
             raise ValueError("; ".join(problems))
@@ -31,7 +36,7 @@ class TelegramControlService:
                 self._thread = None
                 if old_bot is not None:
                     old_bot.stop()
-            bot = TelegramAIBot(config)
+            bot = TelegramAIBot(config, on_command_completed=on_command_completed)
             thread = threading.Thread(
                 target=self._run,
                 args=(bot, on_error),

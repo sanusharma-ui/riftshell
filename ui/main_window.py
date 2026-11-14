@@ -987,6 +987,16 @@ class TerminalSession(QWidget):
     def append_error(self, text: str):
         self.append_html(text, self._theme().error, "!")
 
+    def append_external_command(self, command: str, result):
+        """Display a command executed by a remote control channel."""
+        self.append_html(f"{self.shell.prompt()}{command}", self._theme().accent_alt, "$")
+        if result.output:
+            (self.append_output if result.success else self.append_error)(result.output)
+        self.shell.ctx.history.append(command)
+        self.input.set_history(self.shell.ctx.history)
+        self.path_label.setText(f"{self.shell.ctx.cwd}")
+        self.session_changed.emit()
+
     def clear_console(self):
         self.console.clear()
         if self.native:
@@ -1672,12 +1682,15 @@ class OrbitPanel(QFrame):
 
 
 class MainWindow(QMainWindow):
+    telegram_command_received = Signal(str, object)
+
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.settings = QSettings("RiftShell", "RiftShell")
         self.preferences = self._load_preferences()
         self.telegram_service = TelegramControlService()
+        self.telegram_command_received.connect(self._display_telegram_command)
         self.theme = get_theme(self.preferences["theme"])
         self.history = self._load_history() if self.preferences["restore_history"] else []
         self._orbit_execution: tuple[TerminalSession, str] | None = None
@@ -2085,7 +2098,11 @@ class MainWindow(QMainWindow):
             self.telegram_service.stop()
             return
         try:
-            self.telegram_service.start(load_desktop_config(), on_error=self._telegram_error)
+            self.telegram_service.start(
+                load_desktop_config(),
+                on_error=self._telegram_error,
+                on_command_completed=self._telegram_command_completed,
+            )
             self.status_label.setText("Telegram control enabled")
             if notify:
                 QMessageBox.information(self, "Telegram connected", "Telegram connected")
@@ -2097,6 +2114,14 @@ class MainWindow(QMainWindow):
 
     def _telegram_error(self, error: Exception):
         QTimer.singleShot(0, lambda: self.status_label.setText(f"Telegram stopped: {error}"))
+
+    def _telegram_command_completed(self, command: str, result):
+        self.telegram_command_received.emit(command, result)
+
+    def _display_telegram_command(self, command: str, result):
+        session = self.current_session()
+        if session is not None:
+            session.append_external_command(command, result)
 
     def changeEvent(self, event):
         super().changeEvent(event)

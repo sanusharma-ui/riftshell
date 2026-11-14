@@ -327,8 +327,11 @@ class AgentPlanner:
         self._inspection_passes = 0
         self._incomplete_context = False
         self._task_origin_dir = self.current_dir_provider() if self.current_dir_provider else self.config.workspace_root
-        explicit_command = user_text.strip().lower().startswith("/cmd ") or (
-            user_text.strip().lower() in {name.lower() for name in self.command_names}
+        user_words = user_text.strip().split()
+        first_word = user_words[0].lower() if user_words else ""
+        explicit_command = (
+            user_text.strip().lower().startswith("/cmd ")
+            or user_text.strip().lower() in {name.lower() for name in self.command_names}
         )
         route = QueryIntent()
         if not explicit_command and self._model_routing_enabled():

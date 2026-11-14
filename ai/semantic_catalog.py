@@ -112,6 +112,9 @@ SEMANTIC_INTENTS = (
         ("gadd", "git_stage", "one", "path", (), ("Stage file target in Git", "Add file target to the Git staging area")),
         ("gcommit", "git_commit", "one", "text", ("-m", "{0}"), ("Create a Git commit with message target", "Commit staged changes with the message target")),
         ("gcheckout", "git_checkout", "one", "branch", (), ("Switch to Git branch target", "Check out the branch target")),
+        ("browser", "browser_open", "one", "url", ("open", "{0}"), ("Open the website target in the browser", "Browse to target")),
+        ("browser", "browser_search", "one", "text", ("search", "{0}"), ("Search the web for target using browser", "Look up target in the browser")),
+        ("note", "quick_note", "one", "text", (), ("Write a note containing target", "Take a note about target in Notepad")),
     )),
     *(intent(command, *examples, key=key, layout=layout, kinds=kinds, arguments=args)
       for command, key, layout, kinds, args, examples in (

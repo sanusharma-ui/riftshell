@@ -33,6 +33,7 @@ logs/
 *.pid
 *.tmp
 *.temp
+.riftshell_notes/
 
 # Downloaded, checksum-verified local intent model (scripts/setup_intent_model.py)
 assets/intent-model/
