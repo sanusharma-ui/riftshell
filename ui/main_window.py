@@ -7,8 +7,11 @@ from time import perf_counter
 from pathlib import Path
 from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QSettings, QThread, Signal, QStringListModel, QTimer
-from PySide6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor
+from PySide6.QtCore import (
+    QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
+    QSettings, QStringListModel, Qt, QThread, QTimer, Signal,
+)
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
@@ -87,6 +90,58 @@ def fuzzy_score(query: str, text: str) -> int | None:
             gaps += next_position - position - 1
         position = next_position
     return 50 + gaps
+
+
+def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, duration_ms: int = 240) -> None:
+    """Animate a dialog opening with a 3D-card-flip transition."""
+    dialog.ensurePolished()
+    target_w = dialog.width()
+    target_h = dialog.height()
+    if parent and parent.isVisible():
+        center = parent.mapToGlobal(parent.rect().center())
+    else:
+        screen = QApplication.primaryScreen()
+        center = screen.geometry().center() if screen else QPoint(500, 400)
+
+    target_x = max(20, center.x() - target_w // 2)
+    target_y = max(20, center.y() - target_h // 2)
+    target_rect = QRect(target_x, target_y, target_w, target_h)
+
+    start_w = max(24, int(target_w * 0.22))
+    start_x = center.x() - start_w // 2
+    start_rect = QRect(start_x, target_y, start_w, target_h)
+
+    orig_min_w = dialog.minimumWidth()
+    orig_min_h = dialog.minimumHeight()
+    dialog.setMinimumSize(0, 0)
+    dialog.setGeometry(start_rect)
+    dialog.setWindowOpacity(0.0)
+
+    group = QParallelAnimationGroup(dialog)
+    geo_anim = QPropertyAnimation(dialog, b"geometry", group)
+    geo_anim.setDuration(duration_ms)
+    geo_anim.setStartValue(start_rect)
+    geo_anim.setEndValue(target_rect)
+    geo_anim.setEasingCurve(QEasingCurve.OutBack)
+
+    op_anim = QPropertyAnimation(dialog, b"windowOpacity", group)
+    op_anim.setDuration(max(100, int(duration_ms * 0.85)))
+    op_anim.setStartValue(0.0)
+    op_anim.setEndValue(1.0)
+    op_anim.setEasingCurve(QEasingCurve.OutCubic)
+
+    group.addAnimation(geo_anim)
+    group.addAnimation(op_anim)
+
+    def _on_flip_finished():
+        dialog.setMinimumSize(orig_min_w, orig_min_h)
+        dialog.setGeometry(target_rect)
+        dialog.setWindowOpacity(1.0)
+
+    group.finished.connect(_on_flip_finished)
+    dialog._flip_anim = group
+    dialog.show()
+    group.start()
 
 
 class CommandInput(QLineEdit):
@@ -269,6 +324,8 @@ class CommandPalette(QDialog):
         self.query = QLineEdit()
         self.query.setPlaceholderText("Search commands, actions, or plugins…")
         self.list = QListWidget()
+        self.list.setWordWrap(True)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.addWidget(heading)
@@ -325,7 +382,7 @@ class PreferencesDialog(QDialog):
             self.theme.addItem(item.display_name, item.key)
         self.theme.setCurrentIndex(max(0, self.theme.findData(preferences["theme"])))
         self.font = QComboBox()
-        self.font.addItems(["Cascadia Code", "JetBrains Mono", "Consolas", "Fira Code"])
+        self.font.addItems(["JetBrains Mono", "Cascadia Code", "Consolas", "Fira Code"])
         self.font.setCurrentText(preferences["font_family"])
         self.font_size = QSpinBox()
         self.font_size.setRange(9, 20)
@@ -517,6 +574,36 @@ class PreferencesDialog(QDialog):
         self.accept()
 
 
+def _paint_hud_brackets(widget: QWidget):
+    painter = QPainter(widget)
+    painter.setRenderHint(QPainter.Antialiasing, False)
+    pen = QPen(QColor(61, 224, 245, 220), 1.5)
+    painter.setPen(pen)
+    r = widget.rect()
+    s = 10
+    # Top-left
+    painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1 + s, r.top() + 1)
+    painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1, r.top() + 1 + s)
+    # Top-right
+    painter.drawLine(r.right() - 1, r.top() + 1, r.right() - 1 - s, r.top() + 1)
+    painter.drawLine(r.right() - 1, r.top() + 1, r.right() - 1, r.top() + 1 + s)
+    # Bottom-left
+    painter.drawLine(r.left() + 1, r.bottom() - 1, r.left() + 1 + s, r.bottom() - 1)
+    painter.drawLine(r.left() + 1, r.bottom() - 1, r.left() + 1, r.bottom() - 1 - s)
+    # Bottom-right
+    painter.drawLine(r.right() - 1, r.bottom() - 1, r.right() - 1 - s, r.bottom() - 1)
+    painter.drawLine(r.right() - 1, r.bottom() - 1, r.right() - 1, r.bottom() - 1 - s)
+    painter.end()
+
+
+class HUDFrame(QFrame):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        window = self.window()
+        if getattr(window, "theme", None) and window.theme.key == "cyber-cyan":
+            _paint_hud_brackets(self)
+
+
 class TerminalSession(QWidget):
     session_changed = Signal()
     history_added = Signal(str)
@@ -532,12 +619,12 @@ class TerminalSession(QWidget):
         self._active_native = False
         self.active_command = ""
         self.name_label = QLabel(title)
-        self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
+        self.name_label.setFont(QFont("JetBrains Mono", 10, QFont.Bold))
         self.path_label = QLabel(f"{shell.ctx.cwd}")
         self.path_label.setObjectName("sessionPath")
         self.state_label = QLabel("READY")
         self.state_label.setObjectName("statusPill")
-        header = QFrame()
+        header = HUDFrame()
         header.setObjectName("terminalHeader")
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(12, 8, 12, 8)
@@ -548,6 +635,9 @@ class TerminalSession(QWidget):
         self.console.setReadOnly(True)
         self.console.setObjectName("terminalOutput")
         self.console.document().setMaximumBlockCount(5000)
+        self.console.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.console.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.console.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.console_stack = QStackedWidget()
         self.console_stack.addWidget(self.console)
         self.input = CommandInput()
@@ -570,6 +660,12 @@ class TerminalSession(QWidget):
         self.cancel_button.setEnabled(False)
         self.clear_button = QPushButton("Clear")
         self.copy_button = QPushButton("Copy")
+        self.wrap_button = QPushButton("Wrap")
+        self.wrap_button.setObjectName("wrapToggle")
+        self.wrap_button.setCheckable(True)
+        self.wrap_button.setChecked(True)
+        self.wrap_button.setToolTip("Toggle line wrap (default On)")
+        self.wrap_button.toggled.connect(self._toggle_wrap)
         bottom = QHBoxLayout()
         bottom.setSpacing(8)
         bottom.addWidget(self.input, 1)
@@ -577,6 +673,7 @@ class TerminalSession(QWidget):
         bottom.addWidget(self.cancel_button)
         header_layout.insertWidget(2, self.clear_button)
         header_layout.insertWidget(3, self.copy_button)
+        header_layout.insertWidget(4, self.wrap_button)
         self.copy_button.setToolTip("Copy selected text, or all output")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -670,6 +767,9 @@ class TerminalSession(QWidget):
         self.name_label.setText(title)
         self.session_changed.emit()
 
+    def _toggle_wrap(self, checked: bool):
+        self.console.set_wrap_mode(checked)
+
     def apply_preferences(self, preferences: dict):
         self.preferences = preferences
         font = QFont(preferences["font_family"], preferences["font_size"])
@@ -686,7 +786,7 @@ class TerminalSession(QWidget):
         self.legacy_completer.popup().setFont(font)
         self.console.setFont(font)
         self.input.setFont(font)
-        self.name_label.setFont(QFont("Segoe UI Variable Text", 10, QFont.Bold))
+        self.name_label.setFont(QFont("JetBrains Mono", 10, QFont.Bold))
         if self.native:
             self.native_console.setStyleSheet(font_css)
             self.native_console.setFont(font)
@@ -868,6 +968,9 @@ class OrbitPanel(QFrame):
         self.continue_timer.timeout.connect(self._continue_task)
         heading = QLabel("ORBIT AI")
         heading.setObjectName("sectionTitle")
+        hf = heading.font()
+        hf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        heading.setFont(hf)
         self.thinking_indicator = QLabel("")
         self.thinking_indicator.setObjectName("statusPill")
         self.thinking_timer = QTimer(self)
@@ -888,15 +991,42 @@ class OrbitPanel(QFrame):
         self.conversation.setObjectName("orbitConversation")
         self.conversation.setReadOnly(True)
         self.conversation.setMinimumHeight(200)
+        self.conversation.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.conversation.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.conversation.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.conversation.document().setDefaultStyleSheet("""
+            body, p, div, span {
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                min-width: 0;
+            }
+            pre, code {
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+                word-break: break-all;
+                font-family: "JetBrains Mono", "Cascadia Code", monospace;
+                font-size: 13px;
+                line-height: 140%;
+            }
+            a {
+                overflow-wrap: anywhere;
+                word-break: break-all;
+            }
+        """)
         self.input = QLineEdit()
+        self.input.setObjectName("orbitInput")
         self.input.setPlaceholderText("Ask Orbit: 'explain code', 'show files'…")
         self.plan_button = QPushButton("Ask Orbit")
         self.plan_button.setObjectName("primaryButton")
         self.approve_button = QPushButton("Approve")
+        self.approve_button.setObjectName("approveButton")
         self.approve_button.setEnabled(False)
         self.reject_button = QPushButton("Dismiss")
+        self.reject_button.setObjectName("dismissButton")
         self.reject_button.setEnabled(False)
         self.stop_button = QPushButton("Stop")
+        self.stop_button.setObjectName("stopButton")
         self.stop_button.setEnabled(False)
         actions = QHBoxLayout()
         actions.addWidget(self.approve_button)
@@ -931,6 +1061,12 @@ class OrbitPanel(QFrame):
         self.reject_button.clicked.connect(self.dismiss)
         self.stop_button.clicked.connect(self.stop_task)
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        window = self.window()
+        if getattr(window, "theme", None) and window.theme.key == "cyber-cyan":
+            _paint_hud_brackets(self)
+
     def _reload_modes(self):
         self.mode_selector.blockSignals(True)
         self.mode_selector.clear()
@@ -957,6 +1093,7 @@ class OrbitPanel(QFrame):
         from ui.orbit_modes import OrbitModesDialog
         try:
             dialog = OrbitModesDialog(self)
+            animate_dialog_flip_open(dialog, self.window() if self.window() else self)
             if dialog.exec() == QDialog.Accepted:
                 self._reload_modes()
         except ValueError as exc:
@@ -1369,7 +1506,7 @@ class MainWindow(QMainWindow):
         self.resize(1440, 880)
         self.setMinimumSize(1080, 680)
         self.setStyleSheet(build_stylesheet(self.theme))
-        self.setFont(QFont("Segoe UI", 10))
+        self.setFont(QFont("Inter", 10))
         self.update_controller = UpdateController(self)
         self._build_workspace()
         self._install_shortcuts()
@@ -1400,7 +1537,7 @@ class MainWindow(QMainWindow):
             "workspace_root": self.settings.value("ai/workspace_root", defaults[4], type=str),
             "allow_outside_workspace": self.settings.value("ai/allow_outside_workspace", defaults[5], type=bool),
             "theme": self.settings.value("appearance/theme", "vscode-dark-plus", type=str),
-            "font_family": self.settings.value("appearance/font_family", "Cascadia Code", type=str),
+            "font_family": self.settings.value("appearance/font_family", "JetBrains Mono", type=str),
             "font_size": self.settings.value("appearance/font_size", 11, type=int),
             "confirm_risky": self.settings.value("safety/confirm_risky", True, type=bool),
             "restore_history": self.settings.value("workspace/restore_history", True, type=bool),
@@ -1437,7 +1574,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.safety_label)
 
     def _build_sidebar(self) -> QWidget:
-        panel = QFrame()
+        panel = HUDFrame()
         panel.setObjectName("sidebar")
         panel.setMinimumWidth(230)
         panel.setMaximumWidth(320)
@@ -1449,6 +1586,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(brand)
         subtitle = QLabel("DEVELOPER WORKSPACE")
         subtitle.setObjectName("eyebrow")
+        sf = subtitle.font()
+        sf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        subtitle.setFont(sf)
         layout.addWidget(subtitle)
         layout.addSpacing(14)
         self.new_button = QPushButton("+  New Terminal")
@@ -1467,14 +1607,22 @@ class MainWindow(QMainWindow):
         layout.addSpacing(14)
         sessions_title = QLabel("SESSIONS")
         sessions_title.setObjectName("sectionTitle")
+        stf = sessions_title.font()
+        stf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        sessions_title.setFont(stf)
         layout.addWidget(sessions_title)
         self.session_list = QListWidget()
+        self.session_list.setWordWrap(True)
+        self.session_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.session_list.setMaximumHeight(180)
         self.session_list.itemClicked.connect(self._activate_session_item)
         self.session_list.itemDoubleClicked.connect(self._rename_session_item)
         layout.addWidget(self.session_list)
         plugins_title = QLabel("EXTENSIONS")
         plugins_title.setObjectName("sectionTitle")
+        ptf = plugins_title.font()
+        ptf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        plugins_title.setFont(ptf)
         layout.addWidget(plugins_title)
         self.plugin_summary = QLabel()
         self.plugin_summary.setWordWrap(True)
@@ -1585,6 +1733,10 @@ class MainWindow(QMainWindow):
         self.history = self.history[-500:]
         self.settings.setValue("workspace/history", self.history)
 
+    def _exec_dialog_flip(self, dialog: QDialog) -> int:
+        animate_dialog_flip_open(dialog, self)
+        return dialog.exec()
+
     def open_palette(self):
         session = self.current_session()
         if not session:
@@ -1592,7 +1744,7 @@ class MainWindow(QMainWindow):
         palette = CommandPalette(session.shell, self)
         palette.command_chosen.connect(lambda command: self._insert_command(command))
         palette.action_chosen.connect(self._handle_palette_action)
-        palette.exec()
+        self._exec_dialog_flip(palette)
 
     def _insert_command(self, command: str):
         session = self.current_session()
@@ -1619,6 +1771,8 @@ class MainWindow(QMainWindow):
         search = QLineEdit()
         search.setPlaceholderText("Filter command history…")
         listing = QListWidget()
+        listing.setWordWrap(True)
+        listing.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         use = QPushButton("Use command")
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(18, 18, 18, 18)
@@ -1640,7 +1794,7 @@ class MainWindow(QMainWindow):
         listing.itemDoubleClicked.connect(lambda _: choose())
         use.clicked.connect(choose)
         refresh()
-        dialog.exec()
+        self._exec_dialog_flip(dialog)
 
     def show_command_explorer(self):
         session = self.current_session()
@@ -1652,6 +1806,8 @@ class MainWindow(QMainWindow):
         search = QLineEdit()
         search.setPlaceholderText("Search commands, aliases, descriptions…")
         listing = QListWidget()
+        listing.setWordWrap(True)
+        listing.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         details = QLabel("Select a command to inspect its usage and source.")
         details.setWordWrap(True)
         use = QPushButton("Use selected command")
@@ -1686,12 +1842,12 @@ class MainWindow(QMainWindow):
         listing.itemDoubleClicked.connect(lambda _: use_command())
         use.clicked.connect(use_command)
         refresh()
-        dialog.exec()
+        self._exec_dialog_flip(dialog)
 
     def open_settings(self):
         dialog = PreferencesDialog(self.preferences, self)
         dialog.preferences_saved.connect(self.save_preferences)
-        dialog.exec()
+        self._exec_dialog_flip(dialog)
 
     def save_preferences(self, preferences: dict):
         self.preferences = preferences
@@ -1706,10 +1862,24 @@ class MainWindow(QMainWindow):
                 self.settings.setValue(f"{group}/{key}", value)
         self.settings.sync()
         self.apply_theme(preferences["theme"])
-        self.setFont(QFont("Segoe UI", 10))
+        self.setFont(QFont("Inter", 10))
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 session.apply_preferences(preferences)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if getattr(self, "theme", None) and self.theme.key == "ghost":
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing, False)
+            pen = QPen(QColor(61, 224, 245, 9), 1)
+            painter.setPen(pen)
+            w, h = self.width(), self.height()
+            for y in range(0, h, 4):
+                painter.drawLine(0, y, w, y)
+            for x in range(0, w, 40):
+                painter.drawLine(x, 0, x, h)
+            painter.end()
 
     def apply_theme(self, theme_key: str):
         try:
@@ -1724,6 +1894,7 @@ class MainWindow(QMainWindow):
                 session.shell.ctx.current_theme = self.theme.key
                 session.apply_preferences(self.preferences)
         self._refresh_workspace()
+        self.update()
 
     def show_plugins(self):
         session = self.current_session()
@@ -1747,7 +1918,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.addWidget(title)
         layout.addWidget(text, 1)
-        dialog.exec()
+        self._exec_dialog_flip(dialog)
 
     def toggle_orbit(self):
         self.orbit.setVisible(not self.orbit.isVisible())

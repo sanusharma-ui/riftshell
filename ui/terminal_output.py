@@ -1,8 +1,8 @@
 """Literal, bounded terminal transcript rendering on the Qt event loop."""
 from collections import deque
 
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor, QTextOption
 from PySide6.QtWidgets import QTextEdit
 
 
@@ -13,12 +13,23 @@ class TerminalOutput(QTextEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setUndoRedoEnabled(False)
-        self.setLineWrapMode(QTextEdit.NoWrap)
+        self.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.document().setMaximumBlockCount(5000)
         self._pending = deque()
         self._output_timer = QTimer(self)
         self._output_timer.setInterval(8)
         self._output_timer.timeout.connect(self._drain_output)
+
+    def set_wrap_mode(self, enabled: bool):
+        if enabled:
+            self.setLineWrapMode(QTextEdit.WidgetWidth)
+            self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        else:
+            self.setLineWrapMode(QTextEdit.NoWrap)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
     def append_output(self, text, color, label="", accent=None):
         # Keep the original string once; slice only the next visible batch.
