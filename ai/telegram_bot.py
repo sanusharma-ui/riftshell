@@ -42,6 +42,7 @@ class TelegramAIBot:
         )
         self.pending: dict[str, PendingAction] = {}
         self.shell_lock = asyncio.Lock()
+        self._application = None
 
     def run(self) -> None:
         problems = self.config.validate_for_telegram()
@@ -51,6 +52,7 @@ class TelegramAIBot:
         from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
         app = Application.builder().token(self.config.telegram_bot_token).build()
+        self._application = app
         app.add_handler(CommandHandler("start", self.start))
         app.add_handler(CommandHandler("help", self.start))
         app.add_handler(CommandHandler("cmd", self.cmd))
@@ -60,6 +62,10 @@ class TelegramAIBot:
         app.add_handler(CommandHandler("pending", self.pending_list))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.message))
         app.run_polling(allowed_updates=["message"])
+
+    def stop(self) -> None:
+        if self._application is not None:
+            self._application.stop_running()
 
     def _is_allowed(self, user_id: int | None) -> bool:
         if user_id is None:

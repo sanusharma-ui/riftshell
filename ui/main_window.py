@@ -24,7 +24,11 @@ from core.base import CommandResult
 from core.native_terminal import native_dependency_error
 from ai.agent_run import AgentRun
 from ai.config import AIConfig
-from ai.desktop_settings import load_desktop_config, load_mode_preferences, remove_api_key, save_api_key, saved_key_exists
+from ai.desktop_settings import (
+    load_desktop_config, load_mode_preferences, remove_api_key, remove_telegram_token,
+    save_api_key, save_telegram_token, saved_key_exists, saved_telegram_token_exists,
+)
+from ai.telegram_control import TelegramControlService
 from ai.code_writer import WriteResult, apply_file_writes, preview_file_writes
 from ai.safety import SafetyPolicy
 from ai.provider_runtime import PROVIDER_RUNTIME
@@ -550,6 +554,21 @@ class PreferencesDialog(QDialog):
         workspace_row.addWidget(browse_workspace)
         self.allow_outside_workspace = QCheckBox("Allow Orbit file inspection and writes outside this folder")
         self.allow_outside_workspace.setChecked(preferences["allow_outside_workspace"])
+        self.telegram_enabled = QCheckBox("Enable Telegram control when RiftShell starts")
+        self.telegram_enabled.setChecked(preferences.get("telegram_enabled", False))
+        self.telegram_token = QLineEdit()
+        self.telegram_token_saved = bool(preferences.get("telegram_token_saved", False))
+        self.telegram_token.setEchoMode(QLineEdit.Password)
+        self.telegram_token.setPlaceholderText(
+            "Leave blank to keep the saved bot token"
+            if self.telegram_token_saved
+            else "Paste the token from @BotFather"
+        )
+        self.telegram_remove = QCheckBox("Remove saved Telegram bot token")
+        self.telegram_ids = QLineEdit(preferences.get("telegram_allowed_user_ids", ""))
+        self.telegram_ids.setPlaceholderText("Your Telegram user ID(s), comma-separated")
+        self.telegram_unlisted = QCheckBox("Allow any Telegram user (not recommended)")
+        self.telegram_unlisted.setChecked(preferences.get("telegram_allow_unlisted_users", False))
         form = QFormLayout()
         form.setSpacing(10)
         form.addRow("Theme", self.theme)
@@ -569,13 +588,38 @@ class PreferencesDialog(QDialog):
         form.addRow("Orbit workspace", workspace_row)
         form.addRow("AI file access", self.allow_outside_workspace)
 
-        scroll_content = QWidget()
-        scroll_content.setLayout(form)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setWidget(scroll_content)
+        controls = QWidget()
+        controls_form = QFormLayout(controls)
+        guide = QLabel(
+            "1. Open Telegram and message @BotFather.\n"
+            "2. Use /newbot and paste the bot token below.\n"
+            "3. Send /start to your bot, then find your numeric user ID.\n"
+            "4. Save settings. Only approved IDs can control this PC."
+        )
+        guide.setWordWrap(True)
+        controls_form.addRow("Setup guide", guide)
+        controls_form.addRow("Enabled", self.telegram_enabled)
+        controls_form.addRow("Bot token", self.telegram_token)
+        controls_form.addRow("Allowed user IDs", self.telegram_ids)
+        controls_form.addRow("", self.telegram_unlisted)
+        controls_form.addRow("", self.telegram_remove)
+
+        general_scroll_content = QWidget()
+        general_scroll_content.setLayout(form)
+        general_scroll = QScrollArea()
+        general_scroll.setWidgetResizable(True)
+        general_scroll.setFrameShape(QFrame.NoFrame)
+        general_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        general_scroll.setWidget(general_scroll_content)
+
+        controls_scroll = QScrollArea()
+        controls_scroll.setWidgetResizable(True)
+        controls_scroll.setFrameShape(QFrame.NoFrame)
+        controls_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        controls_scroll.setWidget(controls)
+        tabs = QTabWidget()
+        tabs.addTab(general_scroll, "General")
+        tabs.addTab(controls_scroll, "Controls")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
@@ -585,7 +629,7 @@ class PreferencesDialog(QDialog):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(10)
         layout.addWidget(title)
-        layout.addWidget(scroll, 1)
+        layout.addWidget(tabs, 1)
         layout.addWidget(buttons)
 
         screen = QApplication.primaryScreen()
@@ -620,6 +664,25 @@ class PreferencesDialog(QDialog):
 
         provider = self.provider.currentData()
         ollama_source = self.ollama_source.currentData()
+        telegram_token = self.telegram_token.text().strip()
+        telegram_ids = self.telegram_ids.text().strip()
+        parsed_ids = []
+        for raw_id in telegram_ids.replace(";", ",").split(","):
+            if raw_id.strip():
+                try:
+                    parsed_ids.append(str(int(raw_id.strip())))
+                except ValueError:
+                    QMessageBox.warning(self, "Telegram user IDs", "Use numeric Telegram user IDs separated by commas.")
+                    self.telegram_ids.setFocus()
+                    return
+        if self.telegram_enabled.isChecked() and not (telegram_token or self.telegram_token_saved):
+            QMessageBox.warning(self, "Telegram token required", "Enter a Telegram bot token before enabling Telegram control.")
+            self.telegram_token.setFocus()
+            return
+        if self.telegram_enabled.isChecked() and not parsed_ids and not self.telegram_unlisted.isChecked():
+            QMessageBox.warning(self, "Telegram user ID required", "Add at least one allowed Telegram user ID, or explicitly enable unlisted users.")
+            self.telegram_ids.setFocus()
+            return
 
         if ollama_source == "colab":
             url = self.colab_url.text().strip().rstrip("/")
@@ -658,6 +721,10 @@ class PreferencesDialog(QDialog):
                     remove_api_key(name)
                 elif field.text().strip():
                     save_api_key(name, field.text().strip())
+            if self.telegram_remove.isChecked():
+                remove_telegram_token()
+            elif telegram_token:
+                save_telegram_token(telegram_token)
             env_config = AIConfig.from_env()
             env_key = env_config.groq_api_key if provider == "groq" else env_config.gemini_api_key
             if provider in {"groq", "gemini"} and not (saved_key_exists(provider) or env_key):
@@ -678,6 +745,9 @@ class PreferencesDialog(QDialog):
             "ollama_model": self.ollama_model.text().strip(),
             "workspace_root": str(workspace),
             "allow_outside_workspace": self.allow_outside_workspace.isChecked(),
+            "telegram_enabled": self.telegram_enabled.isChecked(),
+            "telegram_allowed_user_ids": ",".join(parsed_ids),
+            "telegram_allow_unlisted_users": self.telegram_unlisted.isChecked(),
         })
         self.accept()
 
@@ -1607,6 +1677,7 @@ class MainWindow(QMainWindow):
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.settings = QSettings("RiftShell", "RiftShell")
         self.preferences = self._load_preferences()
+        self.telegram_service = TelegramControlService()
         self.theme = get_theme(self.preferences["theme"])
         self.history = self._load_history() if self.preferences["restore_history"] else []
         self._orbit_execution: tuple[TerminalSession, str] | None = None
@@ -1624,6 +1695,8 @@ class MainWindow(QMainWindow):
         self._install_shortcuts()
         self.new_session()
         self._refresh_workspace()
+        if self.preferences.get("telegram_enabled"):
+            QTimer.singleShot(0, lambda: self._configure_telegram(notify=False))
         QTimer.singleShot(3000, lambda: self.update_controller.check(silent=True))
 
     def _load_preferences(self) -> dict:
@@ -1653,7 +1726,17 @@ class MainWindow(QMainWindow):
             "font_size": self.settings.value("appearance/font_size", 11, type=int),
             "confirm_risky": self.settings.value("safety/confirm_risky", True, type=bool),
             "restore_history": self.settings.value("workspace/restore_history", True, type=bool),
+            "telegram_enabled": self.settings.value("controls/telegram_enabled", False, type=bool),
+            "telegram_allowed_user_ids": self.settings.value("controls/telegram_allowed_user_ids", "", type=str),
+            "telegram_allow_unlisted_users": self.settings.value("controls/telegram_allow_unlisted_users", False, type=bool),
+            "telegram_token_saved": self._telegram_token_saved(),
         }
+
+    def _telegram_token_saved(self) -> bool:
+        try:
+            return saved_telegram_token_exists()
+        except Exception:
+            return False
 
     def _load_history(self) -> list[str]:
         value = self.settings.value("workspace/history", [])
@@ -1983,15 +2066,37 @@ class MainWindow(QMainWindow):
                        "workspace_root", "allow_outside_workspace"}:
                 setting = "provider" if key == "ai_provider" else key
                 self.settings.setValue(f"ai/{setting}", value)
+            elif key in {"telegram_enabled", "telegram_allowed_user_ids", "telegram_allow_unlisted_users"}:
+                self.settings.setValue(f"controls/{key}", value)
             else:
                 group = "appearance" if key in {"theme", "font_family", "font_size"} else "safety" if key == "confirm_risky" else "workspace"
                 self.settings.setValue(f"{group}/{key}", value)
         self.settings.sync()
+        self.preferences["telegram_token_saved"] = self._telegram_token_saved()
+        self._configure_telegram()
         self.apply_theme(preferences["theme"])
         self.setFont(QFont("Inter", 10))
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 session.apply_preferences(preferences)
+
+    def _configure_telegram(self, notify: bool = True):
+        if not self.preferences.get("telegram_enabled"):
+            self.telegram_service.stop()
+            return
+        try:
+            self.telegram_service.start(load_desktop_config(), on_error=self._telegram_error)
+            self.status_label.setText("Telegram control enabled")
+            if notify:
+                QMessageBox.information(self, "Telegram connected", "Telegram connected")
+        except Exception as exc:
+            self.preferences["telegram_enabled"] = False
+            self.settings.setValue("controls/telegram_enabled", False)
+            self.status_label.setText("Telegram control is disabled")
+            QMessageBox.warning(self, "Telegram connection failed", str(exc))
+
+    def _telegram_error(self, error: Exception):
+        QTimer.singleShot(0, lambda: self.status_label.setText(f"Telegram stopped: {error}"))
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -2173,5 +2278,6 @@ class MainWindow(QMainWindow):
             event.ignore()
             QTimer.singleShot(100, self.close)
             return
+        self.telegram_service.stop()
         self.settings.sync()
         event.accept()

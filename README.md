@@ -328,7 +328,12 @@ TELEGRAM_ALLOWED_USER_IDS=your_numeric_telegram_user_id
 TELEGRAM_ALLOW_UNLISTED_USERS=false
 ```
 
-Start the Telegram layer separately:
+You can also configure this from **Workspace Settings > Controls** in the desktop app.
+The bot token is stored in the OS credential manager; allowed user IDs remain in
+desktop settings. Enable **Telegram control** there to start the bot with RiftShell
+and show the connection confirmation.
+
+Start the Telegram layer separately when running without the desktop app:
 
 ```powershell
 py run_ai_bot.py
