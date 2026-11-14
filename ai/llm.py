@@ -377,7 +377,7 @@ class AgentPlanner:
         # as a second command extractor after the strict extractor abstains.
         if not explicit_command and not explicit_screenshot and direct.action in {"shell", "screenshot"}:
             direct = AgentAction(action="respond") if self._model_routing_enabled() else self._offline_response(user_text)
-        if self._model_routing_enabled() and not explicit_command and direct.action != "inspect":
+        if self._model_routing_enabled() and not explicit_command and direct.action != "inspect" and not direct.message:
             direct = AgentAction(action="respond")
         if direct.action == "inspect":
             action = self._complete_inspection(user_text, direct)
@@ -481,6 +481,7 @@ class AgentPlanner:
         preferred_provider: str | None = None,
         *,
         conversation: bool = False,
+        max_output_tokens: int | None = None,
     ) -> tuple[AgentAction | None, list[str], str | None]:
         errors: list[str] = []
         if estimated_tokens(prompt) > self.mode.prompt_tokens:
@@ -499,6 +500,7 @@ class AgentPlanner:
         runtime = self.provider_runtime
         retryable = set()
         failures = {}
+        token_limit = max_output_tokens or self.mode.output_tokens
         # Retry generation at most once after all eligible fallbacks fail. This
         # method never executes an action, so a retry cannot replay a command/write.
         for attempt in range(2):
@@ -516,15 +518,15 @@ class AgentPlanner:
                 if self.progress:
                     self.progress(f"Waiting for {provider.title()}…")
                 try:
-                    text = (self._call_provider(provider, prompt, conversation=True) if conversation
-                            else self._call_provider(provider, prompt))
+                    text = (self._call_provider(provider, prompt, conversation=True, max_output_tokens=max_output_tokens) if conversation
+                            else self._call_provider(provider, prompt, max_output_tokens=max_output_tokens))
                     action = (conversation_action(text) if conversation
                               else AgentAction.from_payload(_extract_json(text, self.command_names)))
                     if action is None:
                         raise RuntimeError("The model returned no readable answer.")
                     runtime.record("provider", provider=provider, elapsed_seconds=perf_counter() - started,
                                    prompt_chars=len(prompt), estimated_prompt_tokens=estimated_tokens(prompt),
-                                   output_token_limit=self.mode.output_tokens, mode=self.mode.name, outcome="success")
+                                   output_token_limit=token_limit, mode=self.mode.name, outcome="success")
                     failures.pop(provider, None)
                     return action, list(failures.values()), provider
                 except OutputBudgetError as exc:
@@ -533,7 +535,7 @@ class AgentPlanner:
                         # answer content, but never promote truncated effects.
                         reply = conversation_action(exc.partial_text, truncated=True)
                         runtime.record("provider", provider=provider, elapsed_seconds=perf_counter() - started,
-                                       prompt_chars=len(prompt), output_token_limit=self.mode.output_tokens,
+                                       prompt_chars=len(prompt), output_token_limit=token_limit,
                                        mode=self.mode.name, outcome="partial_answer" if reply else "empty_at_limit")
                         if reply is not None:
                             return reply, list(failures.values()), provider
@@ -641,13 +643,21 @@ class AgentPlanner:
                     message=f"I could not inspect the requested path.\n\n{inspection.content}",
                 )
 
+        is_write = self._requests_file_write(request.objective or user_text)
         prompt = self._build_prompt(
             user_text,
             workspace_context=inspection.content,
             inspection_objective=request.objective or user_text,
             task_context=task_context,
         )
-        action, errors, _ = self._request_model_action(prompt, preferred_provider)
+        if is_write:
+            prompt += (
+                "\n\nIMPORTANT CODE WRITE INSTRUCTION: The user has requested to create or update file content. "
+                "Do NOT return a chat explanation or markdown code in `respond`. Do NOT run shell commands. "
+                "Return exactly one `code_write` action containing the complete final content for every requested target file."
+            )
+        target_tokens = max(self.mode.output_tokens, 2048) if is_write else self.mode.output_tokens
+        action, errors, _ = self._request_model_action(prompt, preferred_provider, max_output_tokens=target_tokens)
         if action is None:
             details = " | ".join(errors) or "No configured provider is available."
             return AgentAction(
@@ -663,7 +673,7 @@ class AgentPlanner:
                                       self.mode.prompt_tokens // 2, tail=True),
                 inspections_left=inspections_left - 1,
             )
-        if self._requests_file_write(request.objective or user_text):
+        if is_write:
             if self._truncated_files:
                 return AgentAction("respond", "Some inspected files exceeded the selected context budget. No edit was prepared from partial file content. Narrow the task or increase the per-file and prompt limits in Orbit modes.")
             if action.action != "code_write" or not action.files:
@@ -675,6 +685,7 @@ class AgentPlanner:
                 corrected, correction_errors, _ = self._request_model_action(
                     correction,
                     preferred_provider,
+                    max_output_tokens=target_tokens,
                 )
                 errors.extend(correction_errors)
                 if corrected is None or corrected.action != "code_write" or not corrected.files:
@@ -725,9 +736,11 @@ class AgentPlanner:
 
     @staticmethod
     def _requests_file_write(text: str) -> bool:
+        if re.search(r"\b(?:do not|don't)\s+(?:edit|write|modify|change|touch|update)\b", text, flags=re.IGNORECASE):
+            return False
         return bool(re.search(
-            r"\b(?:write|generate|create|add|build|put|insert|update|fix|improve"
-            r"|bana|banao|likho|likhe|daal|daalo)\b",
+            r"\b(?:write|generate|create|add|append|build|put|insert|update|fix|improve|save|paste"
+            r"|bana|banao|likho|likhe|likh|daal|daalo)\b",
             text,
             flags=re.IGNORECASE,
         ))
@@ -777,25 +790,26 @@ class AgentPlanner:
             "ollama": bool(self._ollama_model),
         }.get(provider, False)
 
-    def _call_provider(self, provider: str, prompt: str, *, conversation: bool = False) -> str:
+    def _call_provider(self, provider: str, prompt: str, *, conversation: bool = False, max_output_tokens: int | None = None) -> str:
         self._ensure_provider(provider)
         if provider == "gemini":
-            return self._call_gemini(prompt, conversation=conversation)
+            return self._call_gemini(prompt, conversation=conversation, max_output_tokens=max_output_tokens)
         if provider == "groq":
-            return self._call_groq(prompt, conversation=conversation)
+            return self._call_groq(prompt, conversation=conversation, max_output_tokens=max_output_tokens)
         if provider == "ollama":
-            return self._call_ollama(prompt, conversation=conversation)
+            return self._call_ollama(prompt, conversation=conversation, max_output_tokens=max_output_tokens)
         raise ValueError(f"Unsupported AI provider: {provider}")
 
-    def _call_gemini(self, prompt: str, *, conversation: bool = False) -> str:
+    def _call_gemini(self, prompt: str, *, conversation: bool = False, max_output_tokens: int | None = None) -> str:
         if not self._gemini_key:
             raise RuntimeError("GEMINI_API_KEY is not configured.")
         if self._gemini is None:
             detail = f" ({self._gemini_setup_error})" if self._gemini_setup_error else ""
             raise RuntimeError(f"Gemini client is unavailable{detail}.")
+        tokens = max_output_tokens or self.mode.output_tokens
         response = self._gemini.generate_content(prompt, generation_config={
             "response_mime_type": "text/plain" if conversation else "application/json",
-            "max_output_tokens": self.mode.output_tokens,
+            "max_output_tokens": tokens,
         })
         for candidate in getattr(response, "candidates", ()):
             reason = getattr(candidate, "finish_reason", None)
@@ -812,7 +826,7 @@ class AgentPlanner:
             raise RuntimeError("Gemini returned an empty response.")
         return text
 
-    def _call_groq(self, prompt: str, *, conversation: bool = False) -> str:
+    def _call_groq(self, prompt: str, *, conversation: bool = False, max_output_tokens: int | None = None) -> str:
         if not self._groq_key:
             raise RuntimeError("GROQ_API_KEY is not configured.")
         if self._groq is None:
@@ -821,7 +835,8 @@ class AgentPlanner:
         completions = self._groq.chat.completions
         raw_api = getattr(completions, "with_raw_response", None)
         create = raw_api.create if raw_api is not None else completions.create
-        extra_body = {"max_completion_tokens": self.mode.output_tokens}
+        tokens = max_output_tokens or self.mode.output_tokens
+        extra_body = {"max_completion_tokens": tokens}
         if conversation and self._groq_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
             # These models count reasoning against the completion ceiling.
             # Use documented model capabilities, not unsupported flags on all models.
@@ -846,7 +861,7 @@ class AgentPlanner:
             raise RuntimeError("Groq returned an empty response.")
         return text
 
-    def _call_ollama(self, prompt: str, *, conversation: bool = False) -> str:
+    def _call_ollama(self, prompt: str, *, conversation: bool = False, max_output_tokens: int | None = None) -> str:
         if not self._ollama_model:
             raise RuntimeError("OLLAMA_MODEL is not configured.")
 
@@ -857,12 +872,14 @@ class AgentPlanner:
         if user_split in prompt:
             system_text = prompt.split(user_split, 1)[0].strip()
 
+        tokens = max_output_tokens or self.mode.output_tokens
+
         def _post(use_format_json: bool) -> dict:
             body_dict = {
                 "model": self._ollama_model,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.1, "num_predict": self.mode.output_tokens},
+                "options": {"temperature": 0.1, "num_predict": tokens},
             }
             if system_text:
                 body_dict["system"] = system_text
@@ -1080,19 +1097,38 @@ class AgentPlanner:
             )
 
         # ── Code-write intent: "write code in file", "add html in index.html",
-        # "calculator.html mein code likho", etc. Route through inspect so the
-        # model receives file context (or a new-file hint) before producing a
-        # code_write action.  Must precede the plain "create file" pattern so
+        # "calculator.html mein code likho", "append this codes in index.html", etc.
+        # Route through inspect so the model receives file context (or a new-file hint)
+        # before producing a code_write action.  Must precede the plain "create file" pattern so
         # "write a calculator in calc.html" is not reduced to an empty makefile.
         _CODE_WRITE_VERBS = (
-            r"(?:write|add|put|insert|generate|update|build|place|code)"
+            r"(?:write|add|append|put|insert|generate|update|build|place|code|create|make|save|paste|edit|modify"
+            r"|bana|banao|likho|likhe|likh|daal|daalo)"
         )
         _CODE_NOUNS = (
-            r"(?:code|content|html|css|javascript|js|typescript|ts|python|script"
-            r"|program|page|app|application|website|component|function|class"
-            r"|style|markup|template|snippet|logic)"
+            r"(?:code|codes|content|contents|html|css|javascript|js|typescript|ts|python|py|script|scripts"
+            r"|program|programs|page|pages|app|application|website|component|components|function|functions|class|classes"
+            r"|style|styles|markup|template|templates|snippet|snippets|logic|calculator|todo|login|form|dashboard|portfolio)"
         )
-        _CODE_PREPS = r"(?:in(?:to|side)?|to|for|at)"
+        _CODE_PREPS = r"(?:in(?:to|side)?|to|for|at|me(?:in)?|ke\s+andar)"
+
+        if mentioned_files and not analysis_intent and re.search(rf"\b{_CODE_WRITE_VERBS}\b", normalized):
+            target = mentioned_files[0]
+            return self._inspect(
+                [target],
+                f"Write/generate code for {target} as requested: {text}",
+                "I will inspect the target and prepare the code changes for your review.",
+            )
+
+        if not mentioned_files and re.search(
+            r"\b(?:kisi\s+file|file)\s+(?:me(?:in)?|ke\s+andar)\s+code\b|\bcode\s+(?:in|into|to)\s+(?:a|some)\s+file\b",
+            normalized,
+        ):
+            return AgentAction(
+                action="respond",
+                message="Please tell me which file you would like me to write code in (for example: `index.html me code likho`).",
+            )
+
         # English: "write code in calculator.html", "add html to index.html",
         # "generate a login page in login.html", "build a script in run.py"
         code_write_match = re.match(

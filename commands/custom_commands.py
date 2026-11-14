@@ -17,6 +17,8 @@ import hashlib
 import base64
 import urllib.request
 import json
+import tempfile
+import zipfile
 
 
 from core.base import BaseCommand, CommandResult
@@ -925,13 +927,59 @@ class ZipCommand(BaseCommand):
             return CommandResult(output=f"Not a folder: {src}", success=False)
             
         out_name = resolve_path(ctx, args[1])
-        out_path_no_ext = str(out_name).removesuffix('.zip')
-        
+        out_path = out_name if out_name.suffix.lower() == ".zip" else Path(f"{out_name}.zip")
+        source_root = src.resolve(strict=False)
+        target_path = out_path.resolve(strict=False)
+        if target_path == source_root or source_root in target_path.parents:
+            return CommandResult(
+                output="Zip error: the output archive must be outside the folder being compressed.",
+                success=False,
+            )
+        if not target_path.parent.is_dir():
+            return CommandResult(output=f"Output folder not found: {target_path.parent}", success=False)
+
+        # Never write directly to the requested file.  If compression is stopped
+        # or a file changes underneath us, the user keeps the last known-good ZIP.
+        temp_path: Path | None = None
         try:
-            shutil.make_archive(out_path_no_ext, 'zip', str(src))
-            return CommandResult(output=f"Compressed to: {out_path_no_ext}.zip")
+            with tempfile.NamedTemporaryFile(
+                mode="wb", suffix=".zip", prefix=f".{out_path.stem}-", dir=target_path.parent,
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+
+            with zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for directory, folders, files in os.walk(source_root):
+                    if ctx.cancel_event.is_set():
+                        return CommandResult(output="Zip cancelled. No archive was created.", success=False)
+                    current = Path(directory)
+                    relative_dir = current.relative_to(source_root)
+                    if not folders and not files and relative_dir != Path("."):
+                        archive.writestr(f"{relative_dir.as_posix()}/", "")
+                    for filename in files:
+                        if ctx.cancel_event.is_set():
+                            return CommandResult(output="Zip cancelled. No archive was created.", success=False)
+                        file_path = current / filename
+                        archive.write(file_path, file_path.relative_to(source_root).as_posix())
+
+            # Windows Explorer reports a generic "invalid" error for partial or
+            # corrupt ZIPs, so prove the archive before publishing it.
+            with zipfile.ZipFile(temp_path, "r") as archive:
+                corrupt_member = archive.testzip()
+            if corrupt_member:
+                return CommandResult(output=f"Zip error: integrity check failed for {corrupt_member}", success=False)
+
+            os.replace(temp_path, target_path)
+            temp_path = None
+            return CommandResult(output=f"Compressed to: {target_path}")
         except Exception as e:
             return CommandResult(output=f"Zip error: {e}", success=False)
+        finally:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
 class UnzipCommand(BaseCommand):

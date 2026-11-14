@@ -165,6 +165,37 @@ class WorkspaceInspectionTests(unittest.TestCase):
             self.assertEqual(action.action, "code_write")
             self.assertEqual(action.files[0].path, "app.py")
 
+    def test_append_code_routes_directly_to_target_file(self):
+        with workspace_temp() as temp:
+            root = Path(temp)
+            (root / "index.html").write_text("", encoding="utf-8")
+            planner, model = make_planner(
+                root,
+                {
+                    "action": "code_write",
+                    "message": "Appended calculator code.",
+                    "files": [{"path": "index.html", "content": "<div id='calc'></div>\n"}],
+                },
+            )
+
+            action = planner.plan("append this codes in index.html")
+
+            self.assertEqual(action.action, "code_write")
+            self.assertEqual(action.files[0].path, "index.html")
+            self.assertEqual(len(model.prompts), 1)
+            self.assertIn("IMPORTANT CODE WRITE INSTRUCTION", model.prompts[0])
+
+    def test_generic_file_write_requests_filename_immediately(self):
+        with workspace_temp() as temp:
+            root = Path(temp)
+            planner, model = make_planner(root, {"action": "respond", "message": "unused"})
+
+            action = planner.plan("kisi file me code likho")
+
+            self.assertEqual(action.action, "respond")
+            self.assertIn("Please tell me which file you would like me to write code in", action.message)
+            self.assertEqual(len(model.prompts), 0)
+
     def test_chat_code_response_is_retried_as_an_actual_file_write(self):
         with workspace_temp() as temp:
             root = Path(temp)
