@@ -16,6 +16,7 @@ __pycache__/
 .riftshell_ai_memory.json
 .ai_backups/
 .pytest_cache/
+.pytest_temp/
 .venv/
 venv/
 build/

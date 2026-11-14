@@ -52,8 +52,10 @@ def get_version() -> str:
 
 def run_tests(python_exe: str) -> bool:
     print(f"\n[1/5] Running tests with pytest (using: {python_exe})...")
+    temp_dir = ROOT / ".pytest_temp"
+    temp_dir.mkdir(exist_ok=True)
     res = subprocess.run(
-        [python_exe, "-m", "pytest", "tests"],
+        [python_exe, "-m", "pytest", "tests", f"--basetemp={temp_dir}"],
         cwd=ROOT,
         env={**os.environ, "PYTHONPATH": str(ROOT)},
     )
