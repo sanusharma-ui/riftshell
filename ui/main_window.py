@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import math
 import re
 import sys
 from dataclasses import replace
@@ -8,15 +10,19 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from PySide6.QtCore import (
-    QEasingCurve, QEvent, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
-    QSettings, QStringListModel, Qt, QThread, QTimer, Signal,
+    QEasingCurve, QEvent, QParallelAnimationGroup, QPoint, QPointF, QPropertyAnimation,
+    QRect, QRectF, QSettings, QSize, QStringListModel, Qt, QThread, QTimer, Signal,
 )
-from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QShortcut, QTextCursor, QTextOption
+from PySide6.QtGui import (
+    QBrush, QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter,
+    QPainterPath, QPen, QPixmap, QPolygonF, QRadialGradient, QShortcut, QTextCursor, QTextOption,
+)
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QCompleter, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton,
-    QScrollArea, QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
+    QScrollArea, QSpinBox, QSplitter, QStackedWidget, QTabWidget, QTextEdit,
+    QToolButton, QVBoxLayout, QWidget,
 )
 
 from core.shell import Shell
@@ -36,6 +42,145 @@ from ui.themes import build_stylesheet, get_theme, list_themes
 from ui.terminal_output import TerminalOutput
 from version import __version__
 from update_ui import UpdateController
+
+
+def _make_vector_icon(kind: str, color_hex: str = "#9D8EB5", accent_hex: str = "#C084FC", size: int = 24) -> QIcon:
+    """Render crisp geometric vector icons for the collapsible rails."""
+    pix = QPixmap(size * 2, size * 2)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    p.scale(2.0, 2.0)
+
+    c = QColor(color_hex)
+    ac = QColor(accent_hex)
+    pen = QPen(c, 1.7, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+    p.setPen(pen)
+    p.setBrush(Qt.NoBrush)
+
+    if kind == "terminal":
+        pen_ac = QPen(ac, 2.1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen_ac)
+        path = QPainterPath()
+        path.moveTo(6, 7)
+        path.lineTo(11.5, 12)
+        path.lineTo(6, 17)
+        p.drawPath(path)
+        p.drawLine(QPointF(13.0, 17.0), QPointF(18.5, 17.0))
+    elif kind == "grid":
+        r = 1.5
+        p.drawRoundedRect(QRectF(4.5, 4.5, 6.2, 6.2), r, r)
+        p.drawRoundedRect(QRectF(13.3, 4.5, 6.2, 6.2), r, r)
+        p.drawRoundedRect(QRectF(4.5, 13.3, 6.2, 6.2), r, r)
+        p.drawRoundedRect(QRectF(13.3, 13.3, 6.2, 6.2), r, r)
+    elif kind == "clock":
+        p.drawEllipse(QRectF(4.2, 4.2, 15.6, 15.6))
+        p.drawLine(QPointF(12.0, 7.5), QPointF(12.0, 12.2))
+        p.drawLine(QPointF(12.0, 12.2), QPointF(15.2, 14.2))
+    elif kind == "explorer":
+        poly = QPolygonF([
+            QPointF(19.5, 4.5),
+            QPointF(4.2, 11.2),
+            QPointF(10.8, 13.2),
+            QPointF(12.8, 19.8),
+        ])
+        p.drawPolygon(poly)
+        p.drawLine(QPointF(19.5, 4.5), QPointF(10.8, 13.2))
+    elif kind == "settings":
+        p.drawEllipse(QRectF(8.8, 8.8, 6.4, 6.4))
+        for i in range(8):
+            angle = i * (math.pi / 4.0)
+            x1 = 12.0 + math.cos(angle) * 5.2
+            y1 = 12.0 + math.sin(angle) * 5.2
+            x2 = 12.0 + math.cos(angle) * 8.2
+            y2 = 12.0 + math.sin(angle) * 8.2
+            p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+        p.drawEllipse(QRectF(6.2, 6.2, 11.6, 11.6))
+    elif kind == "updates":
+        p.drawEllipse(QRectF(5.2, 5.2, 13.6, 13.6))
+        p.drawLine(QPointF(12.0, 3.2), QPointF(12.0, 6.2))
+        p.drawLine(QPointF(12.0, 17.8), QPointF(12.0, 20.8))
+        p.drawLine(QPointF(3.2, 12.0), QPointF(6.2, 12.0))
+        p.drawLine(QPointF(17.8, 12.0), QPointF(20.8, 12.0))
+    elif kind == "cube":
+        top = QPolygonF([QPointF(12, 4.2), QPointF(19.2, 8.2), QPointF(12, 12.2), QPointF(4.8, 8.2)])
+        p.drawPolygon(top)
+        path = QPainterPath()
+        path.moveTo(4.8, 8.2)
+        path.lineTo(4.8, 16.0)
+        path.lineTo(12.0, 20.0)
+        path.lineTo(19.2, 16.0)
+        path.lineTo(19.2, 8.2)
+        p.drawPath(path)
+        p.drawLine(QPointF(12.0, 12.2), QPointF(12.0, 20.0))
+    elif kind == "orbit":
+        pen_ac = QPen(ac, 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen_ac)
+        p.drawEllipse(QRectF(7.0, 7.0, 10.0, 10.0))
+        p.save()
+        p.translate(12.0, 12.0)
+        p.rotate(-26.0)
+        p.drawEllipse(QRectF(-9.8, -3.6, 19.6, 7.2))
+        p.restore()
+    elif kind == "modes":
+        for dy in (-3.8, 0.0, 3.8):
+            poly = QPolygonF([
+                QPointF(12.0, 6.5 + dy),
+                QPointF(19.0, 10.0 + dy),
+                QPointF(12.0, 13.5 + dy),
+                QPointF(5.0, 10.0 + dy),
+            ])
+            p.drawPolygon(poly)
+
+    p.end()
+    return QIcon(pix)
+
+
+class HeroLogoWidget(QWidget):
+    """Paints the glowing purple-magenta `>_` centerpiece emblem on the initial Hero screen."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(110, 78)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+    def paintEvent(self, event):
+        window = self.window()
+        theme = getattr(window, "theme", None)
+        accent = QColor(theme.accent if theme else "#A855F7")
+        secondary = QColor(theme.accent_alt if theme else "#D946EF")
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+
+        # Ambient radial glow behind `>_`
+        glow = QRadialGradient(QPointF(self.width() * 0.5, self.height() * 0.52), 46.0)
+        c_center = QColor(accent)
+        c_center.setAlpha(65)
+        c_zero = QColor(accent)
+        c_zero.setAlpha(0)
+        glow.setColorAt(0.0, c_center)
+        glow.setColorAt(1.0, c_zero)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(glow))
+        p.drawEllipse(QRectF(8, 2, 94, 74))
+
+        grad = QLinearGradient(QPointF(24, 16), QPointF(88, 62))
+        grad.setColorAt(0.0, secondary)
+        grad.setColorAt(1.0, accent)
+
+        pen = QPen(QBrush(grad), 6.5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+
+        chevron = QPainterPath()
+        chevron.moveTo(30.0, 20.0)
+        chevron.lineTo(50.0, 39.0)
+        chevron.lineTo(30.0, 58.0)
+        p.drawPath(chevron)
+
+        p.drawLine(QPointF(58.0, 58.0), QPointF(82.0, 58.0))
+        p.end()
 
 
 def pending_action_reply(text: str) -> str | None:
@@ -96,8 +241,8 @@ def fuzzy_score(query: str, text: str) -> int | None:
     return 50 + gaps
 
 
-def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, duration_ms: int = 240) -> None:
-    """Animate a dialog opening with a 3D-card-flip transition."""
+def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, duration_ms: int = 200) -> None:
+    """Animate a dialog opening with a smooth modern Windows 11 scale & fade transition."""
     dialog.ensurePolished()
     target_w = dialog.width()
     target_h = dialog.height()
@@ -111,9 +256,11 @@ def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, dur
     target_y = max(20, center.y() - target_h // 2)
     target_rect = QRect(target_x, target_y, target_w, target_h)
 
-    start_w = max(24, int(target_w * 0.22))
+    start_w = max(120, int(target_w * 0.92))
+    start_h = max(90, int(target_h * 0.92))
     start_x = center.x() - start_w // 2
-    start_rect = QRect(start_x, target_y, start_w, target_h)
+    start_y = center.y() - start_h // 2 + 8
+    start_rect = QRect(start_x, start_y, start_w, start_h)
 
     orig_min_w = dialog.minimumWidth()
     orig_min_h = dialog.minimumHeight()
@@ -126,10 +273,10 @@ def animate_dialog_flip_open(dialog: QDialog, parent: QWidget | None = None, dur
     geo_anim.setDuration(duration_ms)
     geo_anim.setStartValue(start_rect)
     geo_anim.setEndValue(target_rect)
-    geo_anim.setEasingCurve(QEasingCurve.OutBack)
+    geo_anim.setEasingCurve(QEasingCurve.OutCubic)
 
     op_anim = QPropertyAnimation(dialog, b"windowOpacity", group)
-    op_anim.setDuration(max(100, int(duration_ms * 0.85)))
+    op_anim.setDuration(max(90, int(duration_ms * 0.85)))
     op_anim.setStartValue(0.0)
     op_anim.setEndValue(1.0)
     op_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -153,10 +300,10 @@ class CustomTitleBar(QWidget):
         super().__init__(parent)
         self.parent_window = parent
         self.setObjectName("customTitleBar")
-        self.setFixedHeight(40)
+        self.setFixedHeight(42)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setContentsMargins(14, 0, 0, 0)
         layout.setSpacing(8)
 
         self.icon_label = QLabel()
@@ -166,6 +313,10 @@ class CustomTitleBar(QWidget):
         icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
         if icon_path.exists():
             self.icon_label.setPixmap(QPixmap(str(icon_path)))
+        else:
+            self.icon_label.setText("◈")
+            self.icon_label.setAlignment(Qt.AlignCenter)
+            self.icon_label.setStyleSheet("font-size: 13px; font-weight: 700; color: #C084FC;")
         layout.addWidget(self.icon_label)
 
         self.brand_label = QLabel("RiftShell")
@@ -178,7 +329,7 @@ class CustomTitleBar(QWidget):
 
         layout.addStretch(1)
 
-        self.center_pill = QLabel("DEVELOPER WORKSPACE", self)
+        self.center_pill = QLabel("◈   WORKSPACE   //   riftshell", self)
         self.center_pill.setObjectName("titleCenterPill")
         self.center_pill.setAlignment(Qt.AlignCenter)
         self.center_pill.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -188,19 +339,19 @@ class CustomTitleBar(QWidget):
         self.min_btn = QPushButton("—")
         self.min_btn.setObjectName("titleMinBtn")
         self.min_btn.setToolTip("Minimize")
-        self.min_btn.setFixedSize(48, 40)
+        self.min_btn.setFixedSize(46, 42)
         self.min_btn.setCursor(Qt.ArrowCursor)
 
         self.max_btn = QPushButton("□")
         self.max_btn.setObjectName("titleMaxBtn")
         self.max_btn.setToolTip("Maximize / Restore")
-        self.max_btn.setFixedSize(48, 40)
+        self.max_btn.setFixedSize(46, 42)
         self.max_btn.setCursor(Qt.ArrowCursor)
 
-        self.close_btn = QPushButton("×")
+        self.close_btn = QPushButton("✕")
         self.close_btn.setObjectName("titleCloseBtn")
         self.close_btn.setToolTip("Close")
-        self.close_btn.setFixedSize(48, 40)
+        self.close_btn.setFixedSize(46, 42)
         self.close_btn.setCursor(Qt.ArrowCursor)
 
         layout.addWidget(self.min_btn)
@@ -216,11 +367,12 @@ class CustomTitleBar(QWidget):
         self._position_center_pill()
 
     def _position_center_pill(self):
-        label_width = self.center_pill.sizeHint().width()
-        label_height = self.height()
+        self.center_pill.adjustSize()
+        label_width = min(max(220, self.center_pill.sizeHint().width() + 28), max(220, self.width() - 360))
+        label_height = 26
         self.center_pill.setGeometry(
             max(0, (self.width() - label_width) // 2),
-            0,
+            (self.height() - label_height) // 2,
             label_width,
             label_height,
         )
@@ -238,7 +390,6 @@ class CustomTitleBar(QWidget):
 
     def set_workspace_text(self, text: str):
         self.center_pill.setText(text)
-        self.center_pill.adjustSize()
         self._position_center_pill()
 
     def mouseDoubleClickEvent(self, event):
@@ -434,17 +585,25 @@ class CommandPalette(QDialog):
     def __init__(self, shell: Shell, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Command Palette")
-        self.setMinimumSize(660, 460)
-        heading = QLabel("COMMAND PALETTE")
+        self.setMinimumSize(680, 480)
+        header_row = QHBoxLayout()
+        heading = QLabel("⌘  COMMAND PALETTE")
         heading.setObjectName("eyebrow")
+        hint = QLabel("ENTER to execute  ·  ESC to dismiss")
+        hint.setObjectName("sessionPath")
+        header_row.addWidget(heading)
+        header_row.addStretch()
+        header_row.addWidget(hint)
+
         self.query = QLineEdit()
-        self.query.setPlaceholderText("Search commands, actions, or plugins…")
+        self.query.setPlaceholderText("Type a command name, workspace action, or plugin keyword…")
         self.list = QListWidget()
         self.list.setWordWrap(True)
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.addWidget(heading)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        layout.addLayout(header_row)
         layout.addWidget(self.query)
         layout.addWidget(self.list, 1)
         self._entries: list[tuple[str, str, str]] = [
@@ -469,7 +628,8 @@ class CommandPalette(QDialog):
                 ranked.append((score, kind, name, detail))
         self.list.clear()
         for _, kind, name, detail in sorted(ranked, key=lambda item: (item[0], item[2]))[:70]:
-            item = QListWidgetItem(f"{'›' if kind == 'action' else '>_'}  {name}\n     {detail}")
+            badge = "◈ ACTION" if kind == "action" else "❯ CMD"
+            item = QListWidgetItem(f"{badge}   {name}\n        {detail}")
             item.setData(Qt.UserRole, (kind, name))
             self.list.addItem(item)
         if self.list.count():
@@ -489,9 +649,9 @@ class PreferencesDialog(QDialog):
 
     def __init__(self, preferences: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Workspace settings")
-        self.setMinimumWidth(440)
-        title = QLabel("WORKSPACE SETTINGS")
+        self.setWindowTitle("Workspace Settings")
+        self.setMinimumWidth(520)
+        title = QLabel("⚙  WORKSPACE & AI ENGINE SETTINGS")
         title.setObjectName("eyebrow")
         self.theme = QComboBox()
         for item in list_themes():
@@ -551,9 +711,10 @@ class PreferencesDialog(QDialog):
         self.ollama_model = QLineEdit(preferences["ollama_model"])
         self.ollama_model.setPlaceholderText("Model installed in Ollama (e.g. deepseek-r1:8b)")
         self.workspace_root = QLineEdit(preferences["workspace_root"])
-        browse_workspace = QPushButton("Browse")
+        browse_workspace = QPushButton("Browse…")
         browse_workspace.clicked.connect(self._browse_workspace)
         workspace_row = QHBoxLayout()
+        workspace_row.setSpacing(8)
         workspace_row.addWidget(self.workspace_root, 1)
         workspace_row.addWidget(browse_workspace)
         self.allow_outside_workspace = QCheckBox("Allow Orbit file inspection and writes outside this folder")
@@ -573,27 +734,35 @@ class PreferencesDialog(QDialog):
         self.telegram_ids.setPlaceholderText("Your Telegram user ID(s), comma-separated")
         self.telegram_unlisted = QCheckBox("Allow any Telegram user (not recommended)")
         self.telegram_unlisted.setChecked(preferences.get("telegram_allow_unlisted_users", False))
+
         form = QFormLayout()
+        form.setContentsMargins(8, 8, 8, 8)
         form.setSpacing(10)
-        form.addRow("Theme", self.theme)
+        form.addRow("Color theme", self.theme)
         form.addRow("Terminal font", self.font)
         form.addRow("Font size", self.font_size)
-        form.addRow("Safety", self.confirm)
-        form.addRow("Workspace", self.restore)
+        form.addRow("Safety policy", self.confirm)
+        form.addRow("Session history", self.restore)
         form.addRow("AI provider", self.provider)
         form.addRow("Groq API key", self.groq_key)
         form.addRow("", self.groq_remove)
         form.addRow("Groq model", self.groq_model)
         form.addRow("Gemini API key", self.gemini_key)
         form.addRow("", self.gemini_remove)
-        form.addRow("Ollama connection", self.ollama_source)
+        form.addRow("Ollama runtime", self.ollama_source)
         form.addRow(self.colab_link_label, self.colab_url)
         form.addRow("Ollama model", self.ollama_model)
         form.addRow("Orbit workspace", workspace_row)
-        form.addRow("AI file access", self.allow_outside_workspace)
+        form.addRow("File boundary", self.allow_outside_workspace)
 
         controls = QWidget()
         controls_form = QFormLayout(controls)
+        controls_form.setContentsMargins(8, 8, 8, 8)
+        controls_form.setSpacing(10)
+        guide_card = QFrame()
+        guide_card.setObjectName("infoCard")
+        guide_layout = QVBoxLayout(guide_card)
+        guide_layout.setContentsMargins(12, 10, 12, 10)
         guide = QLabel(
             "1. Open Telegram and message @BotFather.\n"
             "2. Use /newbot and paste the bot token below.\n"
@@ -601,8 +770,9 @@ class PreferencesDialog(QDialog):
             "4. Save settings. Only approved IDs can control this PC."
         )
         guide.setWordWrap(True)
-        controls_form.addRow("Setup guide", guide)
-        controls_form.addRow("Enabled", self.telegram_enabled)
+        guide_layout.addWidget(guide)
+        controls_form.addRow("Setup guide", guide_card)
+        controls_form.addRow("Status", self.telegram_enabled)
         controls_form.addRow("Bot token", self.telegram_token)
         controls_form.addRow("Allowed user IDs", self.telegram_ids)
         controls_form.addRow("", self.telegram_unlisted)
@@ -622,23 +792,26 @@ class PreferencesDialog(QDialog):
         controls_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         controls_scroll.setWidget(controls)
         tabs = QTabWidget()
-        tabs.addTab(general_scroll, "General")
-        tabs.addTab(controls_scroll, "Controls")
+        tabs.addTab(general_scroll, "General & AI Engine")
+        tabs.addTab(controls_scroll, "Telegram Remote Control")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        if save_btn := buttons.button(QDialogButtonBox.Save):
+            save_btn.setObjectName("primaryButton")
+            save_btn.setText("Save Changes")
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
         layout.addWidget(title)
         layout.addWidget(tabs, 1)
         layout.addWidget(buttons)
 
         screen = QApplication.primaryScreen()
-        screen_h = screen.availableGeometry().height() if screen else 700
-        self.resize(460, min(520, int(screen_h * 0.80)))
+        screen_h = screen.availableGeometry().height() if screen else 760
+        self.resize(540, min(580, int(screen_h * 0.82)))
 
     @property
     def ollama_url(self):
@@ -757,12 +930,20 @@ class PreferencesDialog(QDialog):
 
 
 def _paint_hud_brackets(widget: QWidget):
+    """Paint subtle, refined sci-fi telemetry corner accents on HUD surfaces."""
+    window = widget.window()
+    theme = getattr(window, "theme", None)
+    accent_hex = theme.accent if theme else "#A855F7"
+    color = QColor(accent_hex)
+    is_tactical = bool(theme and theme.key in {"cyber-cyan", "ghost", "cyberpunk-neon"})
+    color.setAlpha(135 if is_tactical else 55)
+
     painter = QPainter(widget)
     painter.setRenderHint(QPainter.Antialiasing, False)
-    pen = QPen(QColor(61, 224, 245, 220), 1.5)
+    pen = QPen(color, 1.2)
     painter.setPen(pen)
     r = widget.rect()
-    s = 10
+    s = 7
     # Top-left
     painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1 + s, r.top() + 1)
     painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1, r.top() + 1 + s)
@@ -781,9 +962,7 @@ def _paint_hud_brackets(widget: QWidget):
 class HUDFrame(QFrame):
     def paintEvent(self, event):
         super().paintEvent(event)
-        window = self.window()
-        if getattr(window, "theme", None) and window.theme.key == "cyber-cyan":
-            _paint_hud_brackets(self)
+        _paint_hud_brackets(self)
 
 
 class TerminalSession(QWidget):
@@ -800,19 +979,40 @@ class TerminalSession(QWidget):
         self.native = None
         self._active_native = False
         self.active_command = ""
+        self._is_hero_mode = True
+
         self.name_label = QLabel(title)
-        self.name_label.setFont(QFont("JetBrains Mono", 10, QFont.Bold))
+        self.name_label.setFont(QFont("Cascadia Code", 10, QFont.Bold))
         self.path_label = QLabel(f"{shell.ctx.cwd}")
         self.path_label.setObjectName("sessionPath")
         self.state_label = QLabel("READY")
         self.state_label.setObjectName("statusPill")
-        header = HUDFrame()
-        header.setObjectName("terminalHeader")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 8, 12, 8)
+
+        self.clear_button = QPushButton("Clear")
+        self.copy_button = QPushButton("Copy")
+        self.copy_button.setToolTip("Copy selected text, or all output")
+        self.wrap_button = QPushButton("Wrap")
+        self.wrap_button.setObjectName("wrapToggle")
+        self.wrap_button.setCheckable(True)
+        self.wrap_button.setChecked(True)
+        self.wrap_button.setToolTip("Toggle line wrap (default On)")
+        self.wrap_button.toggled.connect(self._toggle_wrap)
+
+        self.header = HUDFrame()
+        self.header.setObjectName("terminalHeader")
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(14, 8, 14, 8)
+        header_layout.setSpacing(10)
+        session_icon = QLabel(">_")
+        session_icon.setObjectName("promptBadge")
+        header_layout.addWidget(session_icon)
         header_layout.addWidget(self.name_label)
         header_layout.addWidget(self.path_label, 1)
+        header_layout.addWidget(self.clear_button)
+        header_layout.addWidget(self.copy_button)
+        header_layout.addWidget(self.wrap_button)
         header_layout.addWidget(self.state_label)
+
         self.console = TerminalOutput()
         self.console.setReadOnly(True)
         self.console.setObjectName("terminalOutput")
@@ -822,9 +1022,10 @@ class TerminalSession(QWidget):
         self.console.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.console_stack = QStackedWidget()
         self.console_stack.addWidget(self.console)
+
         self.input = CommandInput()
         self.input.setObjectName("commandInput")
-        self.input.setPlaceholderText("Run a RiftShell command…  Ctrl+K for command palette")
+        self.input.setPlaceholderText("Enter command (help, files, git, python...)")
         self.input.set_history(shell.ctx.history)
         names = shell.registry.all_names()
         self.input.set_completion_items(names)
@@ -836,33 +1037,92 @@ class TerminalSession(QWidget):
         completer.popup().setUniformItemSizes(True)
         self.legacy_completer = completer
         self.input.setCompleter(completer)
-        self.run_button = QPushButton("Run")
+
+        self.palette_inline_btn = QPushButton("Ctrl+K  ⌄")
+        self.palette_inline_btn.setObjectName("inlinePaletteBtn")
+        self.palette_inline_btn.setToolTip("Open Command Palette (Ctrl+K)")
+        self.palette_inline_btn.setCursor(Qt.PointingHandCursor)
+        self.palette_inline_btn.clicked.connect(self._open_window_palette)
+
+        input_shell = QFrame()
+        input_shell.setObjectName("commandInputShell")
+        input_shell_layout = QHBoxLayout(input_shell)
+        input_shell_layout.setContentsMargins(4, 2, 6, 2)
+        input_shell_layout.setSpacing(4)
+        input_shell_layout.addWidget(self.input, 1)
+        input_shell_layout.addWidget(self.palette_inline_btn)
+
+        self.run_button = QPushButton("Run  ↵")
         self.run_button.setObjectName("primaryButton")
         self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setObjectName("stopButton")
         self.cancel_button.setEnabled(False)
-        self.clear_button = QPushButton("Clear")
-        self.copy_button = QPushButton("Copy")
-        self.wrap_button = QPushButton("Wrap")
-        self.wrap_button.setObjectName("wrapToggle")
-        self.wrap_button.setCheckable(True)
-        self.wrap_button.setChecked(True)
-        self.wrap_button.setToolTip("Toggle line wrap (default On)")
-        self.wrap_button.toggled.connect(self._toggle_wrap)
-        bottom = QHBoxLayout()
-        bottom.setSpacing(8)
-        bottom.addWidget(self.input, 1)
-        bottom.addWidget(self.run_button)
-        bottom.addWidget(self.cancel_button)
-        header_layout.insertWidget(2, self.clear_button)
-        header_layout.insertWidget(3, self.copy_button)
-        header_layout.insertWidget(4, self.wrap_button)
-        self.copy_button.setToolTip("Copy selected text, or all output")
+
+        self.command_dock = HUDFrame()
+        self.command_dock.setObjectName("commandDock")
+        self.command_dock.setMinimumWidth(520)
+        self.command_dock.setMaximumWidth(680)
+        dock_layout = QHBoxLayout(self.command_dock)
+        dock_layout.setContentsMargins(10, 8, 10, 8)
+        dock_layout.setSpacing(10)
+        prompt_glyph = QLabel(">_")
+        prompt_glyph.setObjectName("promptBadge")
+        dock_layout.addWidget(prompt_glyph)
+        dock_layout.addWidget(input_shell, 1)
+        dock_layout.addWidget(self.run_button)
+        dock_layout.addWidget(self.cancel_button)
+
+        # Centered Hero Landing Container (shown until the first command is fired)
+        self.hero_container = QWidget()
+        hero_v = QVBoxLayout(self.hero_container)
+        hero_v.setContentsMargins(24, 24, 24, 36)
+        hero_v.setSpacing(8)
+        hero_v.addStretch(11)
+
+        logo_row = QHBoxLayout()
+        logo_row.addStretch(1)
+        self.hero_logo = HeroLogoWidget(self.hero_container)
+        logo_row.addWidget(self.hero_logo)
+        logo_row.addStretch(1)
+        hero_v.addLayout(logo_row)
+
+        self.hero_title = QLabel("RiftShell")
+        self.hero_title.setObjectName("heroTitle")
+        self.hero_title.setAlignment(Qt.AlignCenter)
+        hero_v.addWidget(self.hero_title)
+
+        self.hero_subtitle = QLabel("Your AI-Native Windows Shell")
+        self.hero_subtitle.setObjectName("heroSubtitle")
+        self.hero_subtitle.setAlignment(Qt.AlignCenter)
+        hero_v.addWidget(self.hero_subtitle)
+
+        hero_v.addSpacing(22)
+
+        self.hero_dock_row = QHBoxLayout()
+        self.hero_dock_row.addStretch(1)
+        self.hero_dock_row.addWidget(self.command_dock, 1)
+        self.hero_dock_row.addStretch(1)
+        hero_v.addLayout(self.hero_dock_row)
+        hero_v.addStretch(13)
+
+        # Bottom Dock Holder (populated when the first command settles the input bar to bottom)
+        self.bottom_dock_holder = QWidget()
+        self.bottom_dock_layout = QVBoxLayout(self.bottom_dock_holder)
+        self.bottom_dock_layout.setContentsMargins(0, 0, 0, 0)
+        self.bottom_dock_layout.setSpacing(0)
+
+        self.header.setVisible(False)
+        self.console_stack.setVisible(False)
+        self.bottom_dock_holder.setVisible(False)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
-        layout.addWidget(header)
+        layout.addWidget(self.hero_container, 1)
+        layout.addWidget(self.header)
         layout.addWidget(self.console_stack, 1)
-        layout.addLayout(bottom)
+        layout.addWidget(self.bottom_dock_holder)
+
         self.run_button.clicked.connect(self.run_command)
         self.input.returnPressed.connect(self.run_command)
         self.cancel_button.clicked.connect(self.request_cancel)
@@ -886,9 +1146,30 @@ class TerminalSession(QWidget):
             self.append_system("RiftShell ready. Built-ins and PowerShell commands share this terminal.")
         else:
             self.append_error(dependency_error)
-        self.input.setPlaceholderText("RiftShell command (help, files, git...)")
+        self.input.setPlaceholderText("Enter command (help, files, git, python...)")
         self._set_running(self.is_busy)
         self.apply_preferences(preferences)
+
+    def _open_window_palette(self):
+        win = self.window()
+        if hasattr(win, "open_palette"):
+            win.open_palette()
+
+    def _settle_to_bottom(self):
+        """Move the command input dock from the centered Hero screen to the bottom of the terminal."""
+        if not self._is_hero_mode:
+            return
+        self._is_hero_mode = False
+        self.hero_container.setVisible(False)
+        self.hero_dock_row.removeWidget(self.command_dock)
+        self.command_dock.setMinimumWidth(0)
+        self.command_dock.setMaximumWidth(16777215)
+        self.bottom_dock_layout.addWidget(self.command_dock)
+        self.header.setVisible(True)
+        self.console_stack.setVisible(True)
+        self.bottom_dock_holder.setVisible(True)
+        if self.native:
+            self.native_console._resize_screen()
 
     @property
     def is_busy(self) -> bool:
@@ -968,12 +1249,12 @@ class TerminalSession(QWidget):
         self.legacy_completer.popup().setFont(font)
         self.console.setFont(font)
         self.input.setFont(font)
-        self.name_label.setFont(QFont("JetBrains Mono", 10, QFont.Bold))
+        self.name_label.setFont(QFont("Cascadia Code", 10, QFont.Bold))
         if self.native:
             self.native_console.setStyleSheet(font_css)
             self.native_console.setFont(font)
             theme = self._theme()
-            self.native_console.set_colors(theme.text, theme.background, theme.selection, theme.accent)
+            self.native_console.set_colors(theme.text, theme.terminalBg, theme.selection, theme.accent)
             self.native_console._resize_screen()
 
     def _theme(self):
@@ -993,6 +1274,7 @@ class TerminalSession(QWidget):
 
     def append_external_command(self, command: str, result):
         """Display a command executed by a remote control channel."""
+        self._settle_to_bottom()
         self.append_html(f"{self.shell.prompt()}{command}", self._theme().accent_alt, "$")
         if result.output:
             (self.append_output if result.success else self.append_error)(result.output)
@@ -1032,8 +1314,10 @@ class TerminalSession(QWidget):
             return False
         use_native = self._uses_native(command, from_orbit)
         if command.lower() in {"clear", "cls"} and not use_native:
+            self._settle_to_bottom()
             self.clear_console()
             self.input.clear()
+            self.input.setFocus()
             return True
         decision = None if approval_granted else (
             self.safety.check_powershell_command(command) if use_native and self.preferences["confirm_risky"]
@@ -1052,6 +1336,7 @@ class TerminalSession(QWidget):
             if dialog.exec() != QMessageBox.Yes:
                 self.append_system("Command cancelled before execution.")
                 return False
+        self._settle_to_bottom()
         if use_native:
             self.console_stack.setCurrentWidget(self.native_console)
             self.native_console._resize_screen()
@@ -1142,6 +1427,7 @@ class TerminalSession(QWidget):
 class OrbitPanel(QFrame):
     action_requested = Signal(object, bool, object)
     output_ready = Signal(object, str)
+    collapse_requested = Signal()
 
     def __init__(self, session_provider, parent=None):
         super().__init__(parent)
@@ -1159,16 +1445,26 @@ class OrbitPanel(QFrame):
         self.continue_timer = QTimer(self)
         self.continue_timer.setSingleShot(True)
         self.continue_timer.timeout.connect(self._continue_task)
-        heading = QLabel("ORBIT AI")
+
+        heading = QLabel("◈  ORBIT AI COPILOT")
         heading.setObjectName("sectionTitle")
         hf = heading.font()
-        hf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        hf.setLetterSpacing(QFont.PercentageSpacing, 108)
         heading.setFont(hf)
-        self.thinking_indicator = QLabel("")
+
+        self.thinking_indicator = QLabel("IDLE")
         self.thinking_indicator.setObjectName("statusPill")
         self.thinking_timer = QTimer(self)
         self.thinking_timer.timeout.connect(self._advance_thinking_indicator)
         self.thinking_frame = 0
+
+        self.collapse_btn = QPushButton("»")
+        self.collapse_btn.setObjectName("railToggleBtn")
+        self.collapse_btn.setFixedSize(30, 26)
+        self.collapse_btn.setToolTip("Collapse Orbit Panel")
+        self.collapse_btn.setCursor(Qt.PointingHandCursor)
+        self.collapse_btn.clicked.connect(self.collapse_requested.emit)
+
         self.stream_timer = QTimer(self)
         self.stream_timer.timeout.connect(self._stream_next_chunk)
         self.stream_text = ""
@@ -1178,8 +1474,11 @@ class OrbitPanel(QFrame):
         self._preview_worker = None
         self.messages: list[tuple[str, str]] = []
         self._last_rendered_count = 0
+
         self.status = QLabel("Ask anything or request a workspace action.")
+        self.status.setObjectName("orbitStatusBanner")
         self.status.setWordWrap(True)
+
         self.conversation = QTextEdit()
         self.conversation.setObjectName("orbitConversation")
         self.conversation.setReadOnly(True)
@@ -1187,67 +1486,93 @@ class OrbitPanel(QFrame):
         self.conversation.setLineWrapMode(QTextEdit.WidgetWidth)
         self.conversation.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.conversation.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.conversation.document().setDocumentMargin(8)
         self.conversation.document().setDefaultStyleSheet("""
             body, p, div, span {
                 white-space: pre-wrap;
                 overflow-wrap: anywhere;
                 word-break: break-word;
+                line-height: 145%;
                 min-width: 0;
             }
             pre, code {
                 white-space: pre-wrap;
                 overflow-wrap: anywhere;
                 word-break: break-all;
-                font-family: "JetBrains Mono", "Cascadia Code", monospace;
-                font-size: 13px;
-                line-height: 140%;
+                font-family: "Cascadia Code", "JetBrains Mono", monospace;
+                font-size: 12.5px;
+                line-height: 142%;
             }
             a {
+                color: #C084FC;
                 overflow-wrap: anywhere;
                 word-break: break-all;
             }
         """)
+
         self.input = QLineEdit()
         self.input.setObjectName("orbitInput")
-        self.input.setPlaceholderText("Ask Orbit: 'explain code', 'show files'…")
-        self.plan_button = QPushButton("Ask Orbit")
+        self.input.setPlaceholderText("Ask Orbit to inspect files, run commands, or write code…")
+        self.plan_button = QPushButton("Ask Orbit  ↵")
         self.plan_button.setObjectName("primaryButton")
-        self.approve_button = QPushButton("Approve")
+        self.approve_button = QPushButton("✓  Approve")
         self.approve_button.setObjectName("approveButton")
         self.approve_button.setEnabled(False)
-        self.reject_button = QPushButton("Dismiss")
+        self.reject_button = QPushButton("✕  Dismiss")
         self.reject_button.setObjectName("dismissButton")
         self.reject_button.setEnabled(False)
-        self.stop_button = QPushButton("Stop")
+        self.stop_button = QPushButton("■  Stop")
         self.stop_button.setObjectName("stopButton")
         self.stop_button.setEnabled(False)
+
         actions = QHBoxLayout()
+        actions.setSpacing(6)
         actions.addWidget(self.approve_button)
         actions.addWidget(self.reject_button)
         actions.addWidget(self.stop_button)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
         header = QHBoxLayout()
         header.addWidget(heading)
         header.addStretch()
         header.addWidget(self.thinking_indicator)
+        header.addWidget(self.collapse_btn)
         layout.addLayout(header)
-        mode_row = QHBoxLayout()
+
+        mode_card = QFrame()
+        mode_card.setObjectName("modeBar")
+        mode_row = QHBoxLayout(mode_card)
+        mode_row.setContentsMargins(10, 6, 10, 6)
+        mode_row.setSpacing(8)
         self.mode_selector = QComboBox()
         self.mode_selector.setToolTip("Choose the budget for your next Orbit task")
         self.mode_selector.currentIndexChanged.connect(self._select_mode)
-        mode_button = QPushButton("Modes...")
+        mode_button = QPushButton("Modes…")
         mode_button.clicked.connect(self._edit_modes)
-        mode_row.addWidget(QLabel("Mode"))
+        mode_lbl = QLabel("MODE")
+        mode_lbl.setObjectName("eyebrow")
+        mode_row.addWidget(mode_lbl)
         mode_row.addWidget(self.mode_selector, 1)
         mode_row.addWidget(mode_button)
-        layout.addLayout(mode_row)
+        layout.addWidget(mode_card)
+
         self._reload_modes()
         layout.addWidget(self.status)
         layout.addWidget(self.conversation, 1)
-        layout.addWidget(self.input)
-        layout.addWidget(self.plan_button)
-        layout.addLayout(actions)
+
+        composer = QFrame()
+        composer.setObjectName("orbitComposer")
+        composer_layout = QVBoxLayout(composer)
+        composer_layout.setContentsMargins(10, 10, 10, 10)
+        composer_layout.setSpacing(8)
+        composer_layout.addWidget(self.input)
+        composer_layout.addWidget(self.plan_button)
+        composer_layout.addLayout(actions)
+        layout.addWidget(composer)
+
         self.plan_button.clicked.connect(self.create_plan)
         self.input.returnPressed.connect(self.create_plan)
         self.approve_button.clicked.connect(self.approve)
@@ -1256,9 +1581,7 @@ class OrbitPanel(QFrame):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        window = self.window()
-        if getattr(window, "theme", None) and window.theme.key == "cyber-cyan":
-            _paint_hud_brackets(self)
+        _paint_hud_brackets(self)
 
     def _reload_modes(self):
         self.mode_selector.blockSignals(True)
@@ -1301,7 +1624,7 @@ class OrbitPanel(QFrame):
             self.plan_button.setEnabled(False)
             return
         self.thinking_timer.stop()
-        self.thinking_indicator.setText("")
+        self.thinking_indicator.setText("IDLE")
         available = (not self.executing and not self.continue_timer.isActive()
                      and self._preview_worker is None)
         becoming_available = available and not self.input.isEnabled()
@@ -1349,10 +1672,6 @@ class OrbitPanel(QFrame):
         if not prompt or session is None or self.executing or self.continue_timer.isActive() or self._preview_worker is not None or self.worker and self.worker.isRunning():
             return
 
-        # A confirmation typed into the chat box approves the exact proposal
-        # already on screen.  Do not send it back to the model as a new prompt:
-        # doing so used to discard the generated code and elicit replies such as
-        # "please provide the code" instead of applying the reviewed write.
         if self.pending_action:
             decision = pending_action_reply(prompt)
             if decision == "approve":
@@ -1428,7 +1747,7 @@ class OrbitPanel(QFrame):
         action = self.task.accept(action)
         self.pending_action = None
         self.pending_snapshots = None
-        self.approve_button.setText("Approve & run")
+        self.approve_button.setText("✓  Approve & run")
         self.approve_button.setEnabled(False)
         self.reject_button.setEnabled(False)
         message = action.message or (
@@ -1500,7 +1819,7 @@ class OrbitPanel(QFrame):
             f"{message}\n\nFiles: {paths}\n\nReview the proposed diff:\n\n```diff\n{preview.output}\n```",
         )
         self.status.setText("Review the diff before applying these file changes.")
-        self.approve_button.setText("Approve changes")
+        self.approve_button.setText("✓  Approve changes")
         self.approve_button.setEnabled(True)
         self.reject_button.setEnabled(True)
 
@@ -1536,37 +1855,33 @@ class OrbitPanel(QFrame):
         return text
 
     def _render_conversation(self):
-        # Fast path: only render newly added messages incrementally
         rendered = getattr(self, '_last_rendered_count', 0)
         total = len(self.messages)
 
         if rendered == 0 or rendered > total:
-            # Full re-render needed (first time or after reset)
             blocks = []
             for label, text in self.messages:
                 body = self._escape_user_markdown(text) if label == "You" else text
-                blocks.append(f"**{label}**\n\n{body}")
+                tag = "❯ **You**" if label == "You" else "◈ **Orbit**"
+                blocks.append(f"{tag}\n\n{body}")
             self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
             self._last_rendered_count = total
         elif total > rendered:
-            # Incremental: append only new messages
             cursor = self.conversation.textCursor()
             cursor.movePosition(QTextCursor.End)
             for label, text in self.messages[rendered:]:
                 body = self._escape_user_markdown(text) if label == "You" else text
+                tag = "❯ **You**" if label == "You" else "◈ **Orbit**"
                 cursor.insertBlock()
-                cursor.insertMarkdown(f"---\n\n**{label}**\n\n{body}")
+                cursor.insertMarkdown(f"---\n\n{tag}\n\n{body}")
             self._last_rendered_count = total
         else:
-            # Same count but content may have changed (streaming update)
-            # Only re-render the last message block
             if total > 0:
-                label, text = self.messages[-1]
-                body = self._escape_user_markdown(text) if label == "You" else text
                 blocks = []
                 for l, t in self.messages:
                     b = self._escape_user_markdown(t) if l == "You" else t
-                    blocks.append(f"**{l}**\n\n{b}")
+                    tag = "❯ **You**" if l == "You" else "◈ **Orbit**"
+                    blocks.append(f"{tag}\n\n{b}")
                 self.conversation.setMarkdown("\n\n---\n\n".join(blocks))
 
         cursor = self.conversation.textCursor()
@@ -1634,7 +1949,7 @@ class OrbitPanel(QFrame):
                 self.status.setText("Executing approved command in the active terminal.")
         self.pending_action = None
         self.pending_snapshots = None
-        self.approve_button.setText("Approve & run")
+        self.approve_button.setText("✓  Approve & run")
         self.approve_button.setEnabled(False)
         self.reject_button.setEnabled(False)
 
@@ -1644,7 +1959,7 @@ class OrbitPanel(QFrame):
         self.stop_button.setEnabled(False)
         self.pending_action = None
         self.pending_snapshots = None
-        self.approve_button.setText("Approve & run")
+        self.approve_button.setText("✓  Approve & run")
         self.approve_button.setEnabled(False)
         self.reject_button.setEnabled(False)
         self.status.setText("Ask anything, or request a workspace action.")
@@ -1655,10 +1970,6 @@ class OrbitPanel(QFrame):
         if self.executing and self.task_session and self.task_session.is_busy:
             self.task_session.request_cancel()
         self.status.setText("Stopped. An in-flight request or approved write may finish; no further step will run.")
-        # QThreads remain parent-owned until their finished handlers delete them.
-        # Detach cancelled planning/preview work so it cannot lock a new request
-        # or deliver a late action into a different task. Approved execution is
-        # still busy until its actual result returns.
         self.worker = None
         self._preview_worker = None
         self._set_thinking(False)
@@ -1743,14 +2054,16 @@ class MainWindow(QMainWindow):
         self.history = self._load_history() if self.preferences["restore_history"] else []
         self._orbit_execution: tuple[TerminalSession, str] | None = None
         self._orbit_write_worker: FileWriteWorker | None = None
+        self._left_collapsed = True
+        self._right_collapsed = True
         self.setWindowTitle(f"RiftShell v{__version__} — Developer Workspace")
         icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
-        self.resize(1440, 880)
+        self.resize(1460, 890)
         self.setMinimumSize(1080, 680)
         self.setStyleSheet(build_stylesheet(self.theme))
-        self.setFont(QFont("Inter", 10))
+        self.setFont(QFont("Segoe UI Variable Text", 10))
         self.update_controller = UpdateController(self)
         self._build_workspace()
         self._install_shortcuts()
@@ -1766,7 +2079,6 @@ class MainWindow(QMainWindow):
             defaults = (ai.ai_provider, ai.groq_model, ai.ollama_base_url, ai.ollama_model,
                         str(ai.workspace_root), ai.allow_outside_workspace)
         except ValueError:
-            # A bad developer .env must not prevent the desktop shell from opening.
             defaults = ("auto", "llama-3.3-70b-versatile", "http://127.0.0.1:11434", "",
                         str(Path.home()), False)
         ollama_url = self.settings.value("ai/ollama_base_url", defaults[2], type=str)
@@ -1806,23 +2118,39 @@ class MainWindow(QMainWindow):
     def _build_workspace(self):
         self.title_bar = CustomTitleBar(self)
         root = QSplitter(Qt.Horizontal)
-        root.setHandleWidth(5)
+        root.setHandleWidth(2)
         root.setChildrenCollapsible(False)
-        root.addWidget(self._build_sidebar())
+
+        self.left_panel_stack = QStackedWidget()
+        self.left_rail = self._build_left_rail()
+        self.sidebar_expanded = self._build_sidebar()
+        self.left_panel_stack.addWidget(self.left_rail)
+        self.left_panel_stack.addWidget(self.sidebar_expanded)
+        root.addWidget(self.left_panel_stack)
+
         self.tabs = QTabWidget()
         self.tabs.setObjectName("workspaceTabs")
         self.tabs.setTabsClosable(True)
         self.tabs.setDocumentMode(True)
+        self.tabs.setTabBarAutoHide(True)
         self.tabs.currentChanged.connect(self._refresh_workspace)
         self.tabs.tabCloseRequested.connect(self.close_session_at)
         root.addWidget(self.tabs)
+
+        self.right_panel_stack = QStackedWidget()
+        self.right_rail = self._build_right_rail()
         self.orbit = OrbitPanel(self.current_session)
-        self.orbit.setMinimumWidth(320)
+        self.orbit.setMinimumWidth(330)
         self.orbit.action_requested.connect(self._run_orbit_action)
         self.orbit.output_ready.connect(self._show_orbit_output)
-        root.addWidget(self.orbit)
-        root.setSizes([260, 880, 300])
+        self.orbit.collapse_requested.connect(lambda: self.set_right_collapsed(True))
+        self.right_panel_stack.addWidget(self.right_rail)
+        self.right_panel_stack.addWidget(self.orbit)
+        root.addWidget(self.right_panel_stack)
+
         self.root_splitter = root
+        self.set_left_collapsed(True)
+        self.set_right_collapsed(True)
 
         container = QWidget()
         container.setObjectName("windowContainer")
@@ -1835,73 +2163,255 @@ class MainWindow(QMainWindow):
 
         self.status_label = QLabel()
         self.statusBar().addWidget(self.status_label, 1)
-        self.safety_label = QLabel("SAFE MODE")
+        self.safety_label = QLabel("⛨  SAFE MODE")
         self.safety_label.setObjectName("statusPill")
         self.statusBar().addPermanentWidget(self.safety_label)
+        self._refresh_rail_icons()
+
+    def _build_left_rail(self) -> QWidget:
+        rail = QFrame()
+        rail.setObjectName("leftRail")
+        rail.setFixedWidth(58)
+        layout = QVBoxLayout(rail)
+        layout.setContentsMargins(9, 14, 9, 14)
+        layout.setSpacing(10)
+
+        self.rail_new_btn = QPushButton()
+        self.rail_new_btn.setObjectName("railPrimaryBtn")
+        self.rail_new_btn.setFixedSize(40, 40)
+        self.rail_new_btn.setIconSize(QSize(22, 22))
+        self.rail_new_btn.setToolTip("New Terminal Session (Ctrl+Shift+T)")
+        self.rail_new_btn.setCursor(Qt.PointingHandCursor)
+        self.rail_new_btn.clicked.connect(self.new_session)
+        layout.addWidget(self.rail_new_btn, 0, Qt.AlignHCenter)
+
+        layout.addSpacing(4)
+
+        self._left_rail_buttons: list[tuple[QPushButton, str]] = []
+        rail_actions = [
+            ("grid", "Command Palette (Ctrl+K)", self.open_palette),
+            ("clock", "Command History", self.show_history),
+            ("explorer", "Command Explorer", self.show_command_explorer),
+            ("settings", "Workspace Settings (Ctrl+,)", self.open_settings),
+            ("updates", "Check for Updates", lambda: self.update_controller.check(silent=False)),
+            ("cube", "Manage Extensions", self.show_plugins),
+        ]
+        for icon_kind, tooltip, callback in rail_actions:
+            btn = QPushButton()
+            btn.setObjectName("railIconBtn")
+            btn.setFixedSize(38, 38)
+            btn.setIconSize(QSize(21, 21))
+            btn.setToolTip(tooltip)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(callback)
+            layout.addWidget(btn, 0, Qt.AlignHCenter)
+            self._left_rail_buttons.append((btn, icon_kind))
+
+        layout.addStretch(1)
+
+        self.expand_left_btn = QPushButton("»")
+        self.expand_left_btn.setObjectName("railToggleBtn")
+        self.expand_left_btn.setFixedSize(36, 32)
+        self.expand_left_btn.setToolTip("Expand Sidebar")
+        self.expand_left_btn.setCursor(Qt.PointingHandCursor)
+        self.expand_left_btn.clicked.connect(lambda: self.set_left_collapsed(False))
+        layout.addWidget(self.expand_left_btn, 0, Qt.AlignHCenter)
+        return rail
+
+    def _build_right_rail(self) -> QWidget:
+        rail = QFrame()
+        rail.setObjectName("rightRail")
+        rail.setFixedWidth(64)
+        layout = QVBoxLayout(rail)
+        layout.setContentsMargins(7, 14, 7, 14)
+        layout.setSpacing(10)
+
+        self.rail_orbit_btn = QToolButton()
+        self.rail_orbit_btn.setObjectName("railCardBtn")
+        self.rail_orbit_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self.rail_orbit_btn.setText("Orbit")
+        self.rail_orbit_btn.setIconSize(QSize(24, 24))
+        self.rail_orbit_btn.setFixedSize(50, 56)
+        self.rail_orbit_btn.setToolTip("Open Orbit AI Copilot")
+        self.rail_orbit_btn.setCursor(Qt.PointingHandCursor)
+        self.rail_orbit_btn.clicked.connect(self._open_orbit_from_rail)
+        layout.addWidget(self.rail_orbit_btn, 0, Qt.AlignHCenter)
+
+        self.rail_modes_btn = QToolButton()
+        self.rail_modes_btn.setObjectName("railCardBtn")
+        self.rail_modes_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self.rail_modes_btn.setText("Modes")
+        self.rail_modes_btn.setIconSize(QSize(22, 22))
+        self.rail_modes_btn.setFixedSize(50, 56)
+        self.rail_modes_btn.setToolTip("Configure Orbit Execution Modes")
+        self.rail_modes_btn.setCursor(Qt.PointingHandCursor)
+        self.rail_modes_btn.clicked.connect(lambda: self.orbit._edit_modes())
+        layout.addWidget(self.rail_modes_btn, 0, Qt.AlignHCenter)
+
+        layout.addStretch(1)
+
+        self.expand_right_btn = QPushButton("«")
+        self.expand_right_btn.setObjectName("railToggleBtn")
+        self.expand_right_btn.setFixedSize(36, 32)
+        self.expand_right_btn.setToolTip("Expand Orbit Panel")
+        self.expand_right_btn.setCursor(Qt.PointingHandCursor)
+        self.expand_right_btn.clicked.connect(lambda: self.set_right_collapsed(False))
+        layout.addWidget(self.expand_right_btn, 0, Qt.AlignHCenter)
+        return rail
+
+    def _refresh_rail_icons(self):
+        muted = self.theme.textMuted if self.theme else "#9D8EB5"
+        accent = self.theme.accent_alt if self.theme else "#C084FC"
+        if hasattr(self, "rail_new_btn"):
+            self.rail_new_btn.setIcon(_make_vector_icon("terminal", muted, accent, 24))
+        for btn, kind in getattr(self, "_left_rail_buttons", []):
+            btn.setIcon(_make_vector_icon(kind, muted, accent, 22))
+        if hasattr(self, "rail_orbit_btn"):
+            self.rail_orbit_btn.setIcon(_make_vector_icon("orbit", muted, accent, 24))
+        if hasattr(self, "rail_modes_btn"):
+            self.rail_modes_btn.setIcon(_make_vector_icon("modes", muted, accent, 22))
+
+    def _open_orbit_from_rail(self):
+        self.set_right_collapsed(False)
+        self.orbit.input.setFocus()
+
+    def set_left_collapsed(self, collapsed: bool):
+        self._left_collapsed = bool(collapsed)
+        if self._left_collapsed:
+            self.left_panel_stack.setCurrentWidget(self.left_rail)
+            self.left_panel_stack.setFixedWidth(58)
+        else:
+            self.left_panel_stack.setCurrentWidget(self.sidebar_expanded)
+            self.left_panel_stack.setMinimumWidth(240)
+            self.left_panel_stack.setMaximumWidth(310)
+        self._sync_splitter_sizes()
+
+    def set_right_collapsed(self, collapsed: bool):
+        self._right_collapsed = bool(collapsed)
+        if self._right_collapsed:
+            self.right_panel_stack.setCurrentWidget(self.right_rail)
+            self.right_panel_stack.setFixedWidth(64)
+        else:
+            self.right_panel_stack.setCurrentWidget(self.orbit)
+            self.right_panel_stack.setMinimumWidth(330)
+            self.right_panel_stack.setMaximumWidth(480)
+        self._sync_splitter_sizes()
+
+    def _sync_splitter_sizes(self):
+        if not hasattr(self, "root_splitter"):
+            return
+        total = max(1080, self.width())
+        left_w = 58 if self._left_collapsed else 255
+        right_w = 64 if self._right_collapsed else 340
+        center_w = max(500, total - left_w - right_w)
+        self.root_splitter.setSizes([left_w, center_w, right_w])
 
     def _build_sidebar(self) -> QWidget:
         panel = HUDFrame()
         panel.setObjectName("sidebar")
-        panel.setMinimumWidth(230)
-        panel.setMaximumWidth(320)
+        panel.setMinimumWidth(240)
+        panel.setMaximumWidth(310)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 18, 16, 16)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 16, 16, 14)
+        layout.setSpacing(6)
+
+        brand_row = QHBoxLayout()
         brand = QLabel("RiftShell")
         brand.setObjectName("brand")
-        layout.addWidget(brand)
-        subtitle = QLabel("DEVELOPER WORKSPACE")
+        brand_row.addWidget(brand)
+        brand_row.addStretch()
+        collapse_top_btn = QPushButton("«")
+        collapse_top_btn.setObjectName("railToggleBtn")
+        collapse_top_btn.setFixedSize(30, 26)
+        collapse_top_btn.setToolTip("Collapse Sidebar")
+        collapse_top_btn.setCursor(Qt.PointingHandCursor)
+        collapse_top_btn.clicked.connect(lambda: self.set_left_collapsed(True))
+        brand_row.addWidget(collapse_top_btn)
+        layout.addLayout(brand_row)
+
+        subtitle = QLabel("AI-NATIVE WINDOWS SHELL")
         subtitle.setObjectName("eyebrow")
         sf = subtitle.font()
-        sf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        sf.setLetterSpacing(QFont.PercentageSpacing, 108)
         subtitle.setFont(sf)
         layout.addWidget(subtitle)
-        layout.addSpacing(14)
-        self.new_button = QPushButton("+  New Terminal")
+        layout.addSpacing(10)
+
+        self.new_button = QPushButton("+   New Terminal Session")
         self.new_button.setObjectName("primaryButton")
         self.new_button.clicked.connect(self.new_session)
         layout.addWidget(self.new_button)
+        layout.addSpacing(6)
+
+        tools_title = QLabel("WORKSPACE TOOLS")
+        tools_title.setObjectName("sectionTitle")
+        layout.addWidget(tools_title)
+
         for label, callback in [
-            ("Command Palette", self.open_palette), ("Command History", self.show_history),
-            ("Command Explorer", self.show_command_explorer), ("Workspace Settings", self.open_settings),
-            ("Check for Updates", lambda: self.update_controller.check(silent=False)),
+            ("⌘   Command Palette", self.open_palette),
+            ("◷   Command History", self.show_history),
+            ("⊞   Command Explorer", self.show_command_explorer),
+            ("⚙   Workspace Settings", self.open_settings),
+            ("↻   Check for Updates", lambda: self.update_controller.check(silent=False)),
         ]:
             button = QPushButton(label)
             button.setObjectName("navButton")
             button.clicked.connect(callback)
             layout.addWidget(button)
-        layout.addSpacing(14)
-        sessions_title = QLabel("SESSIONS")
+
+        layout.addSpacing(10)
+        sessions_title = QLabel("ACTIVE SESSIONS")
         sessions_title.setObjectName("sectionTitle")
         stf = sessions_title.font()
-        stf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        stf.setLetterSpacing(QFont.PercentageSpacing, 108)
         sessions_title.setFont(stf)
         layout.addWidget(sessions_title)
+
         self.session_list = QListWidget()
         self.session_list.setWordWrap(True)
         self.session_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.session_list.setMaximumHeight(180)
+        self.session_list.setMaximumHeight(165)
         self.session_list.itemClicked.connect(self._activate_session_item)
         self.session_list.itemDoubleClicked.connect(self._rename_session_item)
         layout.addWidget(self.session_list)
+
+        layout.addSpacing(8)
         plugins_title = QLabel("EXTENSIONS")
         plugins_title.setObjectName("sectionTitle")
         ptf = plugins_title.font()
-        ptf.setLetterSpacing(QFont.PercentageSpacing, 112)
+        ptf.setLetterSpacing(QFont.PercentageSpacing, 108)
         plugins_title.setFont(ptf)
         layout.addWidget(plugins_title)
+
+        ext_card = QFrame()
+        ext_card.setObjectName("extensionCard")
+        ext_layout = QVBoxLayout(ext_card)
+        ext_layout.setContentsMargins(10, 8, 10, 8)
+        ext_layout.setSpacing(6)
         self.plugin_summary = QLabel()
         self.plugin_summary.setWordWrap(True)
-        layout.addWidget(self.plugin_summary)
-        plugins_button = QPushButton("Manage Extensions")
+        ext_layout.addWidget(self.plugin_summary)
+        plugins_button = QPushButton("Manage Extensions…")
         plugins_button.setObjectName("navButton")
         plugins_button.clicked.connect(self.show_plugins)
-        layout.addWidget(plugins_button)
+        ext_layout.addWidget(plugins_button)
+        layout.addWidget(ext_card)
+
         layout.addStretch()
-        hint = QLabel("Ctrl+K  Command palette\nCtrl+Shift+T  New terminal")
+
+        bottom_row = QHBoxLayout()
+        hint = QLabel("Ctrl+K  Palette  ·  Ctrl+Shift+T  New")
         hint.setWordWrap(True)
         hint.setObjectName("sessionPath")
-        layout.addWidget(hint)
+        self.collapse_left_btn = QPushButton("«")
+        self.collapse_left_btn.setObjectName("railToggleBtn")
+        self.collapse_left_btn.setFixedSize(34, 30)
+        self.collapse_left_btn.setToolTip("Collapse Sidebar")
+        self.collapse_left_btn.setCursor(Qt.PointingHandCursor)
+        self.collapse_left_btn.clicked.connect(lambda: self.set_left_collapsed(True))
+        bottom_row.addWidget(hint, 1)
+        bottom_row.addWidget(self.collapse_left_btn)
+        layout.addLayout(bottom_row)
         return panel
 
     def _install_shortcuts(self):
@@ -1966,7 +2476,7 @@ class MainWindow(QMainWindow):
             if not isinstance(tab, TerminalSession):
                 continue
             status_dot = "●" if tab.is_busy else "○"
-            item = QListWidgetItem(f"{status_dot}  {tab.title}")
+            item = QListWidgetItem(f"{status_dot}   {tab.title}")
             item.setData(Qt.UserRole, index)
             item.setToolTip(str(tab.shell.ctx.cwd))
             self.session_list.addItem(item)
@@ -1978,13 +2488,15 @@ class MainWindow(QMainWindow):
             if hasattr(self, "title_bar"):
                 current_cwd = str(session.shell.ctx.cwd)
                 folder_name = Path(current_cwd).name or current_cwd
-                self.title_bar.set_workspace_text(f"DEVELOPER WORKSPACE  —  {folder_name}")
+                self.title_bar.set_workspace_text(f"◈   WORKSPACE   //   {folder_name}")
             plugins = session.shell.ctx.plugins
             loaded = len(plugins.loaded) if plugins else 0
             failed = len(plugins.failed) if plugins else 0
-            self.plugin_summary.setText(f"{loaded} loaded  •  {failed} needs attention")
+            self.plugin_summary.setText(f"{loaded} active  ·  {failed} attention")
             status_str = "● RUNNING" if session.is_busy else "● READY"
-            self.status_label.setText(f"{status_str}  ·  {session.shell.ctx.cwd}  ·  {len(session.shell.registry.all_names())} commands")
+            self.status_label.setText(f"{status_str}   │   {session.shell.ctx.cwd}   │   {len(session.shell.registry.all_names())} commands")
+        if hasattr(self, "safety_label"):
+            self.safety_label.setText("⛨  SAFE MODE" if self.preferences.get("confirm_risky", True) else "⚡  FAST MODE")
 
     def _activate_session_item(self, item):
         self.tabs.setCurrentIndex(item.data(Qt.UserRole))
@@ -2036,16 +2548,21 @@ class MainWindow(QMainWindow):
     def show_history(self):
         session = self.current_session()
         dialog = QDialog(self)
-        dialog.setWindowTitle("Command history")
-        dialog.resize(650, 480)
+        dialog.setWindowTitle("Command History")
+        dialog.resize(660, 490)
+        eyebrow = QLabel("◷  RECENT COMMAND HISTORY")
+        eyebrow.setObjectName("eyebrow")
         search = QLineEdit()
         search.setPlaceholderText("Filter command history…")
         listing = QListWidget()
         listing.setWordWrap(True)
         listing.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        use = QPushButton("Use command")
+        use = QPushButton("Insert Selected Command")
+        use.setObjectName("primaryButton")
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        layout.addWidget(eyebrow)
         layout.addWidget(search)
         layout.addWidget(listing, 1)
         layout.addWidget(use)
@@ -2071,21 +2588,31 @@ class MainWindow(QMainWindow):
         if not session:
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle("Command explorer")
-        dialog.resize(820, 560)
+        dialog.setWindowTitle("Command Explorer")
+        dialog.resize(840, 580)
+        eyebrow = QLabel("⊞  BUILT-IN & EXTENSION COMMAND EXPLORER")
+        eyebrow.setObjectName("eyebrow")
         search = QLineEdit()
         search.setPlaceholderText("Search commands, aliases, descriptions…")
         listing = QListWidget()
         listing.setWordWrap(True)
         listing.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        details_card = QFrame()
+        details_card.setObjectName("infoCard")
+        details_layout = QVBoxLayout(details_card)
+        details_layout.setContentsMargins(12, 10, 12, 10)
         details = QLabel("Select a command to inspect its usage and source.")
         details.setWordWrap(True)
-        use = QPushButton("Use selected command")
+        details_layout.addWidget(details)
+        use = QPushButton("Use Selected Command")
+        use.setObjectName("primaryButton")
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        layout.addWidget(eyebrow)
         layout.addWidget(search)
         layout.addWidget(listing, 1)
-        layout.addWidget(details)
+        layout.addWidget(details_card)
         layout.addWidget(use)
         metas = session.shell.registry.list_metadata()
         def refresh(query=""):
@@ -2096,7 +2623,7 @@ class MainWindow(QMainWindow):
                 if score is not None:
                     ranked.append((score, meta))
             for _, meta in sorted(ranked, key=lambda result: result[0]):
-                item = QListWidgetItem(f"{meta.name}  —  {meta.description}")
+                item = QListWidgetItem(f"❯  {meta.name}   —   {meta.description}")
                 item.setData(Qt.UserRole, meta)
                 listing.addItem(item)
         def describe(item):
@@ -2136,7 +2663,7 @@ class MainWindow(QMainWindow):
         self.preferences["telegram_token_saved"] = self._telegram_token_saved()
         self._configure_telegram()
         self.apply_theme(preferences["theme"])
-        self.setFont(QFont("Inter", 10))
+        self.setFont(QFont("Segoe UI Variable Text", 10))
         for index in range(self.tabs.count()):
             if session := self.tabs.widget(index):
                 session.apply_preferences(preferences)
@@ -2179,17 +2706,64 @@ class MainWindow(QMainWindow):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if getattr(self, "theme", None) and self.theme.key == "ghost":
-            painter = QPainter(self)
+        theme = getattr(self, "theme", None)
+        if not theme:
+            return
+        w, h = float(self.width()), float(self.height())
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        if theme.key == "vscode-dark-plus":
+            # Silky obsidian + magenta-violet aurora waves matching the reference design
+            base = QLinearGradient(0, 0, w, h)
+            base.setColorAt(0.0, QColor("#12091E"))
+            base.setColorAt(0.42, QColor("#08050D"))
+            base.setColorAt(0.78, QColor("#14071D"))
+            base.setColorAt(1.0, QColor("#21092A"))
+            painter.fillRect(self.rect(), base)
+
+            # Upper-right magenta-violet wave glow
+            g1 = QRadialGradient(QPointF(w * 0.86, h * 0.28), max(w, h) * 0.48)
+            g1.setColorAt(0.0, QColor(217, 70, 239, 68))
+            g1.setColorAt(0.38, QColor(147, 51, 234, 34))
+            g1.setColorAt(1.0, QColor(11, 7, 17, 0))
+            painter.fillRect(self.rect(), g1)
+
+            # Lower-left crimson-magenta wave glow
+            g2 = QRadialGradient(QPointF(w * 0.16, h * 0.78), max(w, h) * 0.46)
+            g2.setColorAt(0.0, QColor(236, 72, 153, 62))
+            g2.setColorAt(0.42, QColor(126, 34, 206, 28))
+            g2.setColorAt(1.0, QColor(11, 7, 17, 0))
+            painter.fillRect(self.rect(), g2)
+
+            # Bottom-right deep violet glow
+            g3 = QRadialGradient(QPointF(w * 0.82, h * 0.92), max(w, h) * 0.36)
+            g3.setColorAt(0.0, QColor(192, 38, 211, 54))
+            g3.setColorAt(1.0, QColor(11, 7, 17, 0))
+            painter.fillRect(self.rect(), g3)
+
+            # Subtle diagonal aurora fold highlight
+            wave = QPainterPath()
+            wave.moveTo(w * 0.05, h * 0.82)
+            wave.cubicTo(w * 0.32, h * 0.54, w * 0.64, h * 0.48, w * 0.96, h * 0.18)
+            wave.lineTo(w, h * 0.35)
+            wave.cubicTo(w * 0.68, h * 0.58, w * 0.36, h * 0.66, w * 0.08, h * 0.95)
+            wave.closeSubpath()
+            wave_grad = QLinearGradient(0, h * 0.85, w, h * 0.2)
+            wave_grad.setColorAt(0.0, QColor(236, 72, 153, 24))
+            wave_grad.setColorAt(0.5, QColor(168, 85, 247, 14))
+            wave_grad.setColorAt(1.0, QColor(217, 70, 239, 30))
+            painter.fillPath(wave, wave_grad)
+        elif theme.key == "ghost":
             painter.setRenderHint(QPainter.Antialiasing, False)
-            pen = QPen(QColor(61, 224, 245, 9), 1)
+            pen = QPen(QColor(56, 189, 248, 8), 1)
             painter.setPen(pen)
-            w, h = self.width(), self.height()
-            for y in range(0, h, 4):
-                painter.drawLine(0, y, w, y)
-            for x in range(0, w, 40):
-                painter.drawLine(x, 0, x, h)
-            painter.end()
+            for y in range(0, int(h), 6):
+                painter.drawLine(0, y, int(w), y)
+            for x in range(0, int(w), 48):
+                painter.drawLine(x, 0, x, int(h))
+
+        painter.end()
 
     def apply_theme(self, theme_key: str):
         try:
@@ -2199,6 +2773,7 @@ class MainWindow(QMainWindow):
         self.preferences["theme"] = self.theme.key
         self.settings.setValue("appearance/theme", self.theme.key)
         self.setStyleSheet(build_stylesheet(self.theme))
+        self._refresh_rail_icons()
         if sys.platform == "win32":
             try:
                 hwnd = int(self.winId())
@@ -2225,6 +2800,8 @@ class MainWindow(QMainWindow):
             if session := self.tabs.widget(index):
                 session.shell.ctx.current_theme = self.theme.key
                 session.apply_preferences(self.preferences)
+                if hasattr(session, "hero_logo"):
+                    session.hero_logo.update()
         self._refresh_workspace()
         self.update()
 
@@ -2234,9 +2811,9 @@ class MainWindow(QMainWindow):
             return
         report = session.shell.ctx.plugins
         dialog = QDialog(self)
-        dialog.setWindowTitle("Plugin manager")
-        dialog.resize(650, 430)
-        title = QLabel("PLUGINS & EXTENSIONS")
+        dialog.setWindowTitle("Plugin Manager")
+        dialog.resize(660, 440)
+        title = QLabel("◈  PLUGINS & EXTENSIONS")
         title.setObjectName("eyebrow")
         text = QTextEdit()
         text.setReadOnly(True)
@@ -2247,13 +2824,14 @@ class MainWindow(QMainWindow):
         lines.append("\nPlugin enable/disable is determined at launch. Restart RiftShell after changing plugin files.")
         text.setPlainText("\n".join(lines))
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
         layout.addWidget(title)
         layout.addWidget(text, 1)
         self._exec_dialog_flip(dialog)
 
     def toggle_orbit(self):
-        self.orbit.setVisible(not self.orbit.isVisible())
+        self.set_right_collapsed(not self._right_collapsed)
 
     def _show_orbit_output(self, session, text):
         if self.tabs.indexOf(session) >= 0:

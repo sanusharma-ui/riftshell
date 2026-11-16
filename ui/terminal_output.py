@@ -17,6 +17,7 @@ class TerminalOutput(QTextEdit):
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.document().setMaximumBlockCount(5000)
+        self.document().setDocumentMargin(8)
         self._pending = deque()
         self._output_timer = QTimer(self)
         self._output_timer.setInterval(8)

@@ -8,7 +8,7 @@ from itertools import groupby
 from time import perf_counter
 
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QKeySequence
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QKeySequence, QPen
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QMessageBox
 
 
@@ -58,12 +58,12 @@ class TerminalWidget(QAbstractScrollArea):
         self._cursor_on = True
         self._cursor_timer = QTimer(self)
         self._cursor_timer.timeout.connect(self._blink_cursor)
-        self.foreground = QColor("#d4d4d4")
-        self.background = QColor("#181818")
-        self.selection_color = QColor("#264f78")
-        self.accent_color = QColor("#4daafc")
-        self.PAD_X = 12
-        self.PAD_Y = 10
+        self.foreground = QColor("#F3EEFA")
+        self.background = QColor("#08050D")
+        self.selection_color = QColor("#3B1D5E")
+        self.accent_color = QColor("#A855F7")
+        self.PAD_X = 14
+        self.PAD_Y = 12
         self._selection_start = None
         self._selection_end = None
         self._messages = deque()
@@ -108,11 +108,16 @@ class TerminalWidget(QAbstractScrollArea):
         self._refresh_cursor()
 
     def set_colors(self, foreground: str, background: str, selection: str | None = None, accent: str | None = None):
-        self.foreground, self.background = QColor(foreground), QColor(background)
-        if selection:
-            self.selection_color = QColor(selection)
+        self.foreground = QColor(foreground) if foreground != "transparent" else QColor("#F3EEFA")
+        self.background = QColor(background) if background != "transparent" else QColor("#08050D")
+        if selection and not selection.startswith("rgba"):
+            c = QColor(selection)
+            if c.isValid():
+                self.selection_color = c
         if accent:
-            self.accent_color = QColor(accent)
+            c = QColor(accent)
+            if c.isValid():
+                self.accent_color = c
         self.viewport().update()
 
     def feed(self, text: str):
@@ -140,7 +145,7 @@ class TerminalWidget(QAbstractScrollArea):
         self._capture_screen = self._capture_stream = None
         if screen is None:
             return ""
-        lines = list(screen.history.top) + [screen.buffer[y] for y in range(screen.lines)]
+        lines = list(screen.history.top) + [screen.buffer[y] for y in range(self.screen.lines)]
         return "\n".join("".join(line[x].data for x in range(screen.columns)).rstrip() for line in lines).strip("\n")
 
     def append_message(self, text: str, color: str | None = None):
@@ -200,11 +205,11 @@ class TerminalWidget(QAbstractScrollArea):
 
     def _color(self, value, default):
         palette = {
-            "black": "#1e1e24", "red": "#ff5c57", "green": "#5af78e", "brown": "#f3f99d",
-            "blue": "#57c7ff", "magenta": "#ff6ac1", "cyan": "#9aedfe", "white": "#f1f1f0",
-            "brightblack": "#686868", "brightred": "#ff6e6e", "brightgreen": "#69ff94",
-            "brightbrown": "#ffffa5", "brightblue": "#66d9ef", "brightmagenta": "#ff92d0",
-            "brightcyan": "#a4ffff", "brightwhite": "#ffffff",
+            "black": "#1E1B2E", "red": "#F43F5E", "green": "#10B981", "brown": "#F59E0B",
+            "blue": "#38BDF8", "magenta": "#C084FC", "cyan": "#22D3EE", "white": "#F3EEFA",
+            "brightblack": "#6D5F85", "brightred": "#FB7185", "brightgreen": "#34D399",
+            "brightbrown": "#FBBF24", "brightblue": "#7DD3FC", "brightmagenta": "#E879F9",
+            "brightcyan": "#67E8F9", "brightwhite": "#FFFFFF",
         }
         if value == "default":
             return default
@@ -275,11 +280,18 @@ class TerminalWidget(QAbstractScrollArea):
                 if text.strip() or style[2] or style[3]:
                     painter.drawText(pad_x + run[0] * width, pad_y + y * height + ascent, text)
         cursor = self.screen.cursor
-        if (self.input_enabled and self.hasFocus() and self._cursor_on
-                and not cursor.hidden and offset == self.verticalScrollBar().maximum()):
+        if (self.input_enabled and not cursor.hidden and offset == self.verticalScrollBar().maximum()):
             cx = pad_x + min(cursor.x, self.screen.columns - 1) * width
             cy = pad_y + cursor.y * height
-            painter.fillRect(cx, cy, 2, height, self.accent_color)
+            if self.hasFocus() and self._cursor_on:
+                glow = QColor(self.accent_color)
+                glow.setAlpha(45)
+                painter.fillRect(cx, cy, width, height, glow)
+                painter.fillRect(cx, cy, 2, height, self.accent_color)
+            elif not self.hasFocus():
+                pen = QPen(self.accent_color, 1)
+                painter.setPen(pen)
+                painter.drawRect(cx, cy, max(1, width - 1), max(1, height - 1))
 
     def _point(self, event):
         width, height, _ = self._metrics()

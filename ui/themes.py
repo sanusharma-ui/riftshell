@@ -100,223 +100,226 @@ class Theme:
 THEMES: dict[str, Theme] = {
     "vscode-dark-plus": Theme(
         key="vscode-dark-plus",
-        display_name="Default",
-        aliases=("default", "violet", "dark+", "dark-plus", "vscode", "vs-code", "vs-code-dark-plus"),
-        bg="#12111A",
-        panel="#1A1826",
-        panelBorder="#2E2A40",
-        text="#EDE8F5",
-        textMuted="#9A94AA",
-        accent="#8B5CF6",
-        accentGlow="rgba(139, 92, 246, 0.25)",
+        display_name="Rift Aurora (Default)",
+        aliases=(
+            "default", "rift-aurora", "aurora", "violet", "dark+",
+            "dark-plus", "vscode", "vs-code", "vs-code-dark-plus",
+        ),
+        bg="#0B0711",
+        panel="#120B1D",
+        panelBorder="#2A1B3D",
+        text="#F3EEFA",
+        textMuted="#9D8EB5",
+        accent="#A855F7",
+        accentGlow="rgba(168, 85, 247, 0.22)",
         success="#10B981",
-        danger="#EF4444",
-        terminalBg="#0F0E16",
-        inputBg="#201D30",
-        buttonBg="#28253B",
-        buttonText="#EDE8F5",
-        secondary="#A78BFA",
-        selection_override="#3B2D54",
+        danger="#F43F5E",
+        terminalBg="#08050D",
+        inputBg="#170E26",
+        buttonBg="#1F1433",
+        buttonText="#F3EEFA",
+        secondary="#D946EF",
+        selection_override="#3B1D5E",
     ),
     "ghost": Theme(
         key="ghost",
-        display_name="Ghost",
+        display_name="Ghost HUD",
         aliases=("ghost", "sci-fi", "transparent"),
-        bg="#08090C",
+        bg="#070A0F",
         panel="transparent",
-        panelBorder="rgba(61, 224, 245, 0.12)",
+        panelBorder="rgba(56, 189, 248, 0.16)",
         text="#E2E8F0",
-        textMuted="#64748B",
+        textMuted="#7C8EA6",
         accent="#38BDF8",
-        accentGlow="rgba(56, 189, 248, 0.20)",
+        accentGlow="rgba(56, 189, 248, 0.16)",
         success="#34D399",
-        danger="#F87171",
+        danger="#FB7185",
         terminalBg="transparent",
-        inputBg="transparent",
-        buttonBg="transparent",
+        inputBg="rgba(17, 24, 39, 0.55)",
+        buttonBg="rgba(30, 41, 59, 0.45)",
         buttonText="#E2E8F0",
-        secondary="#67E8F9",
-        selection_override="rgba(56, 189, 248, 0.20)",
+        secondary="#7DD3FC",
+        selection_override="rgba(56, 189, 248, 0.22)",
     ),
     "cyber-cyan": Theme(
         key="cyber-cyan",
-        display_name="Cyber Cyan",
-        aliases=("cyber-cyan", "cyan", "cyber"),
-        bg="#070B10",
-        panel="#0C131B",
-        panelBorder="rgba(61, 224, 245, 0.25)",
-        text="#DCE8F5",
-        textMuted="#68829E",
-        accent="#3DE0F5",
-        accentGlow="rgba(61, 224, 245, 0.25)",
+        display_name="Aegis Telemetry",
+        aliases=("cyber-cyan", "cyan", "cyber", "aegis"),
+        bg="#080D14",
+        panel="#0D1520",
+        panelBorder="#1B2E42",
+        text="#DCE7F3",
+        textMuted="#758CA3",
+        accent="#22D3EE",
+        accentGlow="rgba(34, 211, 238, 0.16)",
         success="#10B981",
         danger="#F43F5E",
-        terminalBg="#05080D",
-        inputBg="#101923",
-        buttonBg="#131F2C",
-        buttonText="#DCE8F5",
-        secondary="#14B8A6",
-        selection_override="#0D384D",
+        terminalBg="#060A0F",
+        inputBg="#121D2B",
+        buttonBg="#162435",
+        buttonText="#DCE7F3",
+        secondary="#38BDF8",
+        selection_override="#123548",
     ),
     "obsidian-aura": Theme(
         key="obsidian-aura",
-        display_name="Obsidian Aura",
+        display_name="Obsidian Mica",
         aliases=("obsidian-aura", "obsidian", "aura", "eclipse", "eclipse-aura"),
-        bg="#0A090F",
-        panel="#121018",
-        panelBorder="rgba(233, 222, 250, 0.20)",
-        text="#F4F0FA",
-        textMuted="#9B94AA",
-        accent="#E9DEFA",
-        accentGlow="rgba(233, 222, 250, 0.28)",
-        success="#A7F3D0",
-        danger="#FDA4AF",
-        terminalBg="#07060A",
-        inputBg="#171322",
-        buttonBg="#1C182A",
-        buttonText="#F4F0FA",
-        secondary="#FBFCDB",
-        selection_override="#33284D",
+        bg="#0C0C12",
+        panel="#13131C",
+        panelBorder="#252536",
+        text="#ECEAF6",
+        textMuted="#8E8CA3",
+        accent="#A78BFA",
+        accentGlow="rgba(167, 139, 250, 0.16)",
+        success="#34D399",
+        danger="#FB7185",
+        terminalBg="#08080D",
+        inputBg="#1A1A26",
+        buttonBg="#20202F",
+        buttonText="#ECEAF6",
+        secondary="#C4B5FD",
+        selection_override="#2D264C",
     ),
     "tokyo-night": Theme(
         key="tokyo-night",
         display_name="Tokyo Night",
         aliases=("tokyo", "tokyonight", "tokyo-night"),
-        bg="#16161e",
-        panel="#1a1b26",
-        panelBorder="#2f354d",
-        text="#c0caf5",
-        textMuted="#7aa2f7",
-        accent="#7aa2f7",
-        accentGlow="rgba(122, 162, 247, 0.25)",
-        success="#9ece6a",
-        danger="#f7768e",
-        terminalBg="#13141c",
-        inputBg="#24283b",
-        buttonBg="#24283b",
-        buttonText="#c0caf5",
-        secondary="#7dcfff",
-        selection_override="#33467c",
+        bg="#11131D",
+        panel="#161926",
+        panelBorder="#262B40",
+        text="#C0CAF5",
+        textMuted="#7882A9",
+        accent="#7AA2F7",
+        accentGlow="rgba(122, 162, 247, 0.16)",
+        success="#73DACA",
+        danger="#F7768E",
+        terminalBg="#0D0E17",
+        inputBg="#1D2133",
+        buttonBg="#22273B",
+        buttonText="#C0CAF5",
+        secondary="#89DDFF",
+        selection_override="#283457",
     ),
     "nord": Theme(
         key="nord",
-        display_name="Nord",
+        display_name="Nord Frost",
         aliases=("nord",),
-        bg="#242933",
-        panel="#2e3440",
-        panelBorder="#434c5e",
-        text="#eceff4",
-        textMuted="#98a4ba",
-        accent="#88c0d0",
-        accentGlow="rgba(136, 192, 208, 0.25)",
-        success="#a3be8c",
-        danger="#bf616a",
-        terminalBg="#1e222b",
-        inputBg="#3b4252",
-        buttonBg="#3b4252",
-        buttonText="#eceff4",
-        secondary="#8fbcbb",
-        selection_override="#434c5e",
+        bg="#1E232B",
+        panel="#262C36",
+        panelBorder="#363E4C",
+        text="#ECEFF4",
+        textMuted="#9099AB",
+        accent="#88C0D0",
+        accentGlow="rgba(136, 192, 208, 0.16)",
+        success="#A3BE8C",
+        danger="#BF616A",
+        terminalBg="#181C23",
+        inputBg="#2F3643",
+        buttonBg="#353D4B",
+        buttonText="#ECEFF4",
+        secondary="#81A1C1",
+        selection_override="#3B4252",
     ),
     "dracula": Theme(
         key="dracula",
-        display_name="Dracula",
+        display_name="Dracula Pro",
         aliases=("dracula",),
-        bg="#1e1f29",
-        panel="#282a36",
-        panelBorder="#44475a",
-        text="#f8f8f2",
-        textMuted="#a5a8be",
-        accent="#bd93f9",
-        accentGlow="rgba(189, 147, 249, 0.25)",
-        success="#50fa7b",
-        danger="#ff5555",
-        terminalBg="#191a21",
-        inputBg="#343746",
-        buttonBg="#343746",
-        buttonText="#f8f8f2",
-        secondary="#8be9fd",
-        selection_override="#44475a",
+        bg="#161720",
+        panel="#1E202B",
+        panelBorder="#313447",
+        text="#F8F8F2",
+        textMuted="#8E92AD",
+        accent="#BD93F9",
+        accentGlow="rgba(189, 147, 249, 0.16)",
+        success="#50FA7B",
+        danger="#FF6E6E",
+        terminalBg="#111219",
+        inputBg="#262938",
+        buttonBg="#2C2F40",
+        buttonText="#F8F8F2",
+        secondary="#8BE9FD",
+        selection_override="#393D54",
     ),
     "github-dark": Theme(
         key="github-dark",
-        display_name="GitHub Dark",
+        display_name="GitHub Carbon",
         aliases=("github", "github-dark", "gh-dark"),
-        bg="#0a0c10",
-        panel="#161b22",
-        panelBorder="#30363d",
-        text="#e6edf3",
-        textMuted="#8b949e",
-        accent="#58a6ff",
-        accentGlow="rgba(88, 166, 255, 0.25)",
-        success="#7ee787",
-        danger="#ff7b72",
-        terminalBg="#06080c",
-        inputBg="#21262d",
-        buttonBg="#21262d",
-        buttonText="#e6edf3",
-        secondary="#79c0ff",
-        selection_override="#1f6feb",
+        bg="#0B0E14",
+        panel="#121721",
+        panelBorder="#252C38",
+        text="#E6EDF3",
+        textMuted="#848D97",
+        accent="#58A6FF",
+        accentGlow="rgba(88, 166, 255, 0.16)",
+        success="#3FB950",
+        danger="#F85149",
+        terminalBg="#070A0E",
+        inputBg="#181F2C",
+        buttonBg="#1E2636",
+        buttonText="#E6EDF3",
+        secondary="#79C0FF",
+        selection_override="#1B3B6B",
     ),
     "catppuccin-mocha": Theme(
         key="catppuccin-mocha",
         display_name="Catppuccin Mocha",
         aliases=("catppuccin", "mocha"),
-        bg="#181825",
-        panel="#1e1e2e",
-        panelBorder="#45475a",
-        text="#cdd6f4",
-        textMuted="#9399b2",
-        accent="#cba6f7",
-        accentGlow="rgba(203, 166, 247, 0.25)",
-        success="#a6e3a1",
-        danger="#f38ba8",
-        terminalBg="#11111b",
-        inputBg="#313244",
-        buttonBg="#313244",
-        buttonText="#cdd6f4",
-        secondary="#89dceb",
-        selection_override="#45475a",
+        bg="#14141F",
+        panel="#1B1B2A",
+        panelBorder="#2E2F45",
+        text="#CDD6F4",
+        textMuted="#9399B2",
+        accent="#89B4FA",
+        accentGlow="rgba(137, 180, 250, 0.16)",
+        success="#A6E3A1",
+        danger="#F38BA8",
+        terminalBg="#0E0E17",
+        inputBg="#242538",
+        buttonBg="#2B2C42",
+        buttonText="#CDD6F4",
+        secondary="#B4BEFE",
+        selection_override="#353752",
     ),
     "one-dark-pro": Theme(
         key="one-dark-pro",
-        display_name="One Dark Pro",
+        display_name="One Dark Studio",
         aliases=("one-dark", "onedark", "atom"),
-        bg="#1e2227",
-        panel="#282c34",
-        panelBorder="#3e4451",
-        text="#abb2bf",
-        textMuted="#7f848e",
-        accent="#61afef",
-        accentGlow="rgba(97, 175, 239, 0.25)",
-        success="#98c379",
-        danger="#e06c75",
-        terminalBg="#181b20",
-        inputBg="#353b45",
-        buttonBg="#353b45",
-        buttonText="#abb2bf",
-        secondary="#56b6c2",
-        selection_override="#3e4451",
+        bg="#16191E",
+        panel="#1E2229",
+        panelBorder="#2E3440",
+        text="#D8DEE9",
+        textMuted="#818896",
+        accent="#61AFEF",
+        accentGlow="rgba(97, 175, 239, 0.16)",
+        success="#98C379",
+        danger="#E06C75",
+        terminalBg="#121418",
+        inputBg="#252A33",
+        buttonBg="#2B313C",
+        buttonText="#D8DEE9",
+        secondary="#56B6C2",
+        selection_override="#2C3849",
     ),
     "cyberpunk-neon": Theme(
         key="cyberpunk-neon",
-        display_name="Cyberpunk Neon",
-        aliases=("cyberpunk", "cyber", "neon"),
-        bg="#0d0e15",
-        panel="#131520",
-        panelBorder="#2b2d42",
-        text="#00ff9f",
-        textMuted="#7a82ab",
-        accent="#00f0ff",
-        accentGlow="rgba(0, 240, 255, 0.25)",
-        success="#00ff9f",
-        danger="#ff3366",
-        terminalBg="#08090e",
-        inputBg="#1d2030",
-        buttonBg="#1d2030",
-        buttonText="#00ff9f",
-        secondary="#ff007f",
-        selection_override="#3d1e4e",
+        display_name="Horizon Tactical",
+        aliases=("cyberpunk", "cyber", "neon", "horizon"),
+        bg="#0A0E17",
+        panel="#101726",
+        panelBorder="#1F2D46",
+        text="#E2E8F0",
+        textMuted="#7E92B2",
+        accent="#06B6D4",
+        accentGlow="rgba(6, 182, 212, 0.18)",
+        success="#10B981",
+        danger="#F43F5E",
+        terminalBg="#070A10",
+        inputBg="#151F32",
+        buttonBg="#1A263D",
+        buttonText="#E2E8F0",
+        secondary="#38BDF8",
+        selection_override="#163654",
     ),
 }
 
@@ -356,419 +359,350 @@ def list_themes() -> list[Theme]:
 
 
 def build_stylesheet(theme: Theme) -> str:
+    is_aurora = theme.key == "vscode-dark-plus"
     is_ghost = theme.key == "ghost"
-    is_cyber = theme.key == "cyber-cyan"
     is_obsidian = theme.key == "obsidian-aura"
 
-    # Tab selection indicator: Ghost uses a thin glowing underline, others use accent bottom border
-    if is_ghost:
-        tab_selected_css = f"""
-QTabBar::tab {{
-    background: transparent;
-    color: {theme.textMuted};
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 7px 14px;
-    margin-right: 3px;
-    font-size: 13px;
-    font-weight: 500;
-}}
-QTabBar::tab:hover {{
-    background: rgba(255, 255, 255, 0.04);
-    color: {theme.text};
-}}
-QTabBar::tab:selected {{
-    background: transparent;
-    color: {theme.text};
-    border: none;
-    border-bottom: 2px solid {theme.accent};
-    font-weight: 600;
-}}
-QListWidget::item:selected {{
-    background-color: {theme.accentGlow};
-    border-left: 2px solid {theme.accent};
-    color: {theme.text};
-    font-weight: 600;
-}}
-"""
+    ui_font = '"Segoe UI Variable Text", "Inter", "Segoe UI", sans-serif'
+    mono_font = '"Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace'
+
+    panel_fill = theme.panel if theme.panel != "transparent" else "rgba(13, 19, 30, 0.68)"
+    input_fill = theme.inputBg if theme.inputBg != "transparent" else "rgba(22, 31, 46, 0.65)"
+    button_fill = theme.buttonBg if theme.buttonBg != "transparent" else "rgba(30, 41, 59, 0.55)"
+    terminal_fill = theme.terminalBg if theme.terminalBg != "transparent" else "rgba(8, 11, 17, 0.72)"
+
+    if is_aurora:
+        window_bg_css = (
+            "background: qlineargradient(x1: 0.0, y1: 0.0, x2: 1.0, y2: 1.0, "
+            "stop: 0.0 #12091E, stop: 0.35 #09060E, stop: 0.72 #15081E, stop: 1.0 #240A2C);"
+        )
+        title_bar_bg = (
+            "background: rgba(14, 9, 23, 0.92); "
+            f"border-bottom: 1px solid {theme.panelBorder};"
+        )
+        rail_bg_css = "background-color: rgba(14, 9, 24, 0.78);"
+        primary_btn_bg = (
+            "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
+            "stop: 0 #9333EA, stop: 0.5 #A855F7, stop: 1 #C084FC)"
+        )
+        primary_btn_hover = (
+            "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
+            "stop: 0 #A855F7, stop: 0.5 #C084FC, stop: 1 #E879F9)"
+        )
+        primary_btn_fg = "#FFFFFF"
+        dock_bg_css = (
+            "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, "
+            "stop: 0 rgba(58, 22, 82, 0.72), stop: 0.25 rgba(23, 14, 38, 0.88), "
+            "stop: 0.75 rgba(23, 14, 38, 0.88), stop: 1 rgba(48, 20, 74, 0.72));"
+        )
+    elif is_obsidian:
+        window_bg_css = (
+            "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
+            "stop: 0 #0F0E17, stop: 0.5 #0B0B11, stop: 1 #13111C);"
+        )
+        title_bar_bg = (
+            "background: rgba(15, 14, 23, 0.95); "
+            f"border-bottom: 1px solid {theme.panelBorder};"
+        )
+        rail_bg_css = f"background-color: {panel_fill};"
+        primary_btn_bg = theme.accent
+        primary_btn_hover = theme.accent_alt
+        primary_btn_fg = "#06090F"
+        dock_bg_css = f"background-color: {panel_fill};"
+    elif is_ghost:
+        window_bg_css = f"background-color: {theme.bg};"
+        title_bar_bg = (
+            "background-color: rgba(10, 14, 22, 0.85); "
+            f"border-bottom: 1px solid {theme.panelBorder};"
+        )
+        rail_bg_css = "background-color: rgba(10, 14, 22, 0.55);"
+        primary_btn_bg = theme.accent
+        primary_btn_hover = theme.accent_alt
+        primary_btn_fg = "#06090F"
+        dock_bg_css = f"background-color: {panel_fill};"
     else:
-        tab_selected_css = f"""
+        window_bg_css = f"background-color: {theme.bg};"
+        title_bar_bg = (
+            f"background-color: {theme.bg}; "
+            f"border-bottom: 1px solid {theme.panelBorder};"
+        )
+        rail_bg_css = f"background-color: {panel_fill};"
+        primary_btn_bg = theme.accent
+        primary_btn_hover = theme.accent_alt
+        primary_btn_fg = "#06090F"
+        dock_bg_css = f"background-color: {panel_fill};"
+
+    tab_selected_css = f"""
+QTabBar {{
+    background: transparent;
+}}
 QTabBar::tab {{
-    background: {theme.bg};
+    background: {theme.bg if not is_ghost else "rgba(15, 23, 42, 0.35)"};
     color: {theme.textMuted};
     border: 1px solid {theme.panelBorder};
     border-bottom: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    padding: 7px 14px;
-    margin-right: 3px;
-    font-size: 13px;
-    font-weight: 500;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 7px 16px;
+    margin-right: 4px;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
 }}
 QTabBar::tab:hover {{
-    background: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
+    background: {input_fill};
     color: {theme.text};
 }}
 QTabBar::tab:selected {{
-    background: {theme.panel};
+    background: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-bottom: 2px solid {theme.accent};
-    font-weight: 600;
-}}
-QListWidget::item:selected {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
-    color: {theme.accent_alt};
-    border: 1px solid {theme.panelBorder};
-    font-weight: 600;
+    border-top: 2px solid {theme.accent};
+    border-bottom: 1px solid {panel_fill};
+    font-weight: 700;
 }}
 """
 
-    if is_ghost:
-        buttons_css = f"""
+    buttons_css = f"""
 QPushButton {{
-    background-color: transparent;
-    color: {theme.text};
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-    min-width: 0;
-}}
-
-QPushButton:hover {{
-    background-color: {theme.accentGlow};
-    border-color: {theme.accent};
-    color: #ffffff;
-}}
-
-QPushButton:pressed {{
-    background-color: rgba(255, 255, 255, 0.08);
-}}
-
-QPushButton:disabled {{
-    background-color: transparent;
-    color: {theme.textMuted};
-    border-color: rgba(255, 255, 255, 0.08);
-}}
-
-QPushButton#primaryButton {{
-    background-color: transparent;
-    color: {theme.accent};
-    border: 1px solid {theme.accent};
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: 600;
-    font-size: 13px;
-}}
-
-QPushButton#primaryButton:hover {{
-    background-color: {theme.accentGlow};
-    border-color: {theme.accent_alt};
-    color: #ffffff;
-}}
-
-QPushButton#approveButton {{
-    background-color: transparent;
-    color: {theme.success};
-    border: 1px solid {theme.success};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-}}
-
-QPushButton#approveButton:hover {{
-    background-color: rgba(52, 211, 153, 0.15);
-    color: #ffffff;
-}}
-
-QPushButton#dismissButton {{
-    background-color: transparent;
-    color: {theme.textMuted};
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-}}
-
-QPushButton#dismissButton:hover {{
-    border-color: {theme.text};
-    color: {theme.text};
-}}
-
-QPushButton#stopButton {{
-    background-color: transparent;
-    color: {theme.danger};
-    border: 1px solid {theme.danger};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-}}
-
-QPushButton#stopButton:hover {{
-    background-color: rgba(248, 113, 113, 0.15);
-    color: #ffffff;
-}}
-"""
-    elif is_obsidian:
-        buttons_css = f"""
-QPushButton {{
-    background-color: {theme.buttonBg};
+    background-color: {button_fill};
     color: {theme.buttonText};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 7px 14px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12.5px;
     min-width: 0;
 }}
 
 QPushButton:hover {{
-    background-color: #27213A;
-    border-color: rgba(233, 222, 250, 0.55);
-    color: #FFFFFF;
-}}
-
-QPushButton:pressed {{
-    background-color: #14101E;
-    border-color: rgba(251, 252, 219, 0.45);
-}}
-
-QPushButton:disabled {{
-    background-color: {theme.panel};
-    color: {theme.textMuted};
-    border-color: rgba(233, 222, 250, 0.10);
-}}
-
-QPushButton#primaryButton {{
-    background: qlineargradient(x1: 0.1, y1: 0.9, x2: 0.9, y2: 0.1, stop: 0 #E9DEFA, stop: 1 #FBFCDB);
-    color: #0A090F;
-    border: 1px solid rgba(251, 252, 219, 0.8);
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: 700;
-    font-size: 13px;
-}}
-
-QPushButton#primaryButton:hover {{
-    background: qlineargradient(x1: 0.1, y1: 0.9, x2: 0.9, y2: 0.1, stop: 0 #F3ECFE, stop: 1 #FFFFE8);
-    border-color: #FFFFFF;
-    color: #000000;
-}}
-
-QPushButton#primaryButton:pressed {{
-    background: qlineargradient(x1: 0.1, y1: 0.9, x2: 0.9, y2: 0.1, stop: 0 #D5C5EE, stop: 1 #ECEEBF);
-}}
-
-QPushButton#approveButton {{
-    background-color: {theme.success};
-    color: #0A090F;
-    border: 1px solid {theme.success};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 700;
-    font-size: 13px;
-}}
-
-QPushButton#approveButton:hover {{
-    background-color: #6EE7B7;
-    border-color: #6EE7B7;
-    color: #050505;
-}}
-
-QPushButton#dismissButton {{
-    background-color: {theme.buttonBg};
-    color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-}}
-
-QPushButton#dismissButton:hover {{
+    background-color: {input_fill};
     border-color: {theme.accent};
     color: {theme.text};
 }}
 
-QPushButton#stopButton {{
-    background-color: {theme.danger};
-    color: #0A090F;
-    border: 1px solid {theme.danger};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 700;
-    font-size: 13px;
-}}
-
-QPushButton#stopButton:hover {{
-    background-color: #FECDD3;
-    border-color: #FECDD3;
-    color: #000000;
-}}
-"""
-    else:
-        primary_fg = "#070B10" if is_cyber else "#ffffff"
-        approve_fg = "#070B10" if is_cyber else "#ffffff"
-        stop_fg = "#ffffff"
-        buttons_css = f"""
-QPushButton {{
-    background-color: {theme.buttonBg};
-    color: {theme.buttonText};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
-    min-width: 0;
-}}
-
-QPushButton:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else theme.buttonBg};
-    border-color: {theme.accent};
-    color: #ffffff;
-}}
-
 QPushButton:pressed {{
-    background-color: {theme.panel if theme.panel != "transparent" else "rgba(255, 255, 255, 0.08)"};
+    background-color: {theme.accentGlow};
+    border-color: {theme.accent};
 }}
 
 QPushButton:disabled {{
-    background-color: {theme.panel if theme.panel != "transparent" else "transparent"};
+    background-color: rgba(255, 255, 255, 0.03);
     color: {theme.textMuted};
     border-color: {theme.panelBorder};
 }}
 
 QPushButton#primaryButton {{
-    background-color: {theme.accent};
-    color: {primary_fg};
+    background: {primary_btn_bg};
+    color: {primary_btn_fg};
     border: 1px solid {theme.accent};
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: 600;
-    font-size: 13px;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 12.5px;
 }}
 
 QPushButton#primaryButton:hover {{
-    background-color: {theme.accent_alt};
+    background: {primary_btn_hover};
     border-color: {theme.accent_alt};
-    color: {primary_fg};
+    color: {primary_btn_fg};
 }}
 
-QPushButton#approveButton {{
-    background-color: {theme.success};
-    color: {approve_fg};
-    border: 1px solid {theme.success};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
-    font-size: 13px;
+QPushButton#primaryButton:pressed {{
+    background: {primary_btn_bg};
 }}
 
-QPushButton#approveButton:hover {{
-    background-color: {theme.success};
-    border-color: {theme.accent};
-    color: #ffffff;
+QPushButton#primaryButton:disabled {{
+    background: {button_fill};
+    color: {theme.textMuted};
+    border-color: {theme.panelBorder};
 }}
 
-QPushButton#dismissButton {{
-    background-color: {theme.buttonBg};
+QPushButton#railPrimaryBtn {{
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(168, 85, 247, 0.38), stop: 1 rgba(217, 70, 239, 0.22));
+    color: {theme.text};
+    border: 1px solid {theme.accent};
+    border-radius: 10px;
+    padding: 0px;
+}}
+
+QPushButton#railPrimaryBtn:hover {{
+    background: {theme.accent};
+    border-color: {theme.accent_alt};
+}}
+
+QPushButton#railIconBtn {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 0px;
+}}
+
+QPushButton#railIconBtn:hover {{
+    background-color: {theme.accentGlow};
+    border-color: {theme.panelBorder};
+}}
+
+QPushButton#railCardBtn {{
+    background-color: rgba(255, 255, 255, 0.03);
     color: {theme.textMuted};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 7px 14px;
+    border-radius: 10px;
+    padding: 6px 2px;
+    font-size: 11px;
     font-weight: 600;
-    font-size: 13px;
 }}
 
-QPushButton#dismissButton:hover {{
+QPushButton#railCardBtn:hover {{
+    background-color: {theme.accentGlow};
     border-color: {theme.accent};
     color: {theme.text};
 }}
 
-QPushButton#stopButton {{
-    background-color: {theme.danger};
-    color: {stop_fg};
-    border: 1px solid {theme.danger};
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 600;
+QPushButton#railToggleBtn {{
+    background-color: rgba(255, 255, 255, 0.03);
+    color: {theme.textMuted};
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
+    padding: 0px;
     font-size: 13px;
+    font-weight: 700;
 }}
 
-QPushButton#stopButton:hover {{
-    border-color: #ffffff;
-    color: #ffffff;
+QPushButton#railToggleBtn:hover {{
+    background-color: {theme.accentGlow};
+    border-color: {theme.accent};
+    color: {theme.text};
+}}
+
+QPushButton#inlinePaletteBtn {{
+    background-color: transparent;
+    color: {theme.textMuted};
+    border: none;
+    border-left: 1px solid {theme.panelBorder};
+    border-radius: 0px;
+    padding: 4px 10px;
+    font-family: {mono_font};
+    font-size: 11.5px;
+    font-weight: 600;
+}}
+
+QPushButton#inlinePaletteBtn:hover {{
+    color: {theme.text};
+}}
+
+QPushButton#approveButton {{
+    background-color: rgba(16, 185, 129, 0.14);
+    color: {theme.success};
+    border: 1px solid {theme.success};
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-weight: 700;
+    font-size: 12px;
+}}
+
+QPushButton#approveButton:hover {{
+    background-color: {theme.success};
+    border-color: {theme.success};
+    color: #05080D;
+}}
+
+QPushButton#approveButton:disabled {{
+    background-color: transparent;
+    color: {theme.textMuted};
+    border-color: {theme.panelBorder};
+}}
+
+QPushButton#dismissButton {{
+    background-color: {button_fill};
+    color: {theme.textMuted};
+    border: 1px solid {theme.panelBorder};
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-weight: 600;
+    font-size: 12px;
+}}
+
+QPushButton#dismissButton:hover {{
+    border-color: {theme.textMuted};
+    color: {theme.text};
+}}
+
+QPushButton#dismissButton:disabled {{
+    background-color: transparent;
+    color: {theme.textMuted};
+    border-color: {theme.panelBorder};
+}}
+
+QPushButton#stopButton {{
+    background-color: rgba(255, 255, 255, 0.04);
+    color: {theme.textMuted};
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 12.5px;
+}}
+
+QPushButton#stopButton:hover:enabled {{
+    background-color: {theme.danger};
+    border-color: {theme.danger};
+    color: #FFFFFF;
+}}
+
+QPushButton#stopButton:disabled {{
+    background-color: rgba(255, 255, 255, 0.02);
+    color: {theme.textMuted};
+    border-color: {theme.panelBorder};
 }}
 """
 
-    terminal_glow_css = ""
-    cyber_label_font = '"JetBrains Mono", "Cascadia Code", monospace' if is_cyber else '"Inter", "Geist", "Segoe UI Variable Text", "Segoe UI", sans-serif'
-    window_background_css = (
-        "background: qlineargradient(x1: 0.1, y1: 0.85, x2: 0.9, y2: 0.15, stop: 0 #151022, stop: 0.45 #0A090F, stop: 0.75 #0C0B12, stop: 1 #181710);"
-        if is_obsidian
-        else f"background-color: {theme.bg};"
-    )
-    dialog_background_css = (
-        "background: qlineargradient(x1: 0.1, y1: 0.85, x2: 0.9, y2: 0.15, stop: 0 #151022, stop: 0.45 #0A090F, stop: 1 #181710);"
-        if is_obsidian
-        else f"background-color: {theme.bg};"
-    )
-    if is_obsidian:
-        title_bar_bg = (
-            "background: qlineargradient(x1: 0.1, y1: 0.85, x2: 0.9, y2: 0.15, "
-            "stop: 0 #151022, stop: 0.45 #0A090F, stop: 0.75 #0C0B12, stop: 1 #181710); "
-            "border-bottom: 1px solid rgba(233, 222, 250, 0.18);"
-        )
-    elif is_ghost:
-        title_bar_bg = "background: transparent; border-bottom: 1px solid rgba(61, 224, 245, 0.12);"
-    elif is_cyber:
-        title_bar_bg = "background-color: #0C131B; border-bottom: 1px solid rgba(61, 224, 245, 0.25);"
-    else:
-        title_bar_bg = f"background-color: {theme.bg}; border-bottom: 1px solid {theme.panelBorder};"
-
     return f"""
 QMainWindow {{
-    {window_background_css}
+    {window_bg_css}
     border: 1px solid {theme.panelBorder};
+}}
+
+QWidget#windowContainer {{
+    background: transparent;
 }}
 
 QWidget#customTitleBar {{
     {title_bar_bg}
-    min-height: 40px;
-    max-height: 40px;
+    min-height: 42px;
+    max-height: 42px;
 }}
 
 QLabel#titleBrand {{
     color: {theme.text};
     font-size: 13px;
     font-weight: 700;
-    font-family: "Inter", "Geist", "Segoe UI Variable Text", sans-serif;
+    font-family: {ui_font};
+    letter-spacing: 0.3px;
     padding-left: 2px;
 }}
 
 QLabel#titleBadge {{
-    background: transparent;
+    background-color: rgba(255, 255, 255, 0.05);
     color: {theme.textMuted};
-    border: none;
-    padding: 0px;
-    font-size: 11px;
-    font-family: "JetBrains Mono", monospace;
-    font-weight: 500;
+    border: 1px solid {theme.panelBorder};
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-family: {mono_font};
+    font-weight: 600;
 }}
 
 QLabel#titleCenterPill {{
-    background: transparent;
+    background-color: rgba(23, 14, 38, 0.75);
     color: {theme.textMuted};
-    border: none;
-    padding: 0px;
-    font-size: 12px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
-    font-weight: 500;
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
+    padding: 4px 16px;
+    font-size: 11px;
+    font-family: {mono_font};
+    font-weight: 600;
+    letter-spacing: 0.6px;
 }}
 
 QPushButton#titleMinBtn, QPushButton#titleMaxBtn, QPushButton#titleCloseBtn {{
@@ -777,81 +711,138 @@ QPushButton#titleMinBtn, QPushButton#titleMaxBtn, QPushButton#titleCloseBtn {{
     border: none;
     border-radius: 0px;
     padding: 0px;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     font-family: "Segoe UI", sans-serif;
-    min-width: 48px;
-    max-width: 48px;
-    min-height: 40px;
-    max-height: 40px;
+    min-width: 46px;
+    max-width: 46px;
+    min-height: 42px;
+    max-height: 42px;
 }}
 
 QPushButton#titleMinBtn:hover, QPushButton#titleMaxBtn:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.08)"};
-    color: {theme.accent};
+    background-color: {input_fill};
+    color: {theme.text};
 }}
 
 QPushButton#titleCloseBtn:hover {{
-    background-color: {theme.danger};
+    background-color: #E11D48;
     color: #FFFFFF;
 }}
 
 QPushButton#titleCloseBtn:pressed {{
-    background-color: {theme.danger};
+    background-color: #BE123C;
     color: #FFFFFF;
 }}
 
 QWidget {{
-    background-color: {theme.bg};
+    background-color: transparent;
     color: {theme.text};
-    font-family: "Inter", "Geist", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    font-family: {ui_font};
     font-size: 13px;
 }}
 
 QLabel {{
     background-color: transparent;
     color: {theme.textMuted};
-    font-size: 13px;
-    font-family: {cyber_label_font};
+    font-size: 12.5px;
+    font-family: {ui_font};
     min-width: 0;
 }}
 
 QLabel#brand {{
     color: {theme.text};
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 700;
+    letter-spacing: 0.3px;
+}}
+
+QLabel#heroTitle {{
+    color: {theme.text};
+    font-size: 26px;
+    font-weight: 600;
+    font-family: {mono_font};
+    letter-spacing: 5px;
+}}
+
+QLabel#heroSubtitle {{
+    color: {theme.textMuted};
+    font-size: 13.5px;
+    font-weight: 500;
+    font-family: {mono_font};
+    letter-spacing: 0.6px;
 }}
 
 QLabel#eyebrow, QLabel#sectionTitle {{
     color: {theme.textMuted};
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
+    font-family: {mono_font};
+    letter-spacing: 0.8px;
 }}
 
 QLabel#sessionPath {{
     color: {theme.textMuted};
-    font-size: 11px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
+    font-size: 11.5px;
+    font-family: {mono_font};
     min-width: 0;
 }}
 
+QLabel#promptBadge {{
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(168, 85, 247, 0.32), stop: 1 rgba(217, 70, 239, 0.18));
+    color: {theme.accent_alt};
+    border: 1px solid {theme.accent};
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-family: {mono_font};
+    font-weight: 700;
+}}
+
 QLabel#statusPill {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
-    color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 5px;
-    padding: 3px 8px;
+    background-color: transparent;
+    color: {theme.accent_alt};
+    border: none;
+    padding: 2px 8px;
     font-size: 11px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
-    font-weight: 600;
+    font-family: {mono_font};
+    font-weight: 700;
+    letter-spacing: 0.8px;
+}}
+
+QLabel#orbitStatusBanner {{
+    background-color: {input_fill};
+    color: {theme.textMuted};
+    border: 1px solid {theme.panelBorder};
+    border-left: 3px solid {theme.accent};
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+}}
+
+QFrame#infoCard, QFrame#shortcutCard, QFrame#extensionCard, QFrame#modeBar, QFrame#orbitComposer {{
+    background-color: {input_fill};
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
+}}
+
+QFrame#commandInputShell {{
+    background-color: rgba(12, 8, 20, 0.78);
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
+}}
+
+QFrame#commandDock {{
+    {dock_bg_css}
+    border: 1px solid {theme.panelBorder};
+    border-radius: 12px;
 }}
 
 QTextEdit {{
-    background-color: {theme.panel};
+    background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 10px 12px;
     font-size: 13px;
     selection-background-color: {theme.selection};
@@ -860,10 +851,10 @@ QTextEdit {{
 }}
 
 QLineEdit {{
-    background-color: {theme.inputBg};
+    background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 8px 12px;
     font-size: 13px;
     selection-background-color: {theme.selection};
@@ -871,56 +862,69 @@ QLineEdit {{
     min-width: 0;
 }}
 
+QLineEdit:hover {{
+    border-color: {theme.textMuted};
+}}
+
 QLineEdit:focus {{
     border: 1px solid {theme.accent};
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.04)"};
+    background-color: {input_fill};
 }}
 
 QListWidget {{
-    background-color: {theme.panel};
+    background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 6px;
+    border-radius: 8px;
+    padding: 5px;
     outline: none;
-    font-size: 13px;
+    font-size: 12.5px;
     min-width: 0;
 }}
 
 QListWidget::item {{
     padding: 7px 10px;
-    border-radius: 5px;
+    border-radius: 6px;
     margin: 1px 0px;
     border: 1px solid transparent;
 }}
 
 QListWidget::item:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.04)"};
+    background-color: {button_fill};
     color: {theme.text};
+}}
+
+QListWidget::item:selected {{
+    background-color: {theme.accentGlow};
+    color: {theme.text};
+    border: 1px solid {theme.accent};
+    font-weight: 600;
 }}
 
 {tab_selected_css}
 
 QAbstractItemView#commandSuggestions {{
-    background-color: {theme.panel};
+    background-color: {panel_fill};
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
+    border: 1px solid {theme.accent};
+    border-radius: 8px;
     padding: 4px;
     outline: none;
     selection-background-color: {theme.selection};
     selection-color: {theme.text};
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
+    font-family: {mono_font};
     font-size: 13px;
 }}
 
 QAbstractItemView#commandSuggestions::item {{
     padding: 7px 12px;
-    min-height: 20px;
+    min-height: 22px;
+    border-radius: 5px;
     border: none;
 }}
 
 QAbstractItemView#commandSuggestions::item:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
+    background-color: {input_fill};
 }}
 
 {buttons_css}
@@ -928,34 +932,34 @@ QAbstractItemView#commandSuggestions::item:hover {{
 QPushButton#navButton {{
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     text-align: left;
-    padding: 8px 10px;
+    padding: 8px 11px;
     color: {theme.textMuted};
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 12.5px;
+    font-weight: 600;
 }}
 
 QPushButton#navButton:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
+    background-color: {input_fill};
     border-color: {theme.panelBorder};
     color: {theme.text};
 }}
 
 QPushButton#navButton:checked, QPushButton#navButton:pressed {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.05)"};
+    background-color: {theme.accentGlow};
     border-color: {theme.accent};
     color: {theme.accent};
-    font-weight: 600;
+    font-weight: 700;
 }}
 
 QPushButton#wrapToggle {{
-    background-color: transparent;
+    background-color: {input_fill};
     border: 1px solid {theme.panelBorder};
-    border-radius: 5px;
-    padding: 4px 8px;
+    border-radius: 6px;
+    padding: 4px 10px;
     font-size: 11px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
+    font-family: {mono_font};
     font-weight: 600;
     color: {theme.textMuted};
 }}
@@ -972,88 +976,95 @@ QPushButton#wrapToggle:checked {{
 }}
 
 QStatusBar {{
-    background-color: {theme.panel};
+    background-color: rgba(11, 7, 17, 0.92);
     color: {theme.textMuted};
     border-top: 1px solid {theme.panelBorder};
-    font-size: 12px;
-    padding: 3px 10px;
+    font-size: 11.5px;
+    font-family: {mono_font};
+    padding: 3px 12px;
 }}
 
-QFrame#sidebar, QFrame#inspector, QFrame#terminalHeader {{
-    background-color: {theme.panel};
+QStatusBar::item {{
+    border: none;
+}}
+
+QFrame#sidebar, QFrame#inspector, QFrame#leftRail, QFrame#rightRail {{
+    {rail_bg_css}
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 0px;
 }}
 
-QFrame#sidebar {{
-    border-radius: 0;
-    border-top: 0;
-    border-bottom: 0;
-    border-left: 0;
+QFrame#sidebar, QFrame#leftRail {{
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
     border-right: 1px solid {theme.panelBorder};
 }}
 
-QFrame#inspector {{
-    border-radius: 0;
-    border-top: 0;
-    border-bottom: 0;
-    border-right: 0;
+QFrame#inspector, QFrame#rightRail {{
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
     border-left: 1px solid {theme.panelBorder};
 }}
 
 QFrame#terminalHeader {{
-    border-radius: 6px;
-    background-color: {theme.panel};
+    border-radius: 8px;
+    background-color: {input_fill};
+    border: 1px solid {theme.panelBorder};
 }}
 
 QFrame#terminalHeader QPushButton {{
     background-color: transparent;
-    border-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
     color: {theme.textMuted};
-    padding: 4px 8px;
-    font-size: 12px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
 }}
 
 QFrame#terminalHeader QPushButton:hover {{
-    background-color: {theme.inputBg if theme.inputBg != "transparent" else "rgba(255, 255, 255, 0.06)"};
+    background-color: {button_fill};
+    border-color: {theme.panelBorder};
     color: {theme.text};
 }}
 
 QLineEdit#commandInput {{
-    background-color: {theme.inputBg};
+    background-color: transparent;
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 9px 12px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
-    font-size: 14px;
+    border: none;
+    padding: 7px 10px;
+    font-family: {mono_font};
+    font-size: 13px;
     min-height: 22px;
     min-width: 0;
 }}
 
 QLineEdit#commandInput:focus {{
-    border-color: {theme.accent};
+    border: none;
+    background-color: transparent;
 }}
 
 QTextEdit#terminalOutput {{
-    background-color: {theme.terminalBg};
+    background-color: rgba(8, 5, 13, 0.72);
     color: {theme.text};
-    border: none;
+    border: 1px solid {theme.panelBorder};
+    border-radius: 8px;
     padding: 12px 14px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
-    font-size: 14px;
+    font-family: {mono_font};
+    font-size: 13.5px;
     min-width: 0;
-    {terminal_glow_css}
 }}
 
 QLineEdit#orbitInput {{
-    background-color: {theme.inputBg};
+    background-color: {theme.bg};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 10px 14px;
-    font-family: "JetBrains Mono", "Cascadia Code", monospace;
-    font-size: 14px;
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-family: {ui_font};
+    font-size: 13px;
     min-height: 22px;
     min-width: 0;
 }}
@@ -1063,20 +1074,26 @@ QLineEdit#orbitInput:focus {{
 }}
 
 QTextEdit#orbitConversation {{
-    background-color: {theme.terminalBg if not is_ghost else "transparent"};
+    background-color: rgba(8, 5, 13, 0.72);
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 12px;
-    font-family: "Inter", "Geist", "Segoe UI Variable Text", "Segoe UI", sans-serif;
-    font-size: 14px;
+    font-family: {ui_font};
+    font-size: 13px;
     min-width: 0;
+}}
+
+QTabWidget#workspaceTabs::pane {{
+    border: none;
+    background: transparent;
+    margin-top: 0px;
 }}
 
 QTabWidget::pane {{
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    background-color: {theme.panel};
+    border-radius: 8px;
+    background-color: {panel_fill};
     margin-top: -1px;
 }}
 
@@ -1088,11 +1105,11 @@ QTabBar::close-button {{
 }}
 
 QTabBar::close-button:hover {{
-    background-color: rgba(239, 68, 68, 0.25);
+    background-color: rgba(244, 63, 94, 0.25);
 }}
 
 QSplitter::handle {{
-    background-color: {theme.bg};
+    background-color: transparent;
 }}
 
 QSplitter::handle:hover {{
@@ -1102,13 +1119,13 @@ QSplitter::handle:hover {{
 QScrollBar:vertical {{
     background: transparent;
     width: 8px;
-    margin: 0px;
+    margin: 2px 1px;
 }}
 
 QScrollBar::handle:vertical {{
     background: {theme.panelBorder};
-    border-radius: 4px;
-    min-height: 26px;
+    border-radius: 3px;
+    min-height: 28px;
 }}
 
 QScrollBar::handle:vertical:hover {{
@@ -1128,13 +1145,13 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
 QScrollBar:horizontal {{
     background: transparent;
     height: 8px;
-    margin: 0px;
+    margin: 1px 2px;
 }}
 
 QScrollBar::handle:horizontal {{
     background: {theme.panelBorder};
-    border-radius: 4px;
-    min-width: 26px;
+    border-radius: 3px;
+    min-width: 28px;
 }}
 
 QScrollBar::handle:horizontal:hover {{
@@ -1152,12 +1169,12 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
 }}
 
 QComboBox {{
-    background-color: {theme.inputBg};
+    background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 6px 12px;
-    font-size: 13px;
+    font-size: 12.5px;
     min-height: 20px;
 }}
 
@@ -1177,10 +1194,10 @@ QComboBox::drop-down {{
 }}
 
 QComboBox QAbstractItemView {{
-    background-color: {theme.panel};
+    background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 8px;
     selection-background-color: {theme.selection};
     selection-color: {theme.text};
     padding: 4px;
@@ -1188,12 +1205,12 @@ QComboBox QAbstractItemView {{
 }}
 
 QSpinBox {{
-    background-color: {theme.inputBg};
+    background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 12.5px;
     min-height: 20px;
 }}
 
@@ -1202,8 +1219,8 @@ QSpinBox:focus {{
 }}
 
 QSpinBox::up-button, QSpinBox::down-button {{
-    width: 16px;
-    background-color: {theme.buttonBg};
+    width: 18px;
+    background-color: {button_fill};
     border: 1px solid {theme.panelBorder};
     border-radius: 3px;
     margin: 1px;
@@ -1216,7 +1233,7 @@ QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
 QCheckBox {{
     color: {theme.text};
     spacing: 8px;
-    font-size: 13px;
+    font-size: 12.5px;
 }}
 
 QCheckBox::indicator {{
@@ -1224,7 +1241,7 @@ QCheckBox::indicator {{
     height: 16px;
     border: 1px solid {theme.panelBorder};
     border-radius: 4px;
-    background-color: {theme.inputBg};
+    background-color: {input_fill};
 }}
 
 QCheckBox::indicator:hover {{
@@ -1237,15 +1254,16 @@ QCheckBox::indicator:checked {{
 }}
 
 QDialog {{
-    {dialog_background_css}
+    {window_bg_css}
+    border: 1px solid {theme.panelBorder};
 }}
 
 QToolTip {{
-    background-color: {theme.panel};
+    background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 6px 10px;
     font-size: 12px;
 }}
 """

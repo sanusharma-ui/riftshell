@@ -3,8 +3,8 @@ from dataclasses import replace
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QFrame,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout,
 )
 
 from ai.desktop_settings import load_mode_preferences
@@ -14,24 +14,41 @@ from ai.modes import MODE_LIMITS, OrbitMode, decode_modes, encode_modes
 class OrbitModesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Orbit modes")
-        self.setMinimumWidth(460)
+        self.setWindowTitle("Orbit Execution Modes")
+        self.setMinimumWidth(500)
         modes, selected = load_mode_preferences()
         self.modes = list(modes)
         self.index = -1
+
+        eyebrow = QLabel("◈  ORBIT EXECUTION MODES")
+        eyebrow.setObjectName("eyebrow")
+
+        note_card = QFrame()
+        note_card.setObjectName("infoCard")
+        note_layout = QVBoxLayout(note_card)
+        note_layout.setContentsMargins(12, 10, 12, 10)
+        note = QLabel(
+            "Configure token budgets, context depth, and autonomous planning steps for Orbit AI.\n"
+            "Duplicate any profile to create a custom workflow. Changes apply to new tasks."
+        )
+        note.setWordWrap(True)
+        note_layout.addWidget(note)
+
         self.selector = QComboBox()
         self.name = QLineEdit()
         self.fields = {}
         form = QFormLayout()
-        form.addRow("Edit mode", self.selector)
-        form.addRow("Name", self.name)
+        form.setSpacing(10)
+        form.setContentsMargins(0, 6, 0, 6)
+        form.addRow("Active profile", self.selector)
+        form.addRow("Profile name", self.name)
         labels = {
-            "prompt_tokens": "Prompt budget (estimated tokens)",
+            "prompt_tokens": "Prompt budget (est. tokens)",
             "output_tokens": "Maximum output tokens",
             "history_turns": "Recent conversation turns",
-            "max_files": "Files per task",
+            "max_files": "Max files per task",
             "file_chars": "Characters per file",
-            "max_steps": "Planning decisions / action steps",
+            "max_steps": "Max planning / action steps",
             "inspection_passes": "Inspection passes per task",
         }
         for key, (low, high) in MODE_LIMITS.items():
@@ -39,30 +56,36 @@ class OrbitModesDialog(QDialog):
             field.setRange(low, high)
             self.fields[key] = field
             form.addRow(labels[key], field)
-        self.compact = QCheckBox("Compact prompt and concise shell answers")
+        self.compact = QCheckBox("Use compact system prompt and concise shell answers")
         form.addRow("Response style", self.compact)
-        note = QLabel(
-            "Every mode is editable. Duplicate a mode to create your own.\n"
-            "Prompt tokens are a local estimate; provider quotas still apply. "
-            "Output limits include JSON and any model reasoning.\n"
-            "Changes apply to new tasks. Running tasks keep their selected limits."
-        )
-        note.setWordWrap(True)
-        duplicate = QPushButton("Duplicate mode")
+
+        duplicate = QPushButton("+  Duplicate Profile")
         duplicate.clicked.connect(self._duplicate)
-        remove = QPushButton("Remove mode")
+        remove = QPushButton("Remove Profile")
+        remove.setObjectName("dismissButton")
         remove.clicked.connect(self._remove)
         row = QHBoxLayout()
+        row.setSpacing(8)
         row.addWidget(duplicate)
         row.addWidget(remove)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        if save_btn := buttons.button(QDialogButtonBox.Save):
+            save_btn.setObjectName("primaryButton")
+            save_btn.setText("Save Modes")
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(note)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        layout.addWidget(eyebrow)
+        layout.addWidget(note_card)
         layout.addLayout(form)
         layout.addLayout(row)
+        layout.addSpacing(4)
         layout.addWidget(buttons)
+
         self.selector.currentIndexChanged.connect(self._select)
         self._refresh(next(i for i, mode in enumerate(modes) if mode == selected))
 

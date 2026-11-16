@@ -4,34 +4,18 @@ STYLE = build_stylesheet(get_theme(DEFAULT_THEME_KEY))
 
 BOOT_BANNER = r"""
 <pre style="
-color:#38bdf8;
+color:#C084FC;
 font-family:'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-font-size:10.5pt;
-line-height:120%;
+font-size:10pt;
+line-height:132%;
 ">
-
-██████╗ ██╗███████╗████████╗     ███████╗██╗  ██╗███████╗██╗     ██╗
-██╔══██╗██║██╔════╝╚══██╔══╝     ██╔════╝██║  ██║██╔════╝██║     ██║
-██████╔╝██║█████╗     ██║        ███████╗███████║█████╗  ██║     ██║
-██╔══██╗██║██╔══╝     ██║        ╚════██║██╔══██║██╔══╝  ██║     ██║
-██║  ██║██║██║        ██║        ███████║██║  ██║███████╗███████╗███████╗
-╚═╝  ╚═╝╚═╝╚═╝        ╚═╝        ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝
-
-
-                           ◢ RIFTSHELL v3.0 ◣
-
-══════════════════════════════════════════════════════════════════════════════════
-
-   ENGINE      :: CYBER CORE
-   RUNTIME     :: PYTHON
-   AI          :: ENABLED
-   TERMINAL    :: CUSTOM COMMAND ENGINE
-   COMMANDS    :: 100+
-   STATUS      :: ONLINE
-
-══════════════════════════════════════════════════════════════════════════════════
-
-            >>> TYPE "help" TO START YOUR SESSION <<<
-
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  ◈  R I F T S H E L L   //   A I - N A T I V E   W I N D O W S   S H E L L   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  CORE ENGINE   :  HYBRID PTY + BUILT-IN COMMAND RUNTIME                      │
+│  AI COPILOT    :  ORBIT AGENT  (WORKSPACE-AWARE PLANNING &amp; DIFF REVIEW)      │
+│  SHORTCUTS     :  [Ctrl+K] Command Palette   ·   [Ctrl+Shift+T] New Session  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  › Type "help" to browse built-in commands or ask Orbit AI in the right panel.
 </pre>
 """
