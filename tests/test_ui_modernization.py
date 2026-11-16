@@ -1,12 +1,18 @@
 import os
 import re
 import unittest
-from ui.themes import THEMES, build_stylesheet, get_theme
+from ui.themes import (
+    FONT_MONO, FONT_UI, TEXT_PLACEHOLDER, TEXT_PRIMARY, TEXT_SECONDARY,
+    THEMES, build_stylesheet, get_theme,
+)
 
 
 class UIModernizationTests(unittest.TestCase):
     def test_all_themes_build_stylesheets(self):
-        self.assertGreaterEqual(len(THEMES), 8)
+        self.assertEqual(
+            set(THEMES),
+            {"vscode-dark-plus", "github-dark", "midnight-aurora", "ember-grove"},
+        )
         for key, theme in THEMES.items():
             sheet = build_stylesheet(theme)
             self.assertIsInstance(sheet, str)
@@ -15,38 +21,27 @@ class UIModernizationTests(unittest.TestCase):
             self.assertIn(theme.accent, sheet)
 
     def test_theme_lookup_and_aliases(self):
-        tokyo = get_theme("tokyonight")
-        self.assertEqual(tokyo.key, "tokyo-night")
         default_theme = get_theme(None)
-        self.assertEqual(default_theme.key, "vscode-dark-plus")
-        self.assertIn("violet", default_theme.aliases)
-        self.assertEqual(default_theme.accent.lower(), "#8b5cf6")
+        self.assertEqual(default_theme.key, "ember-grove")
+        self.assertIn("ember", default_theme.aliases)
+        self.assertEqual(default_theme.accent.lower(), "#14b88a")
 
-        ghost = get_theme("ghost")
-        self.assertEqual(ghost.key, "ghost")
-        self.assertEqual(ghost.panel, "transparent")
-        self.assertEqual(ghost.terminalBg, "transparent")
-        self.assertEqual(ghost.buttonBg, "transparent")
+        github = get_theme("github")
+        self.assertEqual(github.key, "github-dark")
 
-        cyber = get_theme("cyber-cyan")
-        self.assertEqual(cyber.key, "cyber-cyan")
-        self.assertEqual(cyber.bg.lower(), "#070b10")
-        self.assertEqual(cyber.panel.lower(), "#0c131b")
-        self.assertEqual(cyber.accent.lower(), "#3de0f5")
-        self.assertEqual(cyber.secondary.lower(), "#14b8a6")
+        aurora = get_theme("Midnight Aurora")
+        self.assertEqual(aurora.key, "midnight-aurora")
+        self.assertEqual(aurora.bg.lower(), "#04060d")
+        self.assertEqual(aurora.panel.lower(), "#07111f")
+        self.assertEqual(aurora.accent.lower(), "#14b8a6")
 
-        obsidian = get_theme("obsidian-aura")
-        self.assertEqual(obsidian.key, "obsidian-aura")
-        self.assertEqual(obsidian.bg.lower(), "#0a090f")
-        self.assertEqual(obsidian.panel.lower(), "#121018")
-        self.assertEqual(obsidian.text.lower(), "#f4f0fa")
-        self.assertEqual(obsidian.accent.lower(), "#e9defa")
-        self.assertEqual(obsidian.secondary.lower(), "#fbfcdb")
-        self.assertEqual(get_theme("obsidian").key, "obsidian-aura")
-        self.assertEqual(get_theme("aura").key, "obsidian-aura")
+        grove = get_theme("Ember Grove")
+        self.assertEqual(grove.key, "ember-grove")
+        self.assertEqual(grove.bg.lower(), "#0a080b")
+        self.assertEqual(grove.panel.lower(), "#080d0d")
 
         with self.assertRaises(KeyError):
-            get_theme("unknown-theme")
+            get_theme("tokyonight")
 
     def test_central_theme_object_attributes_and_css_vars(self):
         required_attrs = (
@@ -62,6 +57,16 @@ class UIModernizationTests(unittest.TestCase):
             self.assertIsInstance(css_vars, dict)
             self.assertIn("--bg", css_vars)
             self.assertIn("--accent", css_vars)
+
+    def test_shared_typography_and_text_contrast_tokens(self):
+        stylesheet = build_stylesheet(get_theme())
+        self.assertIn(FONT_UI, stylesheet)
+        self.assertIn(FONT_MONO, stylesheet)
+        self.assertIn(TEXT_PRIMARY, stylesheet)
+        self.assertIn(TEXT_SECONDARY, stylesheet)
+        self.assertIn(TEXT_PLACEHOLDER, stylesheet)
+        self.assertEqual(get_theme().output, TEXT_PRIMARY)
+        self.assertEqual(get_theme().muted, TEXT_SECONDARY)
 
     def test_stylesheet_styles_all_components(self):
         for key, theme in THEMES.items():

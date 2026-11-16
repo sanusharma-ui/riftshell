@@ -3,6 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+FONT_UI = '"Sora", "Inter", "Segoe UI", sans-serif'
+FONT_MONO = '"IBM Plex Mono", "Fira Code", Consolas, monospace'
+TEXT_PRIMARY = "#EBFFFFFF"
+TEXT_SECONDARY = "#ADFFFFFF"
+TEXT_PLACEHOLDER = "#73FFFFFF"
+
+
 @dataclass(frozen=True)
 class Theme:
     key: str
@@ -43,7 +50,7 @@ class Theme:
 
     @property
     def muted(self) -> str:
-        return self.textMuted
+        return TEXT_SECONDARY
 
     @property
     def accent_alt(self) -> str:
@@ -51,7 +58,7 @@ class Theme:
 
     @property
     def output(self) -> str:
-        return self.text
+        return TEXT_PRIMARY
 
     @property
     def error(self) -> str:
@@ -100,7 +107,7 @@ class Theme:
 THEMES: dict[str, Theme] = {
     "vscode-dark-plus": Theme(
         key="vscode-dark-plus",
-        display_name="Rift Horizon (Default)",
+        display_name="Rift Horizon",
         aliases=(
             "default", "rift-horizon", "horizon", "violet", "dark+",
             "dark-plus", "vscode", "vs-code", "vs-code-dark-plus",
@@ -120,126 +127,6 @@ THEMES: dict[str, Theme] = {
         buttonText="#F4F0FA",
         secondary="#C084FC",
         selection_override="#381E5E",
-    ),
-    "ghost": Theme(
-        key="ghost",
-        display_name="Ghost HUD",
-        aliases=("ghost", "sci-fi", "transparent"),
-        bg="#070A0F",
-        panel="transparent",
-        panelBorder="rgba(56, 189, 248, 0.16)",
-        text="#E2E8F0",
-        textMuted="#7C8EA6",
-        accent="#38BDF8",
-        accentGlow="rgba(56, 189, 248, 0.16)",
-        success="#34D399",
-        danger="#FB7185",
-        terminalBg="transparent",
-        inputBg="rgba(17, 24, 39, 0.55)",
-        buttonBg="rgba(30, 41, 59, 0.45)",
-        buttonText="#E2E8F0",
-        secondary="#7DD3FC",
-        selection_override="rgba(56, 189, 248, 0.22)",
-    ),
-    "cyber-cyan": Theme(
-        key="cyber-cyan",
-        display_name="Aegis Telemetry",
-        aliases=("cyber-cyan", "cyan", "cyber", "aegis"),
-        bg="#080D14",
-        panel="#0D1520",
-        panelBorder="#1B2E42",
-        text="#DCE7F3",
-        textMuted="#758CA3",
-        accent="#22D3EE",
-        accentGlow="rgba(34, 211, 238, 0.16)",
-        success="#10B981",
-        danger="#F43F5E",
-        terminalBg="#060A0F",
-        inputBg="#121D2B",
-        buttonBg="#162435",
-        buttonText="#DCE7F3",
-        secondary="#38BDF8",
-        selection_override="#123548",
-    ),
-    "obsidian-aura": Theme(
-        key="obsidian-aura",
-        display_name="Obsidian Mica",
-        aliases=("obsidian-aura", "obsidian", "aura", "eclipse", "eclipse-aura"),
-        bg="#0C0C12",
-        panel="#13131C",
-        panelBorder="#252536",
-        text="#ECEAF6",
-        textMuted="#8E8CA3",
-        accent="#A78BFA",
-        accentGlow="rgba(167, 139, 250, 0.16)",
-        success="#34D399",
-        danger="#FB7185",
-        terminalBg="#08080D",
-        inputBg="#1A1A26",
-        buttonBg="#20202F",
-        buttonText="#ECEAF6",
-        secondary="#C4B5FD",
-        selection_override="#2D264C",
-    ),
-    "tokyo-night": Theme(
-        key="tokyo-night",
-        display_name="Tokyo Night",
-        aliases=("tokyo", "tokyonight", "tokyo-night"),
-        bg="#11131D",
-        panel="#161926",
-        panelBorder="#262B40",
-        text="#C0CAF5",
-        textMuted="#7882A9",
-        accent="#7AA2F7",
-        accentGlow="rgba(122, 162, 247, 0.16)",
-        success="#73DACA",
-        danger="#F7768E",
-        terminalBg="#0D0E17",
-        inputBg="#1D2133",
-        buttonBg="#22273B",
-        buttonText="#C0CAF5",
-        secondary="#89DDFF",
-        selection_override="#283457",
-    ),
-    "nord": Theme(
-        key="nord",
-        display_name="Nord Frost",
-        aliases=("nord",),
-        bg="#1E232B",
-        panel="#262C36",
-        panelBorder="#363E4C",
-        text="#ECEFF4",
-        textMuted="#9099AB",
-        accent="#88C0D0",
-        accentGlow="rgba(136, 192, 208, 0.16)",
-        success="#A3BE8C",
-        danger="#BF616A",
-        terminalBg="#181C23",
-        inputBg="#2F3643",
-        buttonBg="#353D4B",
-        buttonText="#ECEFF4",
-        secondary="#81A1C1",
-        selection_override="#3B4252",
-    ),
-    "dracula": Theme(
-        key="dracula",
-        display_name="Dracula Pro",
-        aliases=("dracula",),
-        bg="#161720",
-        panel="#1E202B",
-        panelBorder="#313447",
-        text="#F8F8F2",
-        textMuted="#8E92AD",
-        accent="#BD93F9",
-        accentGlow="rgba(189, 147, 249, 0.16)",
-        success="#50FA7B",
-        danger="#FF6E6E",
-        terminalBg="#111219",
-        inputBg="#262938",
-        buttonBg="#2C2F40",
-        buttonText="#F8F8F2",
-        secondary="#8BE9FD",
-        selection_override="#393D54",
     ),
     "github-dark": Theme(
         key="github-dark",
@@ -261,69 +148,49 @@ THEMES: dict[str, Theme] = {
         secondary="#79C0FF",
         selection_override="#1B3B6B",
     ),
-    "catppuccin-mocha": Theme(
-        key="catppuccin-mocha",
-        display_name="Catppuccin Mocha",
-        aliases=("catppuccin", "mocha"),
-        bg="#14141F",
-        panel="#1B1B2A",
-        panelBorder="#2E2F45",
-        text="#CDD6F4",
-        textMuted="#9399B2",
-        accent="#89B4FA",
-        accentGlow="rgba(137, 180, 250, 0.16)",
-        success="#A6E3A1",
-        danger="#F38BA8",
-        terminalBg="#0E0E17",
-        inputBg="#242538",
-        buttonBg="#2B2C42",
-        buttonText="#CDD6F4",
-        secondary="#B4BEFE",
-        selection_override="#353752",
-    ),
-    "one-dark-pro": Theme(
-        key="one-dark-pro",
-        display_name="One Dark Studio",
-        aliases=("one-dark", "onedark", "atom"),
-        bg="#16191E",
-        panel="#1E2229",
-        panelBorder="#2E3440",
-        text="#D8DEE9",
-        textMuted="#818896",
-        accent="#61AFEF",
-        accentGlow="rgba(97, 175, 239, 0.16)",
-        success="#98C379",
-        danger="#E06C75",
-        terminalBg="#121418",
-        inputBg="#252A33",
-        buttonBg="#2B313C",
-        buttonText="#D8DEE9",
-        secondary="#56B6C2",
-        selection_override="#2C3849",
-    ),
-    "cyberpunk-neon": Theme(
-        key="cyberpunk-neon",
-        display_name="Horizon Tactical",
-        aliases=("cyberpunk", "cyber", "neon"),
-        bg="#0A0E17",
-        panel="#101726",
-        panelBorder="#1F2D46",
-        text="#E2E8F0",
-        textMuted="#7E92B2",
-        accent="#06B6D4",
-        accentGlow="rgba(6, 182, 212, 0.18)",
-        success="#10B981",
-        danger="#F43F5E",
-        terminalBg="#070A10",
-        inputBg="#151F32",
-        buttonBg="#1A263D",
-        buttonText="#E2E8F0",
+    "midnight-aurora": Theme(
+        key="midnight-aurora",
+        display_name="Midnight Aurora",
+        aliases=("midnight aurora", "aurora", "midnight"),
+        bg="#04060D",
+        panel="#07111F",
+        panelBorder="rgba(20, 90, 140, 0.34)",
+        text="#E6F7FF",
+        textMuted="#8CA8B8",
+        accent="#14B8A6",
+        accentGlow="rgba(0, 150, 140, 0.24)",
+        success="#34D399",
+        danger="#FB7185",
+        terminalBg="#03070A",
+        inputBg="#0A1725",
+        buttonBg="#0D2230",
+        buttonText="#E6F7FF",
         secondary="#38BDF8",
-        selection_override="#163654",
+        selection_override="#124A5A",
+    ),
+    "ember-grove": Theme(
+        key="ember-grove",
+        display_name="Ember Grove (Default)",
+        aliases=("ember grove", "ember", "grove"),
+        bg="#0A080B",
+        panel="#080D0D",
+        panelBorder="rgba(80, 35, 45, 0.34)",
+        text="#F1F5F2",
+        textMuted="#9BAEA6",
+        accent="#14B88A",
+        accentGlow="rgba(20, 110, 85, 0.24)",
+        success="#34D399",
+        danger="#F87171",
+        terminalBg="#050A09",
+        inputBg="#101817",
+        buttonBg="#17231F",
+        buttonText="#F1F5F2",
+        secondary="#D97766",
+        selection_override="#24483E",
     ),
 }
 
-DEFAULT_THEME_KEY = "vscode-dark-plus"
+DEFAULT_THEME_KEY = "ember-grove"
 
 _ALIAS_TO_KEY = {
     alias.lower(): key
@@ -359,19 +226,17 @@ def list_themes() -> list[Theme]:
 
 
 def build_stylesheet(theme: Theme) -> str:
-    is_default = theme.key == "vscode-dark-plus"
-    is_ghost = theme.key == "ghost"
-    is_obsidian = theme.key == "obsidian-aura"
+    is_rift_horizon = theme.key == "vscode-dark-plus"
 
-    ui_font = '"Segoe UI Variable Text", "Inter", "Segoe UI", sans-serif'
-    mono_font = '"Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace'
+    ui_font = FONT_UI
+    mono_font = FONT_MONO
 
     panel_fill = theme.panel if theme.panel != "transparent" else "rgba(13, 19, 30, 0.40)"
     input_fill = theme.inputBg if theme.inputBg != "transparent" else "rgba(22, 31, 46, 0.30)"
     button_fill = theme.buttonBg if theme.buttonBg != "transparent" else "rgba(30, 41, 59, 0.35)"
     terminal_fill = theme.terminalBg if theme.terminalBg != "transparent" else "rgba(8, 11, 17, 0.35)"
 
-    if is_default:
+    if is_rift_horizon:
         window_bg_css = (
             "background: qlineargradient(x1: 0.0, y1: 1.0, x2: 1.0, y2: 0.0, "
             "stop: 0.0 #240D2B, stop: 0.38 #0B0813, stop: 0.72 #0D1322, stop: 1.0 #162636);"
@@ -388,25 +253,6 @@ def build_stylesheet(theme: Theme) -> str:
         )
         primary_btn_fg = "#FFFFFF"
         dock_bg_css = "background: transparent;"
-    elif is_obsidian:
-        window_bg_css = (
-            "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
-            "stop: 0 #0F0E17, stop: 0.5 #0B0B11, stop: 1 #13111C);"
-        )
-        title_bar_bg = "background: transparent; border-bottom: none;"
-        rail_bg_css = f"background-color: rgba(19, 19, 28, 0.35);"
-        primary_btn_bg = theme.accent
-        primary_btn_hover = theme.accent_alt
-        primary_btn_fg = "#06090F"
-        dock_bg_css = "background: transparent;"
-    elif is_ghost:
-        window_bg_css = f"background-color: {theme.bg};"
-        title_bar_bg = "background: transparent; border-bottom: none;"
-        rail_bg_css = "background-color: rgba(10, 14, 22, 0.30);"
-        primary_btn_bg = theme.accent
-        primary_btn_hover = theme.accent_alt
-        primary_btn_fg = "#06090F"
-        dock_bg_css = "background: transparent;"
     else:
         window_bg_css = f"background-color: {theme.bg};"
         title_bar_bg = "background: transparent; border-bottom: none;"
@@ -421,8 +267,8 @@ QTabBar {{
     background: transparent;
 }}
 QTabBar::tab {{
-    background: {theme.bg if not is_ghost else "rgba(15, 23, 42, 0.35)"};
-    color: {theme.textMuted};
+    background: {theme.bg};
+    color: {TEXT_SECONDARY};
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-bottom: none;
     border-top-left-radius: 10px;
@@ -435,11 +281,11 @@ QTabBar::tab {{
 }}
 QTabBar::tab:hover {{
     background: {input_fill};
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
 }}
 QTabBar::tab:selected {{
     background: {panel_fill};
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-top: 2px solid {theme.accent};
     border-bottom: 1px solid {panel_fill};
@@ -450,7 +296,7 @@ QTabBar::tab:selected {{
     buttons_css = f"""
 QPushButton {{
     background-color: {button_fill};
-    color: {theme.buttonText};
+    color: {TEXT_PRIMARY};
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 10px;
     padding: 7px 14px;
@@ -462,7 +308,7 @@ QPushButton {{
 QPushButton:hover {{
     background-color: {input_fill};
     border-color: {theme.accent};
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
 }}
 
 QPushButton:pressed {{
@@ -472,7 +318,7 @@ QPushButton:pressed {{
 
 QPushButton:disabled {{
     background-color: rgba(255, 255, 255, 0.02);
-    color: {theme.textMuted};
+    color: {TEXT_PLACEHOLDER};
     border-color: rgba(255, 255, 255, 0.02);
 }}
 
@@ -698,7 +544,7 @@ QPushButton#titleMinBtn, QPushButton#titleMaxBtn, QPushButton#titleCloseBtn {{
     padding: 0px;
     font-size: 14px;
     font-weight: 500;
-    font-family: "Segoe UI", sans-serif;
+    font-family: {ui_font};
     min-width: 44px;
     max-width: 44px;
     min-height: 36px;
@@ -722,14 +568,14 @@ QPushButton#titleCloseBtn:pressed {{
 
 QWidget {{
     background-color: transparent;
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
     font-family: {ui_font};
     font-size: 13px;
 }}
 
 QLabel {{
     background-color: transparent;
-    color: {theme.textMuted};
+    color: {TEXT_SECONDARY};
     font-size: 12.5px;
     font-family: {ui_font};
     min-width: 0;
@@ -743,7 +589,7 @@ QLabel#brand {{
 }}
 
 QLabel#heroTitle {{
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
     font-size: 28px;
     font-weight: 600;
     font-family: {mono_font};
@@ -751,7 +597,7 @@ QLabel#heroTitle {{
 }}
 
 QLabel#heroSubtitle {{
-    color: {theme.textMuted};
+    color: {TEXT_SECONDARY};
     font-size: 13.5px;
     font-weight: 500;
     font-family: {mono_font};
@@ -767,7 +613,7 @@ QLabel#eyebrow, QLabel#sectionTitle {{
 }}
 
 QLabel#sessionPath {{
-    color: {theme.textMuted};
+    color: {TEXT_SECONDARY};
     font-size: 11.5px;
     font-family: {mono_font};
     min-width: 0;
@@ -1236,9 +1082,25 @@ QDialog {{
     border-radius: 14px;
 }}
 
+QLabel#titleBrand, QLabel#brand, QLabel#heroTitle, QLabel#titleCenterPill,
+QTextEdit#terminalOutput, QTextEdit#orbitConversation, QLineEdit#commandInput,
+QLineEdit#orbitInput {{
+    color: {TEXT_PRIMARY};
+}}
+
+QLabel#titleBadge, QLabel#heroSubtitle, QLabel#eyebrow, QLabel#sectionTitle,
+QLabel#sessionPath, QStatusBar, QTabBar::tab {{
+    color: {TEXT_SECONDARY};
+}}
+
+QWidget:disabled, QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled,
+QSpinBox:disabled, QCheckBox:disabled, QLabel:disabled {{
+    color: {TEXT_PLACEHOLDER};
+}}
+
 QToolTip {{
     background-color: {panel_fill};
-    color: {theme.text};
+    color: {TEXT_PRIMARY};
     border: 1px solid {theme.panelBorder};
     border-radius: 8px;
     padding: 6px 10px;

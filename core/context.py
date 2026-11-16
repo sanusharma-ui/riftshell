@@ -16,7 +16,7 @@ class ShellContext:
     running: bool = True
     registry: object | None = None
     plugins: object | None = None
-    current_theme: str = "vscode-dark-plus"
+    current_theme: str = "ember-grove"
     cancel_event: Event = field(default_factory=Event, repr=False)
 
     def set_cwd(self, path: Path):

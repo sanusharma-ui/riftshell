@@ -946,7 +946,7 @@ def _paint_hud_brackets(widget: QWidget):
     """Paint subtle, refined sci-fi telemetry corner accents on HUD surfaces."""
     window = widget.window()
     theme = getattr(window, "theme", None)
-    if not theme or theme.key not in {"cyber-cyan", "ghost", "cyberpunk-neon"}:
+    if not theme:
         return
     color = QColor(theme.accent)
     color.setAlpha(135)
@@ -1247,13 +1247,12 @@ class TerminalSession(QWidget):
 
     def apply_preferences(self, preferences: dict):
         self.preferences = preferences
-        font = QFont(preferences["font_family"], preferences["font_size"])
+        font_size = max(1, int(preferences.get("font_size", 11)))
+        font = QFont(preferences["font_family"], font_size)
         font.setStyleHint(QFont.Monospace)
         font.setFixedPitch(True)
         family = font.family().replace(chr(34), "").replace(";", "")
         font_css = f'font-family: "{family}"; font-size: {font.pointSize()}pt;'
-        for widget in (self.console, self.input, self.legacy_completer.popup()):
-            widget.setStyleSheet(font_css)
         self.legacy_completer.popup().setStyleSheet(
             build_stylesheet(self._theme())
             + f"QAbstractItemView#commandSuggestions {{{font_css}}}"
@@ -1263,7 +1262,6 @@ class TerminalSession(QWidget):
         self.input.setFont(font)
         self.name_label.setFont(QFont("Cascadia Code", 10, QFont.Bold))
         if self.native:
-            self.native_console.setStyleSheet(font_css)
             self.native_console.setFont(font)
             theme = self._theme()
             self.native_console.set_colors(theme.text, theme.terminalBg, theme.selection, theme.accent)
@@ -2074,7 +2072,10 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1460, 890)
         self.setMinimumSize(1080, 680)
-        self.setStyleSheet(build_stylesheet(self.theme))
+        stylesheet = build_stylesheet(self.theme)
+        self.setStyleSheet(stylesheet)
+        if app := QApplication.instance():
+            app.setStyleSheet(stylesheet)
         self.setFont(QFont("Segoe UI Variable Text", 10))
         self.update_controller = UpdateController(self)
         self._build_workspace()
@@ -2107,7 +2108,7 @@ class MainWindow(QMainWindow):
             "ollama_model": self.settings.value("ai/ollama_model", defaults[3], type=str),
             "workspace_root": self.settings.value("ai/workspace_root", defaults[4], type=str),
             "allow_outside_workspace": self.settings.value("ai/allow_outside_workspace", defaults[5], type=bool),
-            "theme": self.settings.value("appearance/theme", "vscode-dark-plus", type=str),
+            "theme": self._stored_theme_key(),
             "font_family": self.settings.value("appearance/font_family", "JetBrains Mono", type=str),
             "font_size": self.settings.value("appearance/font_size", 11, type=int),
             "confirm_risky": self.settings.value("safety/confirm_risky", True, type=bool),
@@ -2117,6 +2118,13 @@ class MainWindow(QMainWindow):
             "telegram_allow_unlisted_users": self.settings.value("controls/telegram_allow_unlisted_users", False, type=bool),
             "telegram_token_saved": self._telegram_token_saved(),
         }
+
+    def _stored_theme_key(self) -> str:
+        stored = self.settings.value("appearance/theme", "ember-grove", type=str)
+        try:
+            return get_theme(stored).key
+        except KeyError:
+            return "ember-grove"
 
     def _telegram_token_saved(self) -> bool:
         try:
@@ -2753,7 +2761,43 @@ class MainWindow(QMainWindow):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        if theme.key == "vscode-dark-plus":
+        if theme.key == "ember-grove":
+            base = QLinearGradient(0, 0, 0, h)
+            base.setColorAt(0.0, QColor("#0A080B"))
+            base.setColorAt(0.6, QColor("#080D0D"))
+            base.setColorAt(1.0, QColor("#050A09"))
+            painter.fillRect(self.rect(), base)
+
+            top_left = QRadialGradient(QPointF(0, 0), 900.0)
+            top_left.setColorAt(0.0, QColor(80, 35, 45, 115))
+            top_left.setColorAt(0.6, QColor(80, 35, 45, 52))
+            top_left.setColorAt(1.0, QColor(80, 35, 45, 0))
+            painter.fillRect(self.rect(), top_left)
+
+            bottom_right = QRadialGradient(QPointF(w, h), 900.0)
+            bottom_right.setColorAt(0.0, QColor(20, 110, 85, 77))
+            bottom_right.setColorAt(0.6, QColor(20, 110, 85, 31))
+            bottom_right.setColorAt(1.0, QColor(20, 110, 85, 0))
+            painter.fillRect(self.rect(), bottom_right)
+        elif theme.key == "midnight-aurora":
+            base = QLinearGradient(0, h, w, 0)
+            base.setColorAt(0.0, QColor("#04060D"))
+            base.setColorAt(0.5, QColor("#07111F"))
+            base.setColorAt(1.0, QColor("#03070A"))
+            painter.fillRect(self.rect(), base)
+
+            top_left = QRadialGradient(QPointF(w * 0.15, h * 0.10), 900.0)
+            top_left.setColorAt(0.0, QColor(20, 90, 140, 115))
+            top_left.setColorAt(0.6, QColor(20, 90, 140, 52))
+            top_left.setColorAt(1.0, QColor(20, 90, 140, 0))
+            painter.fillRect(self.rect(), top_left)
+
+            bottom_right = QRadialGradient(QPointF(w * 0.90, h * 0.90), 800.0)
+            bottom_right.setColorAt(0.0, QColor(0, 150, 140, 77))
+            bottom_right.setColorAt(0.6, QColor(0, 150, 140, 31))
+            bottom_right.setColorAt(1.0, QColor(0, 150, 140, 0))
+            painter.fillRect(self.rect(), bottom_right)
+        elif theme.key == "vscode-dark-plus":
             # Deep dark void base with top-right slate-teal haze and bottom-left/right soft plum glow
             base = QLinearGradient(0, h, w, 0)
             base.setColorAt(0.0, QColor("#1E0B26"))
@@ -2781,15 +2825,6 @@ class MainWindow(QMainWindow):
             g_bot_right.setColorAt(0.0, QColor(126, 34, 140, 56))
             g_bot_right.setColorAt(1.0, QColor(10, 7, 17, 0))
             painter.fillRect(self.rect(), g_bot_right)
-        elif theme.key == "ghost":
-            painter.setRenderHint(QPainter.Antialiasing, False)
-            pen = QPen(QColor(56, 189, 248, 8), 1)
-            painter.setPen(pen)
-            for y in range(0, int(h), 6):
-                painter.drawLine(0, y, int(w), y)
-            for x in range(0, int(w), 48):
-                painter.drawLine(x, 0, x, int(h))
-
         painter.end()
 
     def apply_theme(self, theme_key: str):
@@ -2799,7 +2834,10 @@ class MainWindow(QMainWindow):
             return
         self.preferences["theme"] = self.theme.key
         self.settings.setValue("appearance/theme", self.theme.key)
-        self.setStyleSheet(build_stylesheet(self.theme))
+        stylesheet = build_stylesheet(self.theme)
+        self.setStyleSheet(stylesheet)
+        if app := QApplication.instance():
+            app.setStyleSheet(stylesheet)
         self._refresh_rail_icons()
         if sys.platform == "win32":
             try:
