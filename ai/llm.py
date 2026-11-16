@@ -243,6 +243,11 @@ class AgentPlanner:
         memory_turns = int(getattr(self.config, "ai_memory_recent_turns", os.getenv("AI_MEMORY_RECENT_TURNS", 12)))
 
         self.memory = MemoryManager(path=memory_path, limit=memory_turns, enabled=memory_enabled)
+        from ai.knowledge_brain import CommandKnowledgeBrain
+        self.knowledge_brain = CommandKnowledgeBrain(
+            command_metadata=self.command_metadata,
+            command_names=self.command_names,
+        )
         self.intent_extractor = self.intent_extractor or HybridIntentExtractor(
             self.command_names, metadata=self.command_metadata or (),
         )
@@ -333,6 +338,14 @@ class AgentPlanner:
             user_text.strip().lower().startswith("/cmd ")
             or user_text.strip().lower() in {name.lower() for name in self.command_names}
         )
+        # Immediate direct handling for command knowledge, feasibility, counts, and guidance
+        if getattr(self, "knowledge_brain", None):
+            brain = self.knowledge_brain
+            if brain.is_task_feasibility_query(user_text):
+                guidance = brain.formulate_guidance(user_text)
+                if guidance:
+                    return self._remember_action(user_text, AgentAction("respond", guidance))
+
         route = QueryIntent()
         if not explicit_command and self._model_routing_enabled():
             started = perf_counter()
@@ -547,6 +560,27 @@ class AgentPlanner:
                         # using the same cap, rather than showing thought text.
                         failures[provider] = f"{provider.title()}: the model used its response budget without producing a readable answer."
                         continue
+                    # For non-conversation JSON planning, check if it was a conversational response
+                    partial = (exc.partial_text or "").strip()
+                    if '"action"' in partial and ('"respond"' in partial or 'respond' in partial):
+                        msg_match = re.search(r'"message"\s*:\s*"(.*)', partial, re.DOTALL)
+                        if msg_match:
+                            raw_msg = msg_match.group(1)
+                            clean_msg = re.sub(r'\\n', '\n', raw_msg)
+                            clean_msg = re.sub(r'\\"', '"', clean_msg)
+                            clean_msg = re.sub(r'\\\\', '\\', clean_msg)
+                            clean_msg = re.sub(r'["\s\}]+$', '', clean_msg).strip()
+                            if clean_msg:
+                                clean_msg += f"\n\n*(Note: Shortened to {self.mode.name} mode limit. Ask a follow-up for more detail.)*"
+                                return AgentAction("respond", clean_msg), list(failures.values()), provider
+
+                    # If knowledge brain can answer this request, fall back to knowledge brain guidance
+                    user_req = prompt.split("\n\nUser request:\n")[-1].strip() if "\n\nUser request:\n" in prompt else prompt.strip()
+                    if getattr(self, "knowledge_brain", None) and self.knowledge_brain.is_task_feasibility_query(user_req):
+                        guidance = self.knowledge_brain.formulate_guidance(user_req)
+                        if guidance:
+                            return AgentAction("respond", guidance), list(failures.values()), provider
+
                     # Executable action JSON remains strict even if it looks complete.
                     return None, [str(exc)], provider
                 except Exception as exc:
@@ -1043,6 +1077,13 @@ class AgentPlanner:
                 ),
             )
 
+        if getattr(self, "knowledge_brain", None):
+            brain = self.knowledge_brain
+            if brain.is_task_feasibility_query(text):
+                guidance = brain.formulate_guidance(text)
+                if guidance:
+                    return AgentAction(action="respond", message=guidance)
+
         local_action = self._route_workspace_request(text, lowered)
         if local_action is not None:
             return local_action
@@ -1434,6 +1475,10 @@ class AgentPlanner:
         return "I can answer that, but I need the question to be a little clearer."
 
     def _offline_response(self, text: str) -> AgentAction:
+        if getattr(self, "knowledge_brain", None) and self.knowledge_brain.is_task_feasibility_query(text):
+            guidance = self.knowledge_brain.formulate_guidance(text)
+            if guidance:
+                return AgentAction(action="respond", message=guidance)
         return AgentAction(
             action="respond",
             message=(
