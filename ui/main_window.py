@@ -44,7 +44,7 @@ from version import __version__
 from update_ui import UpdateController
 
 
-def _make_vector_icon(kind: str, color_hex: str = "#9D8EB5", accent_hex: str = "#C084FC", size: int = 24) -> QIcon:
+def _make_vector_icon(kind: str, color_hex: str = "#9A8FB2", accent_hex: str = "#C084FC", size: int = 24) -> QIcon:
     """Render crisp geometric vector icons for the collapsible rails."""
     pix = QPixmap(size * 2, size * 2)
     pix.fill(Qt.transparent)
@@ -54,21 +54,21 @@ def _make_vector_icon(kind: str, color_hex: str = "#9D8EB5", accent_hex: str = "
 
     c = QColor(color_hex)
     ac = QColor(accent_hex)
-    pen = QPen(c, 1.7, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+    pen = QPen(c, 1.75, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
     p.setPen(pen)
     p.setBrush(Qt.NoBrush)
 
     if kind == "terminal":
-        pen_ac = QPen(ac, 2.1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        pen_ac = QPen(ac, 2.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         p.setPen(pen_ac)
         path = QPainterPath()
-        path.moveTo(6, 7)
-        path.lineTo(11.5, 12)
-        path.lineTo(6, 17)
+        path.moveTo(6.0, 7.0)
+        path.lineTo(11.5, 12.0)
+        path.lineTo(6.0, 17.0)
         p.drawPath(path)
         p.drawLine(QPointF(13.0, 17.0), QPointF(18.5, 17.0))
     elif kind == "grid":
-        r = 1.5
+        r = 1.6
         p.drawRoundedRect(QRectF(4.5, 4.5, 6.2, 6.2), r, r)
         p.drawRoundedRect(QRectF(13.3, 4.5, 6.2, 6.2), r, r)
         p.drawRoundedRect(QRectF(4.5, 13.3, 6.2, 6.2), r, r)
@@ -114,7 +114,7 @@ def _make_vector_icon(kind: str, color_hex: str = "#9D8EB5", accent_hex: str = "
         p.drawPath(path)
         p.drawLine(QPointF(12.0, 12.2), QPointF(12.0, 20.0))
     elif kind == "orbit":
-        pen_ac = QPen(ac, 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        pen_ac = QPen(ac, 1.85, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         p.setPen(pen_ac)
         p.drawEllipse(QRectF(7.0, 7.0, 10.0, 10.0))
         p.save()
@@ -137,49 +137,66 @@ def _make_vector_icon(kind: str, color_hex: str = "#9D8EB5", accent_hex: str = "
 
 
 class HeroLogoWidget(QWidget):
-    """Paints the glowing purple-magenta `>_` centerpiece emblem on the initial Hero screen."""
+    """Paints the circular dark glass orb with the glowing `>_` emblem on the Hero screen."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(110, 78)
+        self.setFixedSize(116, 116)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
 
     def paintEvent(self, event):
         window = self.window()
         theme = getattr(window, "theme", None)
-        accent = QColor(theme.accent if theme else "#A855F7")
-        secondary = QColor(theme.accent_alt if theme else "#D946EF")
+        accent = QColor(theme.accent if theme else "#8B5CF6")
+        secondary = QColor(theme.accent_alt if theme else "#C084FC")
 
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
+        cx, cy = self.width() * 0.5, self.height() * 0.5
 
-        # Ambient radial glow behind `>_`
-        glow = QRadialGradient(QPointF(self.width() * 0.5, self.height() * 0.52), 46.0)
-        c_center = QColor(accent)
-        c_center.setAlpha(65)
-        c_zero = QColor(accent)
-        c_zero.setAlpha(0)
-        glow.setColorAt(0.0, c_center)
-        glow.setColorAt(1.0, c_zero)
+        # Outer ambient halo
+        outer_glow = QRadialGradient(QPointF(cx, cy), 56.0)
+        c0 = QColor(accent)
+        c0.setAlpha(48)
+        c1 = QColor(accent)
+        c1.setAlpha(0)
+        outer_glow.setColorAt(0.0, c0)
+        outer_glow.setColorAt(1.0, c1)
         p.setPen(Qt.NoPen)
-        p.setBrush(QBrush(glow))
-        p.drawEllipse(QRectF(8, 2, 94, 74))
+        p.setBrush(QBrush(outer_glow))
+        p.drawEllipse(QPointF(cx, cy), 55.0, 55.0)
 
-        grad = QLinearGradient(QPointF(24, 16), QPointF(88, 62))
-        grad.setColorAt(0.0, secondary)
-        grad.setColorAt(1.0, accent)
+        # Dark glass circular orb
+        orb_grad = QRadialGradient(QPointF(cx - 10, cy - 12), 48.0)
+        orb_grad.setColorAt(0.0, QColor(34, 20, 56, 230))
+        orb_grad.setColorAt(0.75, QColor(15, 10, 26, 240))
+        orb_grad.setColorAt(1.0, QColor(24, 14, 42, 245))
+        ring_pen = QPen(QColor(192, 132, 252, 65), 1.4)
+        p.setPen(ring_pen)
+        p.setBrush(QBrush(orb_grad))
+        p.drawEllipse(QPointF(cx, cy), 44.0, 44.0)
 
-        pen = QPen(QBrush(grad), 6.5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        p.setPen(pen)
+        # Inner subtle ring
+        inner_pen = QPen(QColor(255, 255, 255, 18), 1.0)
+        p.setPen(inner_pen)
         p.setBrush(Qt.NoBrush)
+        p.drawEllipse(QPointF(cx, cy), 39.0, 39.0)
+
+        # Glowing `>_` inside the orb
+        sym_grad = QLinearGradient(QPointF(cx - 20, cy - 16), QPointF(cx + 22, cy + 16))
+        sym_grad.setColorAt(0.0, secondary)
+        sym_grad.setColorAt(1.0, accent)
+
+        pen = QPen(QBrush(sym_grad), 5.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen)
 
         chevron = QPainterPath()
-        chevron.moveTo(30.0, 20.0)
-        chevron.lineTo(50.0, 39.0)
-        chevron.lineTo(30.0, 58.0)
+        chevron.moveTo(cx - 18.0, cy - 13.0)
+        chevron.lineTo(cx - 3.0, cy + 1.0)
+        chevron.lineTo(cx - 18.0, cy + 15.0)
         p.drawPath(chevron)
 
-        p.drawLine(QPointF(58.0, 58.0), QPointF(82.0, 58.0))
+        p.drawLine(QPointF(cx + 3.0, cy + 15.0), QPointF(cx + 20.0, cy + 15.0))
         p.end()
 
 
@@ -300,10 +317,10 @@ class CustomTitleBar(QWidget):
         super().__init__(parent)
         self.parent_window = parent
         self.setObjectName("customTitleBar")
-        self.setFixedHeight(42)
+        self.setFixedHeight(46)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 0, 0, 0)
+        layout.setContentsMargins(16, 4, 10, 0)
         layout.setSpacing(8)
 
         self.icon_label = QLabel()
@@ -313,10 +330,6 @@ class CustomTitleBar(QWidget):
         icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
         if icon_path.exists():
             self.icon_label.setPixmap(QPixmap(str(icon_path)))
-        else:
-            self.icon_label.setText("◈")
-            self.icon_label.setAlignment(Qt.AlignCenter)
-            self.icon_label.setStyleSheet("font-size: 13px; font-weight: 700; color: #C084FC;")
         layout.addWidget(self.icon_label)
 
         self.brand_label = QLabel("RiftShell")
@@ -329,7 +342,7 @@ class CustomTitleBar(QWidget):
 
         layout.addStretch(1)
 
-        self.center_pill = QLabel("◈   WORKSPACE   //   riftshell", self)
+        self.center_pill = QLabel("•   WORKSPACE   //   riftshell", self)
         self.center_pill.setObjectName("titleCenterPill")
         self.center_pill.setAlignment(Qt.AlignCenter)
         self.center_pill.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -339,19 +352,19 @@ class CustomTitleBar(QWidget):
         self.min_btn = QPushButton("—")
         self.min_btn.setObjectName("titleMinBtn")
         self.min_btn.setToolTip("Minimize")
-        self.min_btn.setFixedSize(46, 42)
+        self.min_btn.setFixedSize(44, 36)
         self.min_btn.setCursor(Qt.ArrowCursor)
 
         self.max_btn = QPushButton("□")
         self.max_btn.setObjectName("titleMaxBtn")
         self.max_btn.setToolTip("Maximize / Restore")
-        self.max_btn.setFixedSize(46, 42)
+        self.max_btn.setFixedSize(44, 36)
         self.max_btn.setCursor(Qt.ArrowCursor)
 
         self.close_btn = QPushButton("✕")
         self.close_btn.setObjectName("titleCloseBtn")
         self.close_btn.setToolTip("Close")
-        self.close_btn.setFixedSize(46, 42)
+        self.close_btn.setFixedSize(44, 36)
         self.close_btn.setCursor(Qt.ArrowCursor)
 
         layout.addWidget(self.min_btn)
@@ -368,11 +381,11 @@ class CustomTitleBar(QWidget):
 
     def _position_center_pill(self):
         self.center_pill.adjustSize()
-        label_width = min(max(220, self.center_pill.sizeHint().width() + 28), max(220, self.width() - 360))
-        label_height = 26
+        label_width = min(max(240, self.center_pill.sizeHint().width() + 36), max(240, self.width() - 360))
+        label_height = 28
         self.center_pill.setGeometry(
             max(0, (self.width() - label_width) // 2),
-            (self.height() - label_height) // 2,
+            (self.height() - label_height) // 2 + 2,
             label_width,
             label_height,
         )
@@ -933,10 +946,10 @@ def _paint_hud_brackets(widget: QWidget):
     """Paint subtle, refined sci-fi telemetry corner accents on HUD surfaces."""
     window = widget.window()
     theme = getattr(window, "theme", None)
-    accent_hex = theme.accent if theme else "#A855F7"
-    color = QColor(accent_hex)
-    is_tactical = bool(theme and theme.key in {"cyber-cyan", "ghost", "cyberpunk-neon"})
-    color.setAlpha(135 if is_tactical else 55)
+    if not theme or theme.key not in {"cyber-cyan", "ghost", "cyberpunk-neon"}:
+        return
+    color = QColor(theme.accent)
+    color.setAlpha(135)
 
     painter = QPainter(widget)
     painter.setRenderHint(QPainter.Antialiasing, False)
@@ -944,16 +957,12 @@ def _paint_hud_brackets(widget: QWidget):
     painter.setPen(pen)
     r = widget.rect()
     s = 7
-    # Top-left
     painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1 + s, r.top() + 1)
     painter.drawLine(r.left() + 1, r.top() + 1, r.left() + 1, r.top() + 1 + s)
-    # Top-right
     painter.drawLine(r.right() - 1, r.top() + 1, r.right() - 1 - s, r.top() + 1)
     painter.drawLine(r.right() - 1, r.top() + 1, r.right() - 1, r.top() + 1 + s)
-    # Bottom-left
     painter.drawLine(r.left() + 1, r.bottom() - 1, r.left() + 1 + s, r.bottom() - 1)
     painter.drawLine(r.left() + 1, r.bottom() - 1, r.left() + 1, r.bottom() - 1 - s)
-    # Bottom-right
     painter.drawLine(r.right() - 1, r.bottom() - 1, r.right() - 1 - s, r.bottom() - 1)
     painter.drawLine(r.right() - 1, r.bottom() - 1, r.right() - 1, r.bottom() - 1 - s)
     painter.end()
@@ -1025,7 +1034,7 @@ class TerminalSession(QWidget):
 
         self.input = CommandInput()
         self.input.setObjectName("commandInput")
-        self.input.setPlaceholderText("Enter command (help, files, git, python...)")
+        self.input.setPlaceholderText("Enter command...")
         self.input.set_history(shell.ctx.history)
         names = shell.registry.all_names()
         self.input.set_completion_items(names)
@@ -1038,7 +1047,7 @@ class TerminalSession(QWidget):
         self.legacy_completer = completer
         self.input.setCompleter(completer)
 
-        self.palette_inline_btn = QPushButton("Ctrl+K  ⌄")
+        self.palette_inline_btn = QPushButton("Ctrl+K   ⌄")
         self.palette_inline_btn.setObjectName("inlinePaletteBtn")
         self.palette_inline_btn.setToolTip("Open Command Palette (Ctrl+K)")
         self.palette_inline_btn.setCursor(Qt.PointingHandCursor)
@@ -1047,8 +1056,8 @@ class TerminalSession(QWidget):
         input_shell = QFrame()
         input_shell.setObjectName("commandInputShell")
         input_shell_layout = QHBoxLayout(input_shell)
-        input_shell_layout.setContentsMargins(4, 2, 6, 2)
-        input_shell_layout.setSpacing(4)
+        input_shell_layout.setContentsMargins(6, 3, 8, 3)
+        input_shell_layout.setSpacing(6)
         input_shell_layout.addWidget(self.input, 1)
         input_shell_layout.addWidget(self.palette_inline_btn)
 
@@ -1061,12 +1070,14 @@ class TerminalSession(QWidget):
         self.command_dock = HUDFrame()
         self.command_dock.setObjectName("commandDock")
         self.command_dock.setMinimumWidth(520)
-        self.command_dock.setMaximumWidth(680)
+        self.command_dock.setMaximumWidth(640)
         dock_layout = QHBoxLayout(self.command_dock)
-        dock_layout.setContentsMargins(10, 8, 10, 8)
+        dock_layout.setContentsMargins(12, 10, 12, 10)
         dock_layout.setSpacing(10)
         prompt_glyph = QLabel(">_")
         prompt_glyph.setObjectName("promptBadge")
+        prompt_glyph.setFixedSize(40, 38)
+        prompt_glyph.setAlignment(Qt.AlignCenter)
         dock_layout.addWidget(prompt_glyph)
         dock_layout.addWidget(input_shell, 1)
         dock_layout.addWidget(self.run_button)
@@ -1077,7 +1088,7 @@ class TerminalSession(QWidget):
         hero_v = QVBoxLayout(self.hero_container)
         hero_v.setContentsMargins(24, 24, 24, 36)
         hero_v.setSpacing(8)
-        hero_v.addStretch(11)
+        hero_v.addStretch(10)
 
         logo_row = QHBoxLayout()
         logo_row.addStretch(1)
@@ -1085,6 +1096,7 @@ class TerminalSession(QWidget):
         logo_row.addWidget(self.hero_logo)
         logo_row.addStretch(1)
         hero_v.addLayout(logo_row)
+        hero_v.addSpacing(4)
 
         self.hero_title = QLabel("RiftShell")
         self.hero_title.setObjectName("heroTitle")
@@ -1096,14 +1108,14 @@ class TerminalSession(QWidget):
         self.hero_subtitle.setAlignment(Qt.AlignCenter)
         hero_v.addWidget(self.hero_subtitle)
 
-        hero_v.addSpacing(22)
+        hero_v.addSpacing(24)
 
         self.hero_dock_row = QHBoxLayout()
         self.hero_dock_row.addStretch(1)
         self.hero_dock_row.addWidget(self.command_dock, 1)
         self.hero_dock_row.addStretch(1)
         hero_v.addLayout(self.hero_dock_row)
-        hero_v.addStretch(13)
+        hero_v.addStretch(12)
 
         # Bottom Dock Holder (populated when the first command settles the input bar to bottom)
         self.bottom_dock_holder = QWidget()
@@ -1116,7 +1128,7 @@ class TerminalSession(QWidget):
         self.bottom_dock_holder.setVisible(False)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setContentsMargins(14, 10, 14, 10)
         layout.setSpacing(10)
         layout.addWidget(self.hero_container, 1)
         layout.addWidget(self.header)
@@ -1146,7 +1158,7 @@ class TerminalSession(QWidget):
             self.append_system("RiftShell ready. Built-ins and PowerShell commands share this terminal.")
         else:
             self.append_error(dependency_error)
-        self.input.setPlaceholderText("Enter command (help, files, git, python...)")
+        self.input.setPlaceholderText("Enter command...")
         self._set_running(self.is_busy)
         self.apply_preferences(preferences)
 
@@ -1460,7 +1472,7 @@ class OrbitPanel(QFrame):
 
         self.collapse_btn = QPushButton("»")
         self.collapse_btn.setObjectName("railToggleBtn")
-        self.collapse_btn.setFixedSize(30, 26)
+        self.collapse_btn.setFixedSize(42, 36)
         self.collapse_btn.setToolTip("Collapse Orbit Panel")
         self.collapse_btn.setCursor(Qt.PointingHandCursor)
         self.collapse_btn.clicked.connect(self.collapse_requested.emit)
@@ -2069,6 +2081,7 @@ class MainWindow(QMainWindow):
         self._install_shortcuts()
         self.new_session()
         self._refresh_workspace()
+        self.apply_theme(self.theme.key)
         if self.preferences.get("telegram_enabled"):
             QTimer.singleShot(0, lambda: self._configure_telegram(notify=False))
         QTimer.singleShot(3000, lambda: self.update_controller.check(silent=True))
@@ -2144,8 +2157,14 @@ class MainWindow(QMainWindow):
         self.orbit.action_requested.connect(self._run_orbit_action)
         self.orbit.output_ready.connect(self._show_orbit_output)
         self.orbit.collapse_requested.connect(lambda: self.set_right_collapsed(True))
+
+        self.orbit_wrapper = QWidget()
+        orbit_wrap_layout = QVBoxLayout(self.orbit_wrapper)
+        orbit_wrap_layout.setContentsMargins(4, 8, 12, 10)
+        orbit_wrap_layout.addWidget(self.orbit)
+
         self.right_panel_stack.addWidget(self.right_rail)
-        self.right_panel_stack.addWidget(self.orbit)
+        self.right_panel_stack.addWidget(self.orbit_wrapper)
         root.addWidget(self.right_panel_stack)
 
         self.root_splitter = root
@@ -2169,17 +2188,22 @@ class MainWindow(QMainWindow):
         self._refresh_rail_icons()
 
     def _build_left_rail(self) -> QWidget:
+        wrapper = QWidget()
+        wrapper.setFixedWidth(78)
+        wrap_layout = QVBoxLayout(wrapper)
+        wrap_layout.setContentsMargins(12, 8, 6, 10)
+        wrap_layout.setSpacing(0)
+
         rail = QFrame()
         rail.setObjectName("leftRail")
-        rail.setFixedWidth(58)
         layout = QVBoxLayout(rail)
-        layout.setContentsMargins(9, 14, 9, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 14, 8, 14)
+        layout.setSpacing(12)
 
         self.rail_new_btn = QPushButton()
         self.rail_new_btn.setObjectName("railPrimaryBtn")
-        self.rail_new_btn.setFixedSize(40, 40)
-        self.rail_new_btn.setIconSize(QSize(22, 22))
+        self.rail_new_btn.setFixedSize(44, 44)
+        self.rail_new_btn.setIconSize(QSize(24, 24))
         self.rail_new_btn.setToolTip("New Terminal Session (Ctrl+Shift+T)")
         self.rail_new_btn.setCursor(Qt.PointingHandCursor)
         self.rail_new_btn.clicked.connect(self.new_session)
@@ -2199,8 +2223,8 @@ class MainWindow(QMainWindow):
         for icon_kind, tooltip, callback in rail_actions:
             btn = QPushButton()
             btn.setObjectName("railIconBtn")
-            btn.setFixedSize(38, 38)
-            btn.setIconSize(QSize(21, 21))
+            btn.setFixedSize(40, 40)
+            btn.setIconSize(QSize(22, 22))
             btn.setToolTip(tooltip)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(callback)
@@ -2211,27 +2235,34 @@ class MainWindow(QMainWindow):
 
         self.expand_left_btn = QPushButton("»")
         self.expand_left_btn.setObjectName("railToggleBtn")
-        self.expand_left_btn.setFixedSize(36, 32)
+        self.expand_left_btn.setFixedSize(44, 40)
         self.expand_left_btn.setToolTip("Expand Sidebar")
         self.expand_left_btn.setCursor(Qt.PointingHandCursor)
         self.expand_left_btn.clicked.connect(lambda: self.set_left_collapsed(False))
         layout.addWidget(self.expand_left_btn, 0, Qt.AlignHCenter)
-        return rail
+
+        wrap_layout.addWidget(rail)
+        return wrapper
 
     def _build_right_rail(self) -> QWidget:
+        wrapper = QWidget()
+        wrapper.setFixedWidth(84)
+        wrap_layout = QVBoxLayout(wrapper)
+        wrap_layout.setContentsMargins(6, 8, 12, 10)
+        wrap_layout.setSpacing(0)
+
         rail = QFrame()
         rail.setObjectName("rightRail")
-        rail.setFixedWidth(64)
         layout = QVBoxLayout(rail)
-        layout.setContentsMargins(7, 14, 7, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(6, 14, 6, 14)
+        layout.setSpacing(12)
 
         self.rail_orbit_btn = QToolButton()
         self.rail_orbit_btn.setObjectName("railCardBtn")
         self.rail_orbit_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.rail_orbit_btn.setText("Orbit")
-        self.rail_orbit_btn.setIconSize(QSize(24, 24))
-        self.rail_orbit_btn.setFixedSize(50, 56)
+        self.rail_orbit_btn.setIconSize(QSize(25, 25))
+        self.rail_orbit_btn.setFixedSize(54, 60)
         self.rail_orbit_btn.setToolTip("Open Orbit AI Copilot")
         self.rail_orbit_btn.setCursor(Qt.PointingHandCursor)
         self.rail_orbit_btn.clicked.connect(self._open_orbit_from_rail)
@@ -2241,8 +2272,8 @@ class MainWindow(QMainWindow):
         self.rail_modes_btn.setObjectName("railCardBtn")
         self.rail_modes_btn.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self.rail_modes_btn.setText("Modes")
-        self.rail_modes_btn.setIconSize(QSize(22, 22))
-        self.rail_modes_btn.setFixedSize(50, 56)
+        self.rail_modes_btn.setIconSize(QSize(23, 23))
+        self.rail_modes_btn.setFixedSize(54, 60)
         self.rail_modes_btn.setToolTip("Configure Orbit Execution Modes")
         self.rail_modes_btn.setCursor(Qt.PointingHandCursor)
         self.rail_modes_btn.clicked.connect(lambda: self.orbit._edit_modes())
@@ -2252,24 +2283,26 @@ class MainWindow(QMainWindow):
 
         self.expand_right_btn = QPushButton("«")
         self.expand_right_btn.setObjectName("railToggleBtn")
-        self.expand_right_btn.setFixedSize(36, 32)
+        self.expand_right_btn.setFixedSize(44, 40)
         self.expand_right_btn.setToolTip("Expand Orbit Panel")
         self.expand_right_btn.setCursor(Qt.PointingHandCursor)
         self.expand_right_btn.clicked.connect(lambda: self.set_right_collapsed(False))
         layout.addWidget(self.expand_right_btn, 0, Qt.AlignHCenter)
-        return rail
+
+        wrap_layout.addWidget(rail)
+        return wrapper
 
     def _refresh_rail_icons(self):
-        muted = self.theme.textMuted if self.theme else "#9D8EB5"
+        muted = self.theme.text if self.theme else "#F4F0FA"
         accent = self.theme.accent_alt if self.theme else "#C084FC"
         if hasattr(self, "rail_new_btn"):
             self.rail_new_btn.setIcon(_make_vector_icon("terminal", muted, accent, 24))
         for btn, kind in getattr(self, "_left_rail_buttons", []):
             btn.setIcon(_make_vector_icon(kind, muted, accent, 22))
         if hasattr(self, "rail_orbit_btn"):
-            self.rail_orbit_btn.setIcon(_make_vector_icon("orbit", muted, accent, 24))
+            self.rail_orbit_btn.setIcon(_make_vector_icon("orbit", muted, accent, 25))
         if hasattr(self, "rail_modes_btn"):
-            self.rail_modes_btn.setIcon(_make_vector_icon("modes", muted, accent, 22))
+            self.rail_modes_btn.setIcon(_make_vector_icon("modes", muted, accent, 23))
 
     def _open_orbit_from_rail(self):
         self.set_right_collapsed(False)
@@ -2279,34 +2312,39 @@ class MainWindow(QMainWindow):
         self._left_collapsed = bool(collapsed)
         if self._left_collapsed:
             self.left_panel_stack.setCurrentWidget(self.left_rail)
-            self.left_panel_stack.setFixedWidth(58)
+            self.left_panel_stack.setFixedWidth(78)
         else:
             self.left_panel_stack.setCurrentWidget(self.sidebar_expanded)
-            self.left_panel_stack.setMinimumWidth(240)
-            self.left_panel_stack.setMaximumWidth(310)
+            self.left_panel_stack.setMinimumWidth(255)
+            self.left_panel_stack.setMaximumWidth(320)
         self._sync_splitter_sizes()
 
     def set_right_collapsed(self, collapsed: bool):
         self._right_collapsed = bool(collapsed)
         if self._right_collapsed:
             self.right_panel_stack.setCurrentWidget(self.right_rail)
-            self.right_panel_stack.setFixedWidth(64)
+            self.right_panel_stack.setFixedWidth(84)
         else:
-            self.right_panel_stack.setCurrentWidget(self.orbit)
-            self.right_panel_stack.setMinimumWidth(330)
-            self.right_panel_stack.setMaximumWidth(480)
+            self.right_panel_stack.setCurrentWidget(self.orbit_wrapper)
+            self.right_panel_stack.setMinimumWidth(345)
+            self.right_panel_stack.setMaximumWidth(490)
         self._sync_splitter_sizes()
 
     def _sync_splitter_sizes(self):
         if not hasattr(self, "root_splitter"):
             return
         total = max(1080, self.width())
-        left_w = 58 if self._left_collapsed else 255
-        right_w = 64 if self._right_collapsed else 340
+        left_w = 78 if self._left_collapsed else 265
+        right_w = 84 if self._right_collapsed else 355
         center_w = max(500, total - left_w - right_w)
         self.root_splitter.setSizes([left_w, center_w, right_w])
 
     def _build_sidebar(self) -> QWidget:
+        wrapper = QWidget()
+        wrap_layout = QVBoxLayout(wrapper)
+        wrap_layout.setContentsMargins(12, 8, 4, 10)
+        wrap_layout.setSpacing(0)
+
         panel = HUDFrame()
         panel.setObjectName("sidebar")
         panel.setMinimumWidth(240)
@@ -2322,7 +2360,7 @@ class MainWindow(QMainWindow):
         brand_row.addStretch()
         collapse_top_btn = QPushButton("«")
         collapse_top_btn.setObjectName("railToggleBtn")
-        collapse_top_btn.setFixedSize(30, 26)
+        collapse_top_btn.setFixedSize(40, 34)
         collapse_top_btn.setToolTip("Collapse Sidebar")
         collapse_top_btn.setCursor(Qt.PointingHandCursor)
         collapse_top_btn.clicked.connect(lambda: self.set_left_collapsed(True))
@@ -2405,14 +2443,16 @@ class MainWindow(QMainWindow):
         hint.setObjectName("sessionPath")
         self.collapse_left_btn = QPushButton("«")
         self.collapse_left_btn.setObjectName("railToggleBtn")
-        self.collapse_left_btn.setFixedSize(34, 30)
+        self.collapse_left_btn.setFixedSize(44, 38)
         self.collapse_left_btn.setToolTip("Collapse Sidebar")
         self.collapse_left_btn.setCursor(Qt.PointingHandCursor)
         self.collapse_left_btn.clicked.connect(lambda: self.set_left_collapsed(True))
         bottom_row.addWidget(hint, 1)
         bottom_row.addWidget(self.collapse_left_btn)
         layout.addLayout(bottom_row)
-        return panel
+
+        wrap_layout.addWidget(panel)
+        return wrapper
 
     def _install_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+K"), self, activated=self.open_palette)
@@ -2488,13 +2528,13 @@ class MainWindow(QMainWindow):
             if hasattr(self, "title_bar"):
                 current_cwd = str(session.shell.ctx.cwd)
                 folder_name = Path(current_cwd).name or current_cwd
-                self.title_bar.set_workspace_text(f"◈   WORKSPACE   //   {folder_name}")
+                self.title_bar.set_workspace_text(f"•   WORKSPACE   //   {folder_name}")
             plugins = session.shell.ctx.plugins
             loaded = len(plugins.loaded) if plugins else 0
             failed = len(plugins.failed) if plugins else 0
             self.plugin_summary.setText(f"{loaded} active  ·  {failed} attention")
-            status_str = "● RUNNING" if session.is_busy else "● READY"
-            self.status_label.setText(f"{status_str}   │   {session.shell.ctx.cwd}   │   {len(session.shell.registry.all_names())} commands")
+            status_str = "● READY" if not session.is_busy else "● RUNNING"
+            self.status_label.setText(f"{status_str}    │    {session.shell.ctx.cwd}    │    {len(session.shell.registry.all_names())} commands")
         if hasattr(self, "safety_label"):
             self.safety_label.setText("⛨  SAFE MODE" if self.preferences.get("confirm_risky", True) else "⚡  FAST MODE")
 
@@ -2714,46 +2754,33 @@ class MainWindow(QMainWindow):
         painter.setRenderHint(QPainter.Antialiasing, True)
 
         if theme.key == "vscode-dark-plus":
-            # Silky obsidian + magenta-violet aurora waves matching the reference design
-            base = QLinearGradient(0, 0, w, h)
-            base.setColorAt(0.0, QColor("#12091E"))
-            base.setColorAt(0.42, QColor("#08050D"))
-            base.setColorAt(0.78, QColor("#14071D"))
-            base.setColorAt(1.0, QColor("#21092A"))
+            # Deep dark void base with top-right slate-teal haze and bottom-left/right soft plum glow
+            base = QLinearGradient(0, h, w, 0)
+            base.setColorAt(0.0, QColor("#1E0B26"))
+            base.setColorAt(0.42, QColor("#0A0711"))
+            base.setColorAt(0.75, QColor("#0B101D"))
+            base.setColorAt(1.0, QColor("#152435"))
             painter.fillRect(self.rect(), base)
 
-            # Upper-right magenta-violet wave glow
-            g1 = QRadialGradient(QPointF(w * 0.86, h * 0.28), max(w, h) * 0.48)
-            g1.setColorAt(0.0, QColor(217, 70, 239, 68))
-            g1.setColorAt(0.38, QColor(147, 51, 234, 34))
-            g1.setColorAt(1.0, QColor(11, 7, 17, 0))
-            painter.fillRect(self.rect(), g1)
+            # Top-right cool slate-teal atmospheric radial glow
+            g_top_right = QRadialGradient(QPointF(w * 0.85, h * 0.14), max(w, h) * 0.52)
+            g_top_right.setColorAt(0.0, QColor(48, 108, 142, 72))
+            g_top_right.setColorAt(0.45, QColor(30, 64, 96, 32))
+            g_top_right.setColorAt(1.0, QColor(10, 7, 17, 0))
+            painter.fillRect(self.rect(), g_top_right)
 
-            # Lower-left crimson-magenta wave glow
-            g2 = QRadialGradient(QPointF(w * 0.16, h * 0.78), max(w, h) * 0.46)
-            g2.setColorAt(0.0, QColor(236, 72, 153, 62))
-            g2.setColorAt(0.42, QColor(126, 34, 206, 28))
-            g2.setColorAt(1.0, QColor(11, 7, 17, 0))
-            painter.fillRect(self.rect(), g2)
+            # Bottom-left warm plum-magenta diffused glow
+            g_bot_left = QRadialGradient(QPointF(w * 0.14, h * 0.88), max(w, h) * 0.56)
+            g_bot_left.setColorAt(0.0, QColor(156, 39, 128, 78))
+            g_bot_left.setColorAt(0.45, QColor(98, 24, 92, 36))
+            g_bot_left.setColorAt(1.0, QColor(10, 7, 17, 0))
+            painter.fillRect(self.rect(), g_bot_left)
 
-            # Bottom-right deep violet glow
-            g3 = QRadialGradient(QPointF(w * 0.82, h * 0.92), max(w, h) * 0.36)
-            g3.setColorAt(0.0, QColor(192, 38, 211, 54))
-            g3.setColorAt(1.0, QColor(11, 7, 17, 0))
-            painter.fillRect(self.rect(), g3)
-
-            # Subtle diagonal aurora fold highlight
-            wave = QPainterPath()
-            wave.moveTo(w * 0.05, h * 0.82)
-            wave.cubicTo(w * 0.32, h * 0.54, w * 0.64, h * 0.48, w * 0.96, h * 0.18)
-            wave.lineTo(w, h * 0.35)
-            wave.cubicTo(w * 0.68, h * 0.58, w * 0.36, h * 0.66, w * 0.08, h * 0.95)
-            wave.closeSubpath()
-            wave_grad = QLinearGradient(0, h * 0.85, w, h * 0.2)
-            wave_grad.setColorAt(0.0, QColor(236, 72, 153, 24))
-            wave_grad.setColorAt(0.5, QColor(168, 85, 247, 14))
-            wave_grad.setColorAt(1.0, QColor(217, 70, 239, 30))
-            painter.fillPath(wave, wave_grad)
+            # Bottom-right subtle violet-plum balance glow
+            g_bot_right = QRadialGradient(QPointF(w * 0.90, h * 0.86), max(w, h) * 0.44)
+            g_bot_right.setColorAt(0.0, QColor(126, 34, 140, 56))
+            g_bot_right.setColorAt(1.0, QColor(10, 7, 17, 0))
+            painter.fillRect(self.rect(), g_bot_right)
         elif theme.key == "ghost":
             painter.setRenderHint(QPainter.Antialiasing, False)
             pen = QPen(QColor(56, 189, 248, 8), 1)
@@ -2783,6 +2810,13 @@ class MainWindow(QMainWindow):
                     ctypes.c_uint32(20),  # DWMWA_USE_IMMERSIVE_DARK_MODE
                     ctypes.byref(dark_val),
                     ctypes.sizeof(dark_val),
+                )
+                corner_pref = ctypes.c_int(2)  # DWMWCP_ROUND (Windows 11 rounded window corners)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    ctypes.c_void_p(hwnd),
+                    ctypes.c_uint32(33),  # DWMWA_WINDOW_CORNER_PREFERENCE
+                    ctypes.byref(corner_pref),
+                    ctypes.sizeof(corner_pref),
                 )
                 h = self.theme.bg.lstrip("#")
                 if len(h) == 6:

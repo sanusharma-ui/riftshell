@@ -100,26 +100,26 @@ class Theme:
 THEMES: dict[str, Theme] = {
     "vscode-dark-plus": Theme(
         key="vscode-dark-plus",
-        display_name="Rift Aurora (Default)",
+        display_name="Rift Horizon (Default)",
         aliases=(
-            "default", "rift-aurora", "aurora", "violet", "dark+",
+            "default", "rift-horizon", "horizon", "violet", "dark+",
             "dark-plus", "vscode", "vs-code", "vs-code-dark-plus",
         ),
-        bg="#0B0711",
-        panel="#120B1D",
-        panelBorder="#2A1B3D",
-        text="#F3EEFA",
-        textMuted="#9D8EB5",
-        accent="#A855F7",
-        accentGlow="rgba(168, 85, 247, 0.22)",
+        bg="#0A0710",
+        panel="#130D1E",
+        panelBorder="rgba(192, 132, 252, 0.16)",
+        text="#F4F0FA",
+        textMuted="#9A8FB2",
+        accent="#8B5CF6",
+        accentGlow="rgba(139, 92, 246, 0.22)",
         success="#10B981",
         danger="#F43F5E",
         terminalBg="#08050D",
-        inputBg="#170E26",
-        buttonBg="#1F1433",
-        buttonText="#F3EEFA",
-        secondary="#D946EF",
-        selection_override="#3B1D5E",
+        inputBg="#140E21",
+        buttonBg="#1D152E",
+        buttonText="#F4F0FA",
+        secondary="#C084FC",
+        selection_override="#381E5E",
     ),
     "ghost": Theme(
         key="ghost",
@@ -304,7 +304,7 @@ THEMES: dict[str, Theme] = {
     "cyberpunk-neon": Theme(
         key="cyberpunk-neon",
         display_name="Horizon Tactical",
-        aliases=("cyberpunk", "cyber", "neon", "horizon"),
+        aliases=("cyberpunk", "cyber", "neon"),
         bg="#0A0E17",
         panel="#101726",
         panelBorder="#1F2D46",
@@ -359,78 +359,62 @@ def list_themes() -> list[Theme]:
 
 
 def build_stylesheet(theme: Theme) -> str:
-    is_aurora = theme.key == "vscode-dark-plus"
+    is_default = theme.key == "vscode-dark-plus"
     is_ghost = theme.key == "ghost"
     is_obsidian = theme.key == "obsidian-aura"
 
     ui_font = '"Segoe UI Variable Text", "Inter", "Segoe UI", sans-serif'
     mono_font = '"Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace'
 
-    panel_fill = theme.panel if theme.panel != "transparent" else "rgba(13, 19, 30, 0.68)"
-    input_fill = theme.inputBg if theme.inputBg != "transparent" else "rgba(22, 31, 46, 0.65)"
-    button_fill = theme.buttonBg if theme.buttonBg != "transparent" else "rgba(30, 41, 59, 0.55)"
-    terminal_fill = theme.terminalBg if theme.terminalBg != "transparent" else "rgba(8, 11, 17, 0.72)"
+    panel_fill = theme.panel if theme.panel != "transparent" else "rgba(13, 19, 30, 0.40)"
+    input_fill = theme.inputBg if theme.inputBg != "transparent" else "rgba(22, 31, 46, 0.30)"
+    button_fill = theme.buttonBg if theme.buttonBg != "transparent" else "rgba(30, 41, 59, 0.35)"
+    terminal_fill = theme.terminalBg if theme.terminalBg != "transparent" else "rgba(8, 11, 17, 0.35)"
 
-    if is_aurora:
+    if is_default:
         window_bg_css = (
-            "background: qlineargradient(x1: 0.0, y1: 0.0, x2: 1.0, y2: 1.0, "
-            "stop: 0.0 #12091E, stop: 0.35 #09060E, stop: 0.72 #15081E, stop: 1.0 #240A2C);"
+            "background: qlineargradient(x1: 0.0, y1: 1.0, x2: 1.0, y2: 0.0, "
+            "stop: 0.0 #240D2B, stop: 0.38 #0B0813, stop: 0.72 #0D1322, stop: 1.0 #162636);"
         )
-        title_bar_bg = (
-            "background: rgba(14, 9, 23, 0.92); "
-            f"border-bottom: 1px solid {theme.panelBorder};"
-        )
-        rail_bg_css = "background-color: rgba(14, 9, 24, 0.78);"
+        title_bar_bg = "background: transparent; border-bottom: none;"
+        rail_bg_css = "background-color: rgba(20, 14, 32, 0.35);"
         primary_btn_bg = (
             "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
-            "stop: 0 #9333EA, stop: 0.5 #A855F7, stop: 1 #C084FC)"
+            "stop: 0 #6D28D9, stop: 0.5 #7C3AED, stop: 1 #9333EA)"
         )
         primary_btn_hover = (
             "qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
-            "stop: 0 #A855F7, stop: 0.5 #C084FC, stop: 1 #E879F9)"
+            "stop: 0 #7C3AED, stop: 0.5 #8B5CF6, stop: 1 #A855F7)"
         )
         primary_btn_fg = "#FFFFFF"
-        dock_bg_css = (
-            "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, "
-            "stop: 0 rgba(58, 22, 82, 0.72), stop: 0.25 rgba(23, 14, 38, 0.88), "
-            "stop: 0.75 rgba(23, 14, 38, 0.88), stop: 1 rgba(48, 20, 74, 0.72));"
-        )
+        dock_bg_css = "background: transparent;"
     elif is_obsidian:
         window_bg_css = (
             "background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, "
             "stop: 0 #0F0E17, stop: 0.5 #0B0B11, stop: 1 #13111C);"
         )
-        title_bar_bg = (
-            "background: rgba(15, 14, 23, 0.95); "
-            f"border-bottom: 1px solid {theme.panelBorder};"
-        )
-        rail_bg_css = f"background-color: {panel_fill};"
+        title_bar_bg = "background: transparent; border-bottom: none;"
+        rail_bg_css = f"background-color: rgba(19, 19, 28, 0.35);"
         primary_btn_bg = theme.accent
         primary_btn_hover = theme.accent_alt
         primary_btn_fg = "#06090F"
-        dock_bg_css = f"background-color: {panel_fill};"
+        dock_bg_css = "background: transparent;"
     elif is_ghost:
         window_bg_css = f"background-color: {theme.bg};"
-        title_bar_bg = (
-            "background-color: rgba(10, 14, 22, 0.85); "
-            f"border-bottom: 1px solid {theme.panelBorder};"
-        )
-        rail_bg_css = "background-color: rgba(10, 14, 22, 0.55);"
+        title_bar_bg = "background: transparent; border-bottom: none;"
+        rail_bg_css = "background-color: rgba(10, 14, 22, 0.30);"
         primary_btn_bg = theme.accent
         primary_btn_hover = theme.accent_alt
         primary_btn_fg = "#06090F"
-        dock_bg_css = f"background-color: {panel_fill};"
+        dock_bg_css = "background: transparent;"
     else:
         window_bg_css = f"background-color: {theme.bg};"
-        title_bar_bg = (
-            f"background-color: {theme.bg}; "
-            f"border-bottom: 1px solid {theme.panelBorder};"
-        )
-        rail_bg_css = f"background-color: {panel_fill};"
+        title_bar_bg = "background: transparent; border-bottom: none;"
+        rail_bg_css = f"background-color: rgba(19, 19, 28, 0.35);"
         primary_btn_bg = theme.accent
         primary_btn_hover = theme.accent_alt
         primary_btn_fg = "#06090F"
-        dock_bg_css = f"background-color: {panel_fill};"
+        dock_bg_css = "background: transparent;"
 
     tab_selected_css = f"""
 QTabBar {{
@@ -439,10 +423,10 @@ QTabBar {{
 QTabBar::tab {{
     background: {theme.bg if not is_ghost else "rgba(15, 23, 42, 0.35)"};
     color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
+    border: 1px solid rgba(255, 255, 255, 0.04);
     border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
     padding: 7px 16px;
     margin-right: 4px;
     margin-top: 4px;
@@ -456,7 +440,7 @@ QTabBar::tab:hover {{
 QTabBar::tab:selected {{
     background: {panel_fill};
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
+    border: 1px solid rgba(255, 255, 255, 0.04);
     border-top: 2px solid {theme.accent};
     border-bottom: 1px solid {panel_fill};
     font-weight: 700;
@@ -467,8 +451,8 @@ QTabBar::tab:selected {{
 QPushButton {{
     background-color: {button_fill};
     color: {theme.buttonText};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
     padding: 7px 14px;
     font-weight: 600;
     font-size: 12.5px;
@@ -487,19 +471,19 @@ QPushButton:pressed {{
 }}
 
 QPushButton:disabled {{
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: rgba(255, 255, 255, 0.02);
     color: {theme.textMuted};
-    border-color: {theme.panelBorder};
+    border-color: rgba(255, 255, 255, 0.02);
 }}
 
 QPushButton#primaryButton {{
     background: {primary_btn_bg};
     color: {primary_btn_fg};
-    border: 1px solid {theme.accent};
-    border-radius: 8px;
-    padding: 8px 18px;
+    border: 1px solid rgba(192, 132, 252, 0.45);
+    border-radius: 12px;
+    padding: 9px 20px;
     font-weight: 700;
-    font-size: 12.5px;
+    font-size: 13px;
 }}
 
 QPushButton#primaryButton:hover {{
@@ -519,10 +503,10 @@ QPushButton#primaryButton:disabled {{
 }}
 
 QPushButton#railPrimaryBtn {{
-    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(168, 85, 247, 0.38), stop: 1 rgba(217, 70, 239, 0.22));
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(139, 92, 246, 0.42), stop: 1 rgba(192, 132, 252, 0.24));
     color: {theme.text};
-    border: 1px solid {theme.accent};
-    border-radius: 10px;
+    border: 1px solid rgba(192, 132, 252, 0.45);
+    border-radius: 13px;
     padding: 0px;
 }}
 
@@ -534,60 +518,60 @@ QPushButton#railPrimaryBtn:hover {{
 QPushButton#railIconBtn {{
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 9px;
+    border-radius: 11px;
     padding: 0px;
 }}
 
 QPushButton#railIconBtn:hover {{
     background-color: {theme.accentGlow};
-    border-color: {theme.panelBorder};
+    border-color: rgba(255, 255, 255, 0.04);
 }}
 
-QPushButton#railCardBtn {{
-    background-color: rgba(255, 255, 255, 0.03);
-    color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 10px;
+QToolButton#railCardBtn {{
+    background-color: transparent;
+    color: {theme.text};
+    border: 1px solid transparent;
+    border-radius: 12px;
     padding: 6px 2px;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
 }}
 
-QPushButton#railCardBtn:hover {{
+QToolButton#railCardBtn:hover {{
     background-color: {theme.accentGlow};
-    border-color: {theme.accent};
-    color: {theme.text};
+    border-color: rgba(255, 255, 255, 0.04);
+    color: #FFFFFF;
 }}
 
 QPushButton#railToggleBtn {{
     background-color: rgba(255, 255, 255, 0.03);
-    color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    color: {theme.text};
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
     padding: 0px;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 700;
 }}
 
 QPushButton#railToggleBtn:hover {{
     background-color: {theme.accentGlow};
     border-color: {theme.accent};
-    color: {theme.text};
+    color: #FFFFFF;
 }}
 
 QPushButton#inlinePaletteBtn {{
     background-color: transparent;
     color: {theme.textMuted};
     border: none;
-    border-left: 1px solid {theme.panelBorder};
-    border-radius: 0px;
+    border-radius: 8px;
     padding: 4px 10px;
     font-family: {mono_font};
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
 }}
 
 QPushButton#inlinePaletteBtn:hover {{
+    background-color: rgba(255, 255, 255, 0.05);
     color: {theme.text};
 }}
 
@@ -595,7 +579,7 @@ QPushButton#approveButton {{
     background-color: rgba(16, 185, 129, 0.14);
     color: {theme.success};
     border: 1px solid {theme.success};
-    border-radius: 7px;
+    border-radius: 10px;
     padding: 7px 12px;
     font-weight: 700;
     font-size: 12px;
@@ -616,8 +600,8 @@ QPushButton#approveButton:disabled {{
 QPushButton#dismissButton {{
     background-color: {button_fill};
     color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
     padding: 7px 12px;
     font-weight: 600;
     font-size: 12px;
@@ -631,17 +615,17 @@ QPushButton#dismissButton:hover {{
 QPushButton#dismissButton:disabled {{
     background-color: transparent;
     color: {theme.textMuted};
-    border-color: {theme.panelBorder};
+    border-color: rgba(255, 255, 255, 0.02);
 }}
 
 QPushButton#stopButton {{
-    background-color: rgba(255, 255, 255, 0.04);
-    color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
-    padding: 8px 16px;
+    background-color: rgba(26, 18, 40, 0.50);
+    color: {theme.text};
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 9px 18px;
     font-weight: 600;
-    font-size: 12.5px;
+    font-size: 13px;
 }}
 
 QPushButton#stopButton:hover:enabled {{
@@ -651,9 +635,9 @@ QPushButton#stopButton:hover:enabled {{
 }}
 
 QPushButton#stopButton:disabled {{
-    background-color: rgba(255, 255, 255, 0.02);
-    color: {theme.textMuted};
-    border-color: {theme.panelBorder};
+    background-color: rgba(24, 16, 36, 0.35);
+    color: {theme.text};
+    border-color: rgba(255, 255, 255, 0.02);
 }}
 """
 
@@ -661,6 +645,7 @@ QPushButton#stopButton:disabled {{
 QMainWindow {{
     {window_bg_css}
     border: 1px solid {theme.panelBorder};
+    border-radius: 16px;
 }}
 
 QWidget#windowContainer {{
@@ -669,13 +654,13 @@ QWidget#windowContainer {{
 
 QWidget#customTitleBar {{
     {title_bar_bg}
-    min-height: 42px;
-    max-height: 42px;
+    min-height: 46px;
+    max-height: 46px;
 }}
 
 QLabel#titleBrand {{
     color: {theme.text};
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 700;
     font-family: {ui_font};
     letter-spacing: 0.3px;
@@ -683,41 +668,41 @@ QLabel#titleBrand {{
 }}
 
 QLabel#titleBadge {{
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.03);
     color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
-    padding: 2px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 3px 10px;
     font-size: 10.5px;
     font-family: {mono_font};
     font-weight: 600;
 }}
 
 QLabel#titleCenterPill {{
-    background-color: rgba(23, 14, 38, 0.75);
+    background-color: rgba(18, 13, 30, 0.40);
     color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
-    padding: 4px 16px;
-    font-size: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    padding: 4px 20px;
+    font-size: 11.5px;
     font-family: {mono_font};
     font-weight: 600;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.8px;
 }}
 
 QPushButton#titleMinBtn, QPushButton#titleMaxBtn, QPushButton#titleCloseBtn {{
     background-color: transparent;
     color: {theme.textMuted};
     border: none;
-    border-radius: 0px;
+    border-radius: 8px;
     padding: 0px;
     font-size: 14px;
     font-weight: 500;
     font-family: "Segoe UI", sans-serif;
-    min-width: 46px;
-    max-width: 46px;
-    min-height: 42px;
-    max-height: 42px;
+    min-width: 44px;
+    max-width: 44px;
+    min-height: 36px;
+    max-height: 36px;
 }}
 
 QPushButton#titleMinBtn:hover, QPushButton#titleMaxBtn:hover {{
@@ -759,10 +744,10 @@ QLabel#brand {{
 
 QLabel#heroTitle {{
     color: {theme.text};
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 600;
     font-family: {mono_font};
-    letter-spacing: 5px;
+    letter-spacing: 3px;
 }}
 
 QLabel#heroSubtitle {{
@@ -770,7 +755,7 @@ QLabel#heroSubtitle {{
     font-size: 13.5px;
     font-weight: 500;
     font-family: {mono_font};
-    letter-spacing: 0.6px;
+    letter-spacing: 0.5px;
 }}
 
 QLabel#eyebrow, QLabel#sectionTitle {{
@@ -789,12 +774,12 @@ QLabel#sessionPath {{
 }}
 
 QLabel#promptBadge {{
-    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(168, 85, 247, 0.32), stop: 1 rgba(217, 70, 239, 0.18));
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 rgba(139, 92, 246, 0.36), stop: 1 rgba(192, 132, 252, 0.20));
     color: {theme.accent_alt};
-    border: 1px solid {theme.accent};
-    border-radius: 8px;
-    padding: 5px 10px;
-    font-size: 13px;
+    border: 1px solid rgba(192, 132, 252, 0.40);
+    border-radius: 12px;
+    padding: 7px 11px;
+    font-size: 14px;
     font-family: {mono_font};
     font-weight: 700;
 }}
@@ -813,36 +798,36 @@ QLabel#statusPill {{
 QLabel#orbitStatusBanner {{
     background-color: {input_fill};
     color: {theme.textMuted};
-    border: 1px solid {theme.panelBorder};
+    border: 1px solid rgba(255, 255, 255, 0.04);
     border-left: 3px solid {theme.accent};
-    border-radius: 6px;
+    border-radius: 10px;
     padding: 7px 10px;
     font-size: 12px;
 }}
 
 QFrame#infoCard, QFrame#shortcutCard, QFrame#extensionCard, QFrame#modeBar, QFrame#orbitComposer {{
     background-color: {input_fill};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
 }}
 
 QFrame#commandInputShell {{
-    background-color: rgba(12, 8, 20, 0.78);
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
 }}
 
 QFrame#commandDock {{
     {dock_bg_css}
-    border: 1px solid {theme.panelBorder};
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-radius: 24px;
 }}
 
 QTextEdit {{
     background-color: {panel_fill};
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
     padding: 10px 12px;
     font-size: 13px;
     selection-background-color: {theme.selection};
@@ -853,8 +838,8 @@ QTextEdit {{
 QLineEdit {{
     background-color: {input_fill};
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
     padding: 8px 12px;
     font-size: 13px;
     selection-background-color: {theme.selection};
@@ -863,7 +848,7 @@ QLineEdit {{
 }}
 
 QLineEdit:hover {{
-    border-color: {theme.textMuted};
+    border-color: rgba(255, 255, 255, 0.08);
 }}
 
 QLineEdit:focus {{
@@ -874,8 +859,8 @@ QLineEdit:focus {{
 QListWidget {{
     background-color: {input_fill};
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
     padding: 5px;
     outline: none;
     font-size: 12.5px;
@@ -884,7 +869,7 @@ QListWidget {{
 
 QListWidget::item {{
     padding: 7px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     margin: 1px 0px;
     border: 1px solid transparent;
 }}
@@ -907,7 +892,7 @@ QAbstractItemView#commandSuggestions {{
     background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.accent};
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 4px;
     outline: none;
     selection-background-color: {theme.selection};
@@ -919,7 +904,7 @@ QAbstractItemView#commandSuggestions {{
 QAbstractItemView#commandSuggestions::item {{
     padding: 7px 12px;
     min-height: 22px;
-    border-radius: 5px;
+    border-radius: 6px;
     border: none;
 }}
 
@@ -932,7 +917,7 @@ QAbstractItemView#commandSuggestions::item:hover {{
 QPushButton#navButton {{
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: 10px;
     text-align: left;
     padding: 8px 11px;
     color: {theme.textMuted};
@@ -942,7 +927,7 @@ QPushButton#navButton {{
 
 QPushButton#navButton:hover {{
     background-color: {input_fill};
-    border-color: {theme.panelBorder};
+    border-color: rgba(255, 255, 255, 0.04);
     color: {theme.text};
 }}
 
@@ -955,8 +940,8 @@ QPushButton#navButton:checked, QPushButton#navButton:pressed {{
 
 QPushButton#wrapToggle {{
     background-color: {input_fill};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
     padding: 4px 10px;
     font-size: 11px;
     font-family: {mono_font};
@@ -976,48 +961,40 @@ QPushButton#wrapToggle:checked {{
 }}
 
 QStatusBar {{
-    background-color: rgba(11, 7, 17, 0.92);
+    background-color: transparent;
     color: {theme.textMuted};
-    border-top: 1px solid {theme.panelBorder};
+    border-top: 1px solid rgba(255, 255, 255, 0.02);
     font-size: 11.5px;
     font-family: {mono_font};
-    padding: 3px 12px;
+    padding: 3px 14px;
 }}
 
 QStatusBar::item {{
     border: none;
 }}
 
-QFrame#sidebar, QFrame#inspector, QFrame#leftRail, QFrame#rightRail {{
+QFrame#leftRail, QFrame#rightRail {{
     {rail_bg_css}
-    border: 1px solid {theme.panelBorder};
-    border-radius: 0px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
 }}
 
-QFrame#sidebar, QFrame#leftRail {{
-    border-top: none;
-    border-bottom: none;
-    border-left: none;
-    border-right: 1px solid {theme.panelBorder};
-}}
-
-QFrame#inspector, QFrame#rightRail {{
-    border-top: none;
-    border-bottom: none;
-    border-right: none;
-    border-left: 1px solid {theme.panelBorder};
+QFrame#sidebar, QFrame#inspector {{
+    {rail_bg_css}
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 18px;
 }}
 
 QFrame#terminalHeader {{
-    border-radius: 8px;
-    background-color: {input_fill};
-    border: 1px solid {theme.panelBorder};
+    border-radius: 14px;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.02);
 }}
 
 QFrame#terminalHeader QPushButton {{
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 8px;
     color: {theme.textMuted};
     padding: 4px 10px;
     font-size: 11.5px;
@@ -1026,7 +1003,7 @@ QFrame#terminalHeader QPushButton {{
 
 QFrame#terminalHeader QPushButton:hover {{
     background-color: {button_fill};
-    border-color: {theme.panelBorder};
+    border-color: rgba(255, 255, 255, 0.05);
     color: {theme.text};
 }}
 
@@ -1034,9 +1011,9 @@ QLineEdit#commandInput {{
     background-color: transparent;
     color: {theme.text};
     border: none;
-    padding: 7px 10px;
+    padding: 7px 12px;
     font-family: {mono_font};
-    font-size: 13px;
+    font-size: 13.5px;
     min-height: 22px;
     min-width: 0;
 }}
@@ -1047,10 +1024,10 @@ QLineEdit#commandInput:focus {{
 }}
 
 QTextEdit#terminalOutput {{
-    background-color: rgba(8, 5, 13, 0.72);
+    background-color: transparent;
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
     padding: 12px 14px;
     font-family: {mono_font};
     font-size: 13.5px;
@@ -1061,7 +1038,7 @@ QLineEdit#orbitInput {{
     background-color: {theme.bg};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 7px;
+    border-radius: 10px;
     padding: 9px 12px;
     font-family: {ui_font};
     font-size: 13px;
@@ -1074,10 +1051,10 @@ QLineEdit#orbitInput:focus {{
 }}
 
 QTextEdit#orbitConversation {{
-    background-color: rgba(8, 5, 13, 0.72);
+    background-color: transparent;
     color: {theme.text};
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-radius: 14px;
     padding: 12px;
     font-family: {ui_font};
     font-size: 13px;
@@ -1091,9 +1068,9 @@ QTabWidget#workspaceTabs::pane {{
 }}
 
 QTabWidget::pane {{
-    border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
-    background-color: {panel_fill};
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    background-color: transparent;
     margin-top: -1px;
 }}
 
@@ -1124,7 +1101,7 @@ QScrollBar:vertical {{
 
 QScrollBar::handle:vertical {{
     background: {theme.panelBorder};
-    border-radius: 3px;
+    border-radius: 4px;
     min-height: 28px;
 }}
 
@@ -1150,7 +1127,7 @@ QScrollBar:horizontal {{
 
 QScrollBar::handle:horizontal {{
     background: {theme.panelBorder};
-    border-radius: 3px;
+    border-radius: 4px;
     min-width: 28px;
 }}
 
@@ -1172,7 +1149,7 @@ QComboBox {{
     background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 7px;
+    border-radius: 10px;
     padding: 6px 12px;
     font-size: 12.5px;
     min-height: 20px;
@@ -1197,7 +1174,7 @@ QComboBox QAbstractItemView {{
     background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 8px;
+    border-radius: 10px;
     selection-background-color: {theme.selection};
     selection-color: {theme.text};
     padding: 4px;
@@ -1208,7 +1185,7 @@ QSpinBox {{
     background-color: {input_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 7px;
+    border-radius: 10px;
     padding: 6px 10px;
     font-size: 12.5px;
     min-height: 20px;
@@ -1222,7 +1199,7 @@ QSpinBox::up-button, QSpinBox::down-button {{
     width: 18px;
     background-color: {button_fill};
     border: 1px solid {theme.panelBorder};
-    border-radius: 3px;
+    border-radius: 4px;
     margin: 1px;
 }}
 
@@ -1240,7 +1217,7 @@ QCheckBox::indicator {{
     width: 16px;
     height: 16px;
     border: 1px solid {theme.panelBorder};
-    border-radius: 4px;
+    border-radius: 5px;
     background-color: {input_fill};
 }}
 
@@ -1256,13 +1233,14 @@ QCheckBox::indicator:checked {{
 QDialog {{
     {window_bg_css}
     border: 1px solid {theme.panelBorder};
+    border-radius: 14px;
 }}
 
 QToolTip {{
     background-color: {panel_fill};
     color: {theme.text};
     border: 1px solid {theme.panelBorder};
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 6px 10px;
     font-size: 12px;
 }}
