@@ -53,3 +53,43 @@ def conversation_action(text: str, *, truncated: bool = False) -> AgentAction | 
             answer += "\n```"
         answer += "\n\n*The reply stopped here. Ask me to continue for the rest.*"
     return AgentAction("respond", answer)
+
+
+# Replies that, on their own, mean "yes, go ahead" (English + Hinglish).
+CONFIRMATION_PHRASES = {
+    "yes", "yeah", "yep", "sure", "ok", "okay", "proceed", "go ahead",
+    "do it", "run it", "execute", "confirm", "agreed", "correct",
+    "haan", "ha", "bilkul", "kar do", "karo", "chal", "theek hai",
+    "thik hai", "ho jaye", "ho jao", "chal do", "bhai kar do",
+}
+_CONFIRMATION_WORDS = {
+    "yes", "yeah", "yep", "sure", "ok", "okay", "please", "proceed", "go", "ahead",
+    "do", "it", "confirm", "confirmed", "agreed", "correct",
+    "haan", "han", "ha", "bilkul", "kar", "karo", "chal", "theek", "thik", "hai",
+    "ho", "jaye", "jao", "bhai", "de", "dena",
+}
+_STRONG_CONFIRMATION_WORDS = {
+    "yes", "yeah", "yep", "sure", "ok", "okay", "proceed", "confirm", "confirmed",
+    "agreed", "haan", "han", "ha", "bilkul", "kar", "karo", "chal", "theek", "thik",
+    "jaye", "jao",
+}
+
+
+def is_confirmation(text: str) -> bool:
+    """True only for short replies such as "yes", "haan kar do" or "ok go ahead".
+
+    A longer sentence never counts, so a new request like "delete a.txt kar do"
+    is not mistaken for approval of a pending plan.
+    """
+    normalized = re.sub(r"[^\w\s]", "", text.lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if not normalized:
+        return False
+    if normalized in CONFIRMATION_PHRASES:
+        return True
+    words = normalized.split()
+    return (
+        len(words) <= 4
+        and all(word in _CONFIRMATION_WORDS for word in words)
+        and any(word in _STRONG_CONFIRMATION_WORDS for word in words)
+    )

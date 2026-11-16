@@ -81,7 +81,7 @@ class ModeBudgetTests(unittest.TestCase):
         return planner
 
     def test_balanced_and_high_have_explicit_shell_behaviour_and_limits(self):
-        balanced, high = default_modes()
+        balanced, high, *_ = default_modes()
         short = self.planner(balanced)._build_prompt("Explain this project")
         detailed = self.planner(high)._build_prompt("Explain this project")
         self.assertIn("compact, useful answer first", short)

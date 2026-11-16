@@ -45,11 +45,20 @@ class OrbitMode:
 
 
 def default_modes() -> tuple[OrbitMode, ...]:
-    return (OrbitMode(), OrbitMode(
-        name="High", prompt_tokens=32000, output_tokens=4096, history_turns=12,
-        max_files=16, file_chars=16000, max_steps=8, inspection_passes=3,
-        compact_prompt=False,
-    ))
+    return (
+        OrbitMode(),  # Balanced - unchanged
+        OrbitMode(
+            name="High", prompt_tokens=32000, output_tokens=4096, history_turns=12,
+            max_files=16, file_chars=16000, max_steps=8, inspection_passes=3,
+            compact_prompt=False,
+        ),
+        # Agentic: tight per-step budget, but more planning steps for multi-command tasks.
+        OrbitMode(
+            name="Agentic", prompt_tokens=8000, output_tokens=1024, history_turns=6,
+            max_files=8, file_chars=6000, max_steps=12, inspection_passes=3,
+            compact_prompt=True,
+        ),
+    )
 
 
 def decode_modes(text: str) -> tuple[OrbitMode, ...]:

@@ -327,37 +327,41 @@ class OrbitWorker(QThread):
     failed = Signal(str)
     progress = Signal(str)
 
-    def __init__(self, shell: Shell, prompt: str, parent=None, task=None):
+    def __init__(self, shell: Shell, prompt: str, parent=None, task=None, execute: bool = False, planner=None):
         super().__init__(parent)
         self.shell = shell
         self.prompt = prompt
         self.task = task
+        self.execute = execute
+        self.planner = planner
 
     def run(self):
         started = perf_counter()
         try:
             from ai.llm import AgentPlanner
 
-            config = self.task.planner.config if self.task and self.task.planner else load_desktop_config()
-            if self.task and self.task.mode and not self.task.planner:
-                config = replace(config, orbit_mode=self.task.mode)
-            planner = self.task.planner if self.task and self.task.planner else AgentPlanner(
-                config=config,
-                command_names=self.shell.registry.all_names(),
-                command_catalog=self.shell.registry.catalog_entries(),
-                command_metadata=self.shell.registry.list_metadata(),
-                current_dir_provider=lambda: self.shell.ctx.cwd,
-                last_output_provider=lambda: self.shell.ctx.last_output,
-                cancelled=lambda task=self.task: bool(task and task.stopped),
-                native_context_provider=getattr(self.shell, "native_context_provider", None),
-            )
+            planner = self.planner or (self.task.planner if self.task else None)
+            if planner is None:
+                config = self.task.planner.config if self.task and self.task.planner else load_desktop_config()
+                if self.task and self.task.mode and not self.task.planner:
+                    config = replace(config, orbit_mode=self.task.mode)
+                planner = AgentPlanner(
+                    config=config,
+                    command_names=self.shell.registry.all_names(),
+                    command_catalog=self.shell.registry.catalog_entries(),
+                    command_metadata=self.shell.registry.list_metadata(),
+                    current_dir_provider=lambda: self.shell.ctx.cwd,
+                    last_output_provider=lambda: self.shell.ctx.last_output,
+                    cancelled=lambda task=self.task: bool(task and task.stopped),
+                    native_context_provider=getattr(self.shell, "native_context_provider", None),
+                )
             if self.task:
                 if not self.task.planner:
                     self.task.max_steps = planner.mode.max_steps
                 self.task.planner = planner
             planner.progress = self.progress.emit
             action = (planner.continue_task(self.prompt, self.task.observations)
-                      if self.task and self.task.observations else planner.plan(self.prompt))
+                      if self.task and self.task.observations else planner.plan(self.prompt, execute=self.execute))
             self.planned.emit(action)
         except Exception as exc:
             self.failed.emit(str(exc))
@@ -1144,6 +1148,7 @@ class OrbitPanel(QFrame):
         self.setObjectName("inspector")
         self.session_provider = session_provider
         self.safety = SafetyPolicy()
+        self.planner = None
         self.worker: OrbitWorker | None = None
         self.pending_action = None
         self.pending_snapshots = None
@@ -1310,6 +1315,35 @@ class OrbitPanel(QFrame):
         self.thinking_indicator.setText(f"THINKING  {frames[self.thinking_frame % len(frames)]}")
         self.thinking_frame += 1
 
+    def _ensure_planner(self, session):
+        if self.planner is None:
+            from ai.llm import AgentPlanner
+            try:
+                modes, mode = load_mode_preferences()
+            except Exception:
+                mode = None
+            config = load_desktop_config()
+            if mode:
+                config = replace(config, orbit_mode=mode)
+            self.planner = AgentPlanner(
+                config=config,
+                command_names=session.shell.registry.all_names(),
+                command_catalog=session.shell.registry.catalog_entries(),
+                command_metadata=session.shell.registry.list_metadata(),
+                current_dir_provider=lambda: session.shell.ctx.cwd,
+                last_output_provider=lambda: session.shell.ctx.last_output,
+                cancelled=lambda: bool(self.task and self.task.stopped),
+                native_context_provider=getattr(session.shell, "native_context_provider", None),
+            )
+        else:
+            try:
+                modes, mode = load_mode_preferences()
+                if mode:
+                    self.planner.mode = mode
+            except Exception:
+                pass
+        return self.planner
+
     def create_plan(self):
         prompt, session = self.input.text().strip(), self.session_provider()
         if not prompt or session is None or self.executing or self.continue_timer.isActive() or self._preview_worker is not None or self.worker and self.worker.isRunning():
@@ -1333,6 +1367,11 @@ class OrbitPanel(QFrame):
                 self._append("Orbit", "The proposed action was dismissed. Nothing was changed.")
                 return
 
+        planner = self._ensure_planner(session)
+        objective = planner.confirm_pending(prompt)
+        is_execute = objective is not None
+        task_objective = objective if is_execute else prompt
+
         try:
             _, mode = load_mode_preferences()
         except ValueError as exc:
@@ -1341,18 +1380,25 @@ class OrbitPanel(QFrame):
         self._append("You", prompt)
         self.input.clear()
         self.dismiss()
-        self.task = AgentRun(prompt, max_steps=mode.max_steps, mode=mode)
+        self.task = AgentRun(task_objective, max_steps=mode.max_steps, mode=mode, planner=planner)
         self.task_session = session
         self.task_cwd = session.shell.ctx.cwd
         self.stop_button.setEnabled(True)
-        self._start_planning()
+        self._start_planning(execute=is_execute)
 
-    def _start_planning(self):
+    def _start_planning(self, execute: bool = False):
         self.status.setText("Thinking with conversation and workspace context…")
         self.approve_button.setEnabled(False)
         self.reject_button.setEnabled(False)
         self._set_thinking(True)
-        self.worker = OrbitWorker(self.task_session.shell, self.task.objective, self, task=self.task)
+        self.worker = OrbitWorker(
+            self.task_session.shell,
+            self.task.objective,
+            self,
+            task=self.task,
+            execute=execute,
+            planner=self.planner,
+        )
         self.worker.planned.connect(self._show_plan)
         self.worker.failed.connect(self._show_failure)
         self.worker.progress.connect(self._show_provider_progress)
@@ -1390,16 +1436,17 @@ class OrbitPanel(QFrame):
             if action.action == "shell"
             else "Here is the result of my workspace analysis."
         )
+        step_prefix = f"Step {self.task.steps}: " if self.task and (self.task.steps > 1 or getattr(action, "continue_after_result", False)) else ""
         if action.action == "shell" and action.command:
             decision = self.safety.check_action(action.action, action.command)
             if decision.requires_approval:
                 self.pending_action = action
-                self._stream("Orbit", f"{message}\n\nProposed command:\n{action.command}\n\nApproval is required because {decision.reason}")
+                self._stream("Orbit", f"{step_prefix}{message}\n\nProposed command:\n{action.command}\n\nApproval is required because {decision.reason}")
                 self.status.setText("Review the proposed command before approving it.")
                 self.approve_button.setEnabled(True)
                 self.reject_button.setEnabled(True)
             else:
-                self._stream("Orbit", f"{message}\n\nRunning in the active terminal:\n{action.command}")
+                self._stream("Orbit", f"{step_prefix}{message}\n\nRunning in the active terminal:\n{action.command}")
                 self.status.setText("Executing in the active terminal. Output will appear there shortly.")
                 self.executing = True
                 self.action_requested.emit(action, False, None)
@@ -1424,7 +1471,8 @@ class OrbitPanel(QFrame):
             self._set_thinking(False)
             if action.action != "respond":
                 message = "This action is not available in the desktop task runner. No action was executed."
-            self._stream("Orbit", message)
+            final_message = f"Task completed: {message}" if self.task and self.task.steps > 1 and not message.startswith("Task") else message
+            self._stream("Orbit", final_message)
             self.status.setText("Ready for your next question or task.")
 
     def _preview_finished(self, worker):

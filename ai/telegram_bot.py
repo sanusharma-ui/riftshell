@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections.abc import Callable
 
@@ -23,6 +23,9 @@ class PendingAction:
     reason: str
     created_at: datetime
     snapshots: tuple[FileSnapshot, ...] = ()
+    objective: str | None = None
+    observations: list[dict] = field(default_factory=list)
+    step: int = 1
 
 
 class TelegramAIBot:
@@ -211,6 +214,31 @@ class TelegramAIBot:
             )
             return
 
+        # Check if user is confirming an action offer
+        objective = self.planner.confirm_pending(text)
+        is_execute = objective is not None
+        plan_query = objective if is_execute else text
+
+        if is_execute:
+            progress_task = asyncio.create_task(
+                self._delayed_progress(update, "Thinking... executing approved task.")
+            )
+            try:
+                action = await asyncio.to_thread(self.planner.plan, plan_query, execute=True)
+            except Exception as exc:
+                progress_task.cancel()
+                await self._reply_text(update, f"I hit an internal planning error: {exc}")
+                return
+            progress_task.cancel()
+            try:
+                await progress_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+            await self._handle_action(update, action, objective=plan_query)
+            return
+
         progress_task = asyncio.create_task(
             self._delayed_progress(update, "Thinking... I will run a command only if your request needs system action.")
         )
@@ -227,7 +255,7 @@ class TelegramAIBot:
             pass
         except Exception:
             pass
-        await self._handle_action(update, action)
+        await self._handle_action(update, action, objective=text)
 
     async def approve(self, update, context) -> None:
         if not await self._guard(update):
@@ -247,7 +275,10 @@ class TelegramAIBot:
             return
 
         await self._reply_text(update, f"Approved {action_id}. Running now...")
-        await self._execute_action(update, pending.action, pending.snapshots)
+        await self._execute_action(
+            update, pending.action, pending.snapshots,
+            objective=pending.objective, observations=pending.observations, step=pending.step
+        )
 
     async def deny(self, update, context) -> None:
         if not await self._guard(update):
@@ -274,7 +305,14 @@ class TelegramAIBot:
             lines.append(f"- {item.id}: {self._describe_action(item.action)} | {item.reason}")
         await self._reply_text(update, "\n".join(lines))
 
-    async def _handle_action(self, update, action: AgentAction) -> None:
+    async def _handle_action(
+        self,
+        update,
+        action: AgentAction,
+        objective: str | None = None,
+        observations: list[dict] | None = None,
+        step: int = 1,
+    ) -> None:
         if action.action == "respond":
             await self._reply_text(update, action.message or "I need a clearer instruction.")
             return
@@ -308,6 +346,9 @@ class TelegramAIBot:
                 reason=decision.reason,
                 created_at=datetime.now(),
                 snapshots=snapshots,
+                objective=objective,
+                observations=list(observations or []),
+                step=step,
             )
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -329,7 +370,9 @@ class TelegramAIBot:
             )
             return
 
-        await self._execute_action(update, action)
+        await self._execute_action(
+            update, action, objective=objective, observations=observations, step=step
+        )
 
     async def button_callback(self, update, context) -> None:
         query = update.callback_query
@@ -362,7 +405,10 @@ class TelegramAIBot:
             except Exception:
                 pass
             await self._reply_text(update, f"Approved {action_id}. Running now...")
-            await self._execute_action(update, pending.action, pending.snapshots)
+            await self._execute_action(
+                update, pending.action, pending.snapshots,
+                objective=pending.objective, observations=pending.observations, step=pending.step
+            )
 
         elif action_type == "deny":
             pending = self.pending.pop(action_id, None)
@@ -381,20 +427,22 @@ class TelegramAIBot:
         update,
         action: AgentAction,
         expected_snapshots: tuple[FileSnapshot, ...] | None = None,
+        objective: str | None = None,
+        observations: list[dict] | None = None,
+        step: int = 1,
     ) -> None:
+        result = None
         if action.action == "shell":
-            await self._execute_shell(update, action.command)
-            return
-        if action.action == "browser":
+            result = await self._execute_shell(update, action.command)
+        elif action.action == "browser":
             cmd = action.command.strip()
             full_cmd = cmd if cmd.startswith("browser ") else f"browser {cmd}"
-            await self._execute_shell(update, full_cmd)
-            return
-        if action.action == "screenshot":
+            result = await self._execute_shell(update, full_cmd)
+        elif action.action == "screenshot":
             await self._reply_text(update, "Taking a screenshot...")
             await self._send_screenshot(update)
-            return
-        if action.action == "code_write":
+            result = type("Result", (), {"success": True, "output": "Screenshot captured."})()
+        elif action.action == "code_write":
             await self._reply_text(
                 update,
                 "Code in progress... preparing files and writing them with backups where needed."
@@ -408,10 +456,29 @@ class TelegramAIBot:
                 expected_snapshots,
             )
             await self._reply_text(update, self._trim(result.output))
+        else:
+            await self._reply_text(update, action.message or "Done.")
             return
-        await self._reply_text(update, action.message or "Done.")
 
-    async def _execute_shell(self, update, command: str) -> None:
+        # Multi-step continuation
+        if getattr(action, "continue_after_result", False) and objective and result and getattr(result, "success", False):
+            obs = list(observations or [])
+            obs.append({
+                "step": step,
+                "action": action.action,
+                "command": action.command,
+                "success": bool(result.success),
+                "output": str(result.output)[-3000:],
+            })
+            if step < getattr(self.planner.mode, "max_steps", 8):
+                await self._reply_text(update, f"Step {step} complete. Planning next step...")
+                try:
+                    next_action = await asyncio.to_thread(self.planner.continue_task, objective, obs)
+                    await self._handle_action(update, next_action, objective=objective, observations=obs, step=step + 1)
+                except Exception as exc:
+                    await self._reply_text(update, f"Continuation stopped: {exc}")
+
+    async def _execute_shell(self, update, command: str):
         await self._reply_text(update, f"Running command: {command}")
         async with self.shell_lock:
             result = await asyncio.to_thread(self.shell.execute_line, command)
@@ -421,6 +488,7 @@ class TelegramAIBot:
         text = result.output or "(no output)"
         prefix = "OK" if result.success else "FAILED"
         await self._reply_text(update, self._trim(f"{prefix}: {command}\n\n{text}"))
+        return result
 
     async def _send_screenshot(self, update) -> None:
         try:

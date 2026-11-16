@@ -498,6 +498,8 @@ HINDI_TASK_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 COMMON_STOPWORD_COMMANDS = {"me", "up", "cd", "now", "last", "path", "run", "where"}
 
+ACTION_OFFER = "Want me to do this now? Reply **yes** or **kar do**."
+
 CORE_CATEGORY_MAP: dict[str, str] = {
     # Files & Navigation
     "files": "files_and_navigation", "folders": "files_and_navigation", "cd": "files_and_navigation",
@@ -728,7 +730,7 @@ class CommandKnowledgeBrain:
         ]
         return any(re.search(pat, text, re.IGNORECASE) for pat in patterns)
 
-    def get_command_count_summary(self) -> str:
+    def get_command_count_summary(self, brief: bool = False) -> str:
         """Generates a brief, direct summary of command count and categories."""
         total = len(self._profiles)
         primary_count = len(self._primary_names) if self._primary_names else total
@@ -750,6 +752,20 @@ class CommandKnowledgeBrain:
             "plugin": "Plugins",
             "general": "General Utilities",
         }
+
+        if brief:
+            # Short answer for "how many commands" questions: count + a few category names.
+            ranked = sorted(
+                ((cat, names) for cat, names in categories.items() if names and cat != "general"),
+                key=lambda item: len(item[1]),
+                reverse=True,
+            )
+            top_labels = [category_labels.get(cat, cat.replace("_", " ").title()) for cat, _ in ranked[:4]]
+            where = f" across categories like {', '.join(top_labels)}" if top_labels else ""
+            return (
+                f"RiftShell has **{primary_count} commands registered** (**{total} names including aliases**){where}.\n\n"
+                "\U0001F4A1 Run `help` or press **Ctrl+K** to browse all commands."
+            )
 
         # Build clean bulleted category list
         cat_lines = []
@@ -904,7 +920,7 @@ class CommandKnowledgeBrain:
     def formulate_guidance(self, query: str) -> str:
         """Formulates an offline conversational guide answering the user's task feasibility inquiry."""
         if self.is_command_count_query(query):
-            return self.get_command_count_summary()
+            return self.get_command_count_summary(brief=True)
         if self.is_command_list_query(query):
             return self.get_command_list_summary()
 
@@ -934,5 +950,5 @@ class CommandKnowledgeBrain:
             second_profile = matches[1][0]
             lines.append(f"\n*Alternative*: `{second_profile.name}` (`{second_profile.usage}`)")
 
-        lines.append(f"\nWould you like me to run `{top_profile.usage}` for you?")
+        lines.append("\n" + ACTION_OFFER)
         return "\n".join(lines)
