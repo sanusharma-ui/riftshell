@@ -534,6 +534,47 @@ class OrbitWorker(QThread):
                                     continuation=bool(self.task and self.task.observations))
 
 
+class ToolWorker(QThread):
+    result_ready = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, bridge, action, parent=None):
+        super().__init__(parent)
+        self.bridge = bridge
+        self.action = action
+
+    def run(self):
+        try:
+            from core.base import CommandResult
+            act = self.action.action
+            if act == "screenshot":
+                from ai.screenshot import capture_screenshot
+                path = capture_screenshot()
+                self.result_ready.emit(CommandResult(output=f"Screenshot saved to {path}", success=True))
+                return
+
+            tool = getattr(self.action, "tool", "") or act
+            tool_args = getattr(self.action, "tool_args", {}) or {}
+
+            if tool == "run_command":
+                name = tool_args.get("name", "")
+                args = tool_args.get("args", [])
+                res = self.bridge.run_command(name, args)
+                self.result_ready.emit(res)
+            elif tool == "browser" or act == "browser":
+                op = tool_args.get("operation") or (self.action.command.split()[0] if self.action.command else "snapshot")
+                res = self.bridge.browser(op, **tool_args)
+                self.result_ready.emit(CommandResult(output=str(res), success=True))
+            elif tool == "pc":
+                op = tool_args.get("operation", "windows")
+                res = self.bridge.pc(op, **tool_args)
+                self.result_ready.emit(CommandResult(output=str(res), success=True))
+            else:
+                self.result_ready.emit(CommandResult(output=f"Unknown tool: {tool}", success=False))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class FileWriteWorker(QThread):
     result_ready = Signal(object)
 
@@ -1779,6 +1820,23 @@ class OrbitPanel(QFrame):
                 self.status.setText("Executing in the active terminal. Output will appear there shortly.")
                 self.executing = True
                 self.action_requested.emit(action, False, None)
+        elif action.action in {"tool", "browser", "screenshot"}:
+            arg_desc = action.command or f"{action.tool} {action.tool_args}".strip()
+            decision = self.safety.check_action(action.action, arg_desc)
+            if decision.requires_approval:
+                self.pending_action = action
+                tool_label = action.tool or action.action
+                self._stream("Orbit", f"{step_prefix}{message}\n\nProposed action: `{tool_label}` {action.tool_args or action.command}\n\nApproval is required because {decision.reason}")
+                self.status.setText("Review the proposed action before approving it.")
+                self.approve_button.setText("✓  Approve & run")
+                self.approve_button.setEnabled(True)
+                self.reject_button.setEnabled(True)
+            else:
+                tool_label = action.tool or action.action
+                self._stream("Orbit", f"{step_prefix}{message}\n\nRunning: `{tool_label}`")
+                self.status.setText(f"Executing {tool_label}…")
+                self.executing = True
+                self.action_requested.emit(action, False, None)
         elif action.action == "code_write":
             session = self.task_session
             if session is None:
@@ -1954,6 +2012,15 @@ class OrbitPanel(QFrame):
             if action.action == "code_write":
                 self._append("Orbit", "Approved. Applying the reviewed file changes with backups.")
                 self.status.setText("Applying approved file changes.")
+            elif action.action in {"tool", "browser", "screenshot"}:
+                from ai.risk import classify_risk
+                from ai.risk_classifier import get_risk_classifier
+                arg_desc = action.command or f"{action.tool} {action.tool_args}".strip()
+                decision = classify_risk(action.action, arg_desc, "local")
+                if decision.session_grantable:
+                    get_risk_classifier().session_grant.grant("tool" if not str(arg_desc).startswith("pc ") else "pc_control")
+                self._append("Orbit", f"Approved. Executing `{action.tool or action.action}`.")
+                self.status.setText(f"Executing approved {action.tool or action.action}.")
             else:
                 self._append("Orbit", "Approved. Executing in the active terminal; the output will appear there.")
                 self.status.setText("Executing approved command in the active terminal.")
@@ -2948,6 +3015,30 @@ class MainWindow(QMainWindow):
                 self._orbit_write_worker.result_ready.connect(self.orbit.show_write_result)
                 self._orbit_write_worker.finished.connect(self._clear_orbit_write_worker)
                 self._orbit_write_worker.start()
+                return
+            if action.action in {"tool", "browser", "screenshot"}:
+                from ai.orbit_bridge import OrbitBridge
+                bridge = OrbitBridge(session.shell)
+                worker = ToolWorker(bridge, action, self)
+
+                def _on_tool_done(res, act=action, w=worker):
+                    w.deleteLater()
+                    from ai.audit import audit_action
+                    from ai.risk import classify_risk
+                    arg_desc = act.command or f"{act.tool} {act.tool_args}".strip()
+                    tier = classify_risk(act.action, arg_desc, "local").tier
+                    audit_action("local", None, f"{act.action}:{getattr(act, 'tool', '')}", tier, "success" if res.success else "failed")
+                    self.orbit.show_execution_result(act.command or getattr(act, "tool", act.action), res)
+
+                def _on_tool_fail(err, act=action, w=worker):
+                    w.deleteLater()
+                    from core.base import CommandResult
+                    res = CommandResult(output=f"Tool execution error: {err}", success=False)
+                    self.orbit.show_execution_result(act.command or getattr(act, "tool", act.action), res)
+
+                worker.result_ready.connect(_on_tool_done)
+                worker.failed.connect(_on_tool_fail)
+                worker.start()
                 return
             if action.action != "shell":
                 self.orbit.executing = False

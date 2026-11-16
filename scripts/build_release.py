@@ -98,6 +98,7 @@ def build_pyinstaller(python_exe: str, onefile: bool = True) -> Path:
             "PyInstaller",
             "--noconfirm",
             "--clean",
+            "--noupx",
             mode_str,
             "--windowed",
             "--name",

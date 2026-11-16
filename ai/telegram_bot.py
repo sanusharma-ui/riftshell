@@ -11,6 +11,9 @@ from ai.code_writer import FileSnapshot, apply_file_writes, preview_file_writes
 from ai.config import AIConfig
 from ai.llm import AgentPlanner
 from ai.safety import SafetyPolicy
+from ai.risk import classify_risk
+from ai.orbit_bridge import OrbitBridge
+from ai.audit import audit_action
 from ai.screenshot import capture_screenshot
 from core.shell import Shell
 
@@ -42,6 +45,7 @@ class TelegramAIBot:
             allow_outside_workspace=config.allow_outside_workspace,
         )
         self.safety = SafetyPolicy()
+        self.bridge = OrbitBridge(self.shell)
         self.planner = AgentPlanner(
             config=config,
             command_names=self.shell.registry.all_names(),
@@ -74,10 +78,16 @@ class TelegramAIBot:
         app.add_handler(CommandHandler("cmd", self.cmd))
         app.add_handler(CommandHandler("open", self.open_cmd))
         app.add_handler(CommandHandler("browser", self.browser_cmd))
+        app.add_handler(CommandHandler("pc", self.pc_cmd))
+        app.add_handler(CommandHandler("mouse", self.mouse_cmd))
+        app.add_handler(CommandHandler("keyboard", self.keyboard_cmd))
+        app.add_handler(CommandHandler("windows", self.windows_cmd))
         app.add_handler(CommandHandler("screenshot", self.screenshot))
         app.add_handler(CommandHandler("approve", self.approve))
         app.add_handler(CommandHandler("deny", self.deny))
         app.add_handler(CommandHandler("pending", self.pending_list))
+        app.add_handler(CommandHandler("stop", self.stop_cmd))
+        app.add_handler(CommandHandler("panic", self.stop_cmd))
         app.add_handler(CallbackQueryHandler(self.button_callback))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.message))
         app.run_polling(allowed_updates=["message", "callback_query"])
@@ -103,9 +113,29 @@ class TelegramAIBot:
     def _is_allowed(self, user_id: int | None) -> bool:
         if user_id is None:
             return False
+        if not self.config.telegram_allowed_user_ids:
+            return False
         if self.config.telegram_allow_unlisted_users:
             return True
         return user_id in self.config.telegram_allowed_user_ids
+
+    async def stop_cmd(self, update, context) -> None:
+        if not await self._guard(update):
+            return
+        self.pending.clear()
+        try:
+            from ai.risk_classifier import get_risk_classifier
+            get_risk_classifier().session_grant.revoke_all()
+        except Exception:
+            pass
+        self.shell.request_cancel()
+        try:
+            from utils.pc_control import release_all_keys
+            release_all_keys()
+        except Exception as exc:
+            await self._reply_text(update, f"Stop requested; key release failed: {exc}")
+            return
+        await self._reply_text(update, "🛑 Stopped pending actions, revoked session grants, and released held modifier keys.")
 
     async def _guard(self, update) -> bool:
         user_id = update.effective_user.id if update.effective_user else None
@@ -123,11 +153,74 @@ class TelegramAIBot:
             "Commands:\n"
             "• Natural language: ask questions or describe actions\n"
             "• /open <path|url|app>: open websites, Windows apps, files\n"
-            "• /browser <open|search|play|control|tabs>: control browser\n"
+            "• /browser <open|search|play|control|tabs|dom|youtube>: control browser\n"
+            "• /pc <windows|mouse|keyboard|screen>: control PC\n"
+            "• /mouse <move|click|scroll>: mouse control\n"
+            "• /keyboard <type|press|hotkey>: keyboard control\n"
+            "• /windows <list|focus|minimize|maximize|close>: window management\n"
             "• /cmd <command>: run any RiftShell command\n"
             "• /screenshot: capture desktop screen\n"
             "• /pending, /approve <id>, /deny <id>: manage security approvals",
         )
+
+    async def pc_cmd(self, update, context) -> None:
+        if not await self._guard(update):
+            return
+        subcommand = " ".join(context.args).strip()
+        if not subcommand:
+            await self._reply_text(update, 
+                "PC Control:\n"
+                "• /pc windows list\n"
+                "• /pc windows focus <title>\n"
+                "• /pc mouse click <x> <y>\n"
+                "• /pc keyboard type <text>\n"
+                "• /pc screen size"
+            )
+            return
+        await self._handle_action(update, AgentAction(
+            action="shell", 
+            command=f"pc {subcommand}", 
+            message="PC control action."
+        ))
+
+    async def mouse_cmd(self, update, context) -> None:
+        if not await self._guard(update):
+            return
+        subcommand = " ".join(context.args).strip()
+        if not subcommand:
+            await self._reply_text(update, "Usage: /mouse <move|click|scroll> [args]")
+            return
+        await self._handle_action(update, AgentAction(
+            action="shell", 
+            command=f"pc mouse {subcommand}", 
+            message="Mouse control."
+        ))
+
+    async def keyboard_cmd(self, update, context) -> None:
+        if not await self._guard(update):
+            return
+        subcommand = " ".join(context.args).strip()
+        if not subcommand:
+            await self._reply_text(update, "Usage: /keyboard <type|press|hotkey> [args]")
+            return
+        await self._handle_action(update, AgentAction(
+            action="shell", 
+            command=f"pc keyboard {subcommand}", 
+            message="Keyboard control."
+        ))
+
+    async def windows_cmd(self, update, context) -> None:
+        if not await self._guard(update):
+            return
+        subcommand = " ".join(context.args).strip()
+        if not subcommand:
+            await self._reply_text(update, "Usage: /windows <list|focus|minimize|maximize|close> [args]")
+            return
+        await self._handle_action(update, AgentAction(
+            action="shell", 
+            command=f"pc windows {subcommand}", 
+            message="Window management."
+        ))
 
     async def open_cmd(self, update, context) -> None:
         if not await self._guard(update):
@@ -136,16 +229,36 @@ class TelegramAIBot:
         if not target:
             await self._reply_text(update, "Usage: /open <path|url|app_name>")
             return
-        await self._handle_action(update, AgentAction(action="shell", command=f"open {target}", message=f"Opening {target}"))
+        from commands.custom_commands import WEB_SHORTCUTS
+        norm_t = target.lower().strip()
+        if norm_t in WEB_SHORTCUTS or re.match(r"^https?://", norm_t) or re.match(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?(?:/[^\s]*)?$", norm_t):
+            await self._handle_action(update, AgentAction(action="shell", command=f"browser open {target}", message=f"Opening `{target}` in browser"))
+        else:
+            await self._handle_action(update, AgentAction(action="shell", command=f"open {target}", message=f"Opening {target}"))
 
     async def browser_cmd(self, update, context) -> None:
         if not await self._guard(update):
             return
         subcommand = " ".join(context.args).strip()
         if not subcommand:
-            await self._reply_text(update, "Usage: /browser <open|search|control|tab|play|pause|click|fill|tabs|close> [args]")
+            await self._reply_text(update, 
+                "Browser commands:\n"
+                "• /browser open <url>\n"
+                "• /browser search <query>\n"
+                "• /browser control <action>\n"
+                "• /browser tabs\n"
+                "• /browser dom - Get current page structure\n"
+                "• /browser youtube <play|pause|mute|fullscreen>\n"
+                "• /browser clickxy <x> <y>\n"
+                "• /browser scrollpx <pixels>"
+            )
             return
-        await self._handle_action(update, AgentAction(action="shell", command=f"browser {subcommand}", message="Browser action."))
+        
+        await self._handle_action(update, AgentAction(
+            action="shell", 
+            command=f"browser {subcommand}", 
+            message="Browser action."
+        ))
 
     async def cmd(self, update, context) -> None:
         if not await self._guard(update):
@@ -173,24 +286,138 @@ class TelegramAIBot:
         words = text.split()
         first_word = words[0].lower() if words else ""
 
-        # 1. Direct shell command matching registered command names (e.g. open, browser, note, files, etc.)
+        # 1. Direct web search shortcut: "search python" -> browser search python
+        if first_word == "search" and len(words) > 1 and words[1].lower() not in {"file", "folder", "directory", "-r", "--regex"}:
+            query = " ".join(words[1:])
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command=f"browser search {query}", message=f"Searching web for `{query}`"),
+            )
+            return
+
+        # 2. Direct shell command matching registered command names (e.g. open, browser, note, files, windows, mouse, keyboard, etc.)
         if first_word in {name.lower() for name in self.shell.registry.all_names()}:
+            if first_word == "open" and len(words) > 1:
+                target = " ".join(words[1:]).strip()
+                from commands.custom_commands import WEB_SHORTCUTS
+                norm_t = target.lower().strip()
+                if norm_t in WEB_SHORTCUTS or re.match(r"^https?://", norm_t) or re.match(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?(?:/[^\s]*)?$", norm_t):
+                    await self._handle_action(
+                        update,
+                        AgentAction(action="shell", command=f"browser open {target}", message=f"Opening `{target}` in browser"),
+                    )
+                    return
             await self._handle_action(
                 update,
                 AgentAction(action="shell", command=text, message=f"Running `{text}`"),
             )
             return
 
-        # 2. Natural language opening (e.g. "youtube kholo", "notepad open karo", "kholo calculator")
+        # 3. Natural language PC / GUI actions
+        norm = text.lower().strip()
+        if re.search(r"\b(?:list|show|display|get)\b.*\b(?:active|open|running)?\s*windows\b", norm) or norm in {"windows", "open windows", "active windows", "windows list", "list windows"}:
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command="windows list", message="Listing open windows."),
+            )
+            return
+
+        # New tab
+        if norm in {"new tab", "open new tab", "open a new tab", "naya tab", "naya tab kholo", "new tab kholo", "new tab open karo", "create new tab"} or re.search(r"\b(?:open|create|start)\b.*\bnew\s+tab\b", norm):
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command="browser control new_tab", message="Opening new browser tab."),
+            )
+            return
+
+        # Browser DOM / buttons access
+        if norm in {
+            "dom", "browser dom", "show dom", "page dom", "dom dikhao", "page ka dom dikhao",
+            "dom access", "page elements", "show page elements", "inspect page",
+            "show dom elements", "dom elements", "buttons dikhao", "show buttons", "list buttons",
+            "page ke buttons", "page ke buttons dikhao", "buttons dikha do"
+        } or re.search(r"\b(?:show|get|display|list)\b.*\b(?:dom|elements|buttons|controls)\b", norm):
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command="browser dom", message="Fetching page elements & buttons."),
+            )
+            return
+
+        # Form filling: "fill e1 python"
+        elem_fill_match = re.match(r"^fill\s+(e\d{1,3})\s+(.+)$", text, re.I)
+        if elem_fill_match:
+            ref = elem_fill_match.group(1)
+            val = elem_fill_match.group(2).strip()
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command=f"browser fill {ref} {val}", message=f"Filling element {ref}."),
+            )
+            return
+
+        # Clicking: buttons, links, element refs, coordinates, or center
+        click_target_match = re.match(r"^(?:please\s+)?(?:click|tap)(?:\s+on)?\s+(?:the\s+)?(.+?)(?:\s+button|\s+link)?$", norm)
+        if click_target_match:
+            target = click_target_match.group(1).strip()
+            if target in {"centre of screen", "center of screen", "centre", "center", "middle", "middle of screen", "screen"}:
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command="mouse click center", message="Clicking center of screen."),
+                )
+                return
+            coord_match = re.match(r"^(?:at\s+)?(\d+)\s+(\d+)$", target)
+            if coord_match:
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command=f"mouse click {coord_match.group(1)} {coord_match.group(2)}", message="Clicking screen coordinates."),
+                )
+                return
+            if target in {"mouse", "left click", "click"}:
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command="mouse click", message="Clicking mouse."),
+                )
+                return
+            # Browser button or link click
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command=f"browser click {target}", message=f"Clicking `{target}`."),
+            )
+            return
+
+        # Hinglish "<target> pe click karo" / "<target> button pe click karo"
+        pe_click_match = re.match(r"^(.+?)(?:\s+button|\s+link)?\s+(?:pe|par)\s+click\s*(?:karo|kar\s+do)?$", norm)
+        if pe_click_match:
+            target = pe_click_match.group(1).strip()
+            if target in {"centre of screen", "center of screen", "centre", "center", "middle", "screen"}:
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command="mouse click center", message="Clicking center of screen."),
+                )
+                return
+            await self._handle_action(
+                update,
+                AgentAction(action="shell", command=f"browser click {target}", message=f"Clicking `{target}`."),
+            )
+            return
+
+        # 4. Natural language opening (e.g. "youtube kholo", "notepad open karo", "kholo calculator")
         kholo_match = re.match(r"^(?:please\s+)?(?:kholo|chalao|open\s+karo)\s+(.+)$", text, re.I)
         if not kholo_match:
             kholo_match = re.match(r"^(.+?)\s+(?:kholo|chalao|open\s+karo|open\s+kar\s+do)$", text, re.I)
         if kholo_match:
             target = kholo_match.group(1).strip()
-            await self._handle_action(
-                update,
-                AgentAction(action="shell", command=f"open {target}", message=f"Opening `{target}`"),
-            )
+            from commands.custom_commands import WEB_SHORTCUTS
+            norm_t = target.lower().strip()
+            if norm_t in WEB_SHORTCUTS or re.match(r"^https?://", norm_t) or re.match(r"^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?(?:/[^\s]*)?$", norm_t):
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command=f"browser open {target}", message=f"Opening `{target}` in browser"),
+                )
+            else:
+                await self._handle_action(
+                    update,
+                    AgentAction(action="shell", command=f"open {target}", message=f"Opening `{target}`"),
+                )
             return
 
         # 3. Natural language media / search ("play ... on youtube", "lofi gaana chalao")
@@ -274,6 +501,22 @@ class TelegramAIBot:
             self.pending[action_id] = pending
             return
 
+        # Record session grant if Tier 1
+        try:
+            from ai.risk import classify_risk
+            from ai.risk_classifier import get_risk_classifier
+            arg_desc = pending.action.command or f"{pending.action.tool} {pending.action.tool_args}".strip()
+            decision = classify_risk(pending.action.action, arg_desc, "telegram")
+            if decision.session_grantable:
+                action_key = "tool" if not str(arg_desc).startswith("pc ") else "pc_control"
+                if pending.action.action == "browser":
+                    action_key = "browser_fill" if "fill" in str(arg_desc) else "browser_click"
+                elif pending.action.action == "shell":
+                    action_key = "file_ops"
+                get_risk_classifier().session_grant.grant(action_key)
+        except Exception:
+            pass
+
         await self._reply_text(update, f"Approved {action_id}. Running now...")
         await self._execute_action(
             update, pending.action, pending.snapshots,
@@ -317,8 +560,13 @@ class TelegramAIBot:
             await self._reply_text(update, action.message or "I need a clearer instruction.")
             return
 
-        decision = self.safety.check_action(action.action, action.command)
+        decision = classify_risk(
+            action.action,
+            action.command or f"{action.tool} {action.tool_args}",
+            "telegram",
+        )
         if decision.requires_approval:
+            audit_action("telegram", update.effective_user.id, self._describe_action(action), decision.tier, "pending approval")
             snapshots: tuple[FileSnapshot, ...] = ()
             preview_text = ""
             if action.action == "code_write":
@@ -404,6 +652,22 @@ class TelegramAIBot:
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
                 pass
+            # Record session grant if Tier 1
+            try:
+                from ai.risk import classify_risk
+                from ai.risk_classifier import get_risk_classifier
+                arg_desc = pending.action.command or f"{pending.action.tool} {pending.action.tool_args}".strip()
+                decision = classify_risk(pending.action.action, arg_desc, "telegram")
+                if decision.session_grantable:
+                    action_key = "tool" if not str(arg_desc).startswith("pc ") else "pc_control"
+                    if pending.action.action == "browser":
+                        action_key = "browser_fill" if "fill" in str(arg_desc) else "browser_click"
+                    elif pending.action.action == "shell":
+                        action_key = "file_ops"
+                    get_risk_classifier().session_grant.grant(action_key)
+            except Exception:
+                pass
+
             await self._reply_text(update, f"Approved {action_id}. Running now...")
             await self._execute_action(
                 update, pending.action, pending.snapshots,
@@ -434,6 +698,8 @@ class TelegramAIBot:
         result = None
         if action.action == "shell":
             result = await self._execute_shell(update, action.command)
+        elif action.action == "tool":
+            result = await self._execute_tool(update, action)
         elif action.action == "browser":
             cmd = action.command.strip()
             full_cmd = cmd if cmd.startswith("browser ") else f"browser {cmd}"
@@ -459,6 +725,14 @@ class TelegramAIBot:
         else:
             await self._reply_text(update, action.message or "Done.")
             return
+
+        audit_action(
+            "telegram",
+            update.effective_user.id if update.effective_user else None,
+            self._describe_action(action),
+            classify_risk(action.action, action.command or f"{action.tool} {action.tool_args}", "telegram").tier,
+            "success" if result and result.success else "failed",
+        )
 
         # Multi-step continuation
         if getattr(action, "continue_after_result", False) and objective and result and getattr(result, "success", False):
@@ -489,6 +763,35 @@ class TelegramAIBot:
         prefix = "OK" if result.success else "FAILED"
         await self._reply_text(update, self._trim(f"{prefix}: {command}\n\n{text}"))
         return result
+
+    async def _execute_tool(self, update, action: AgentAction):
+        if action.tool == "run_command":
+            result = await asyncio.to_thread(
+                self.bridge.run_command,
+                action.tool_args.get("name", ""),
+                action.tool_args.get("args", []),
+            )
+        elif action.tool == "browser":
+            result = await asyncio.to_thread(
+                self.bridge.browser,
+                action.tool_args.get("operation", ""),
+                **{k: v for k, v in action.tool_args.items() if k != "operation"},
+            )
+        elif action.tool == "pc":
+            result = await asyncio.to_thread(
+                self.bridge.pc,
+                action.tool_args.get("operation", ""),
+                **{k: v for k, v in action.tool_args.items() if k != "operation"},
+            )
+        else:
+            await self._reply_text(update, f"Unknown Orbit tool: {action.tool}")
+            return type("Result", (), {"success": False, "output": "Unknown Orbit tool"})()
+        output = str(getattr(result, "output", result))
+        short_output = output.split("\nFRESH SNAPSHOT:", 1)[0]
+        if action.tool == "browser" and action.tool_args.get("operation") in {"snapshot", "read_page_text"}:
+            short_output = "Browser snapshot captured for Orbit."
+        await self._reply_text(update, self._trim(short_output))
+        return type("Result", (), {"success": True, "output": output})()
 
     async def _send_screenshot(self, update) -> None:
         try:

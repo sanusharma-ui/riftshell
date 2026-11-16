@@ -177,6 +177,7 @@ class RealQueryRoutingTests(unittest.TestCase):
         examples = {text for group in QUERY_EXAMPLES.values() for text in group}
         self.assertFalse(examples.intersection(HELD_OUT_QUESTIONS))
         planner = planner_for_test()
+        planner.knowledge_brain = None
         for question in HELD_OUT_QUESTIONS:
             with self.subTest(question=question):
                 planner._call_provider = Mock(return_value='{"action":"respond","message":"Knowledge answer."}')

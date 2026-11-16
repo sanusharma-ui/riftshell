@@ -82,7 +82,7 @@ PARAPHRASES = {
     "Switch the Git branch to feature/parser": "gcheckout feature/parser",
     "Display the configured remote Git repositories": "gremote",
     "Execute the hello plugin test": "hello",
-    "Apply the interface theme nord": "theme nord",
+    "Apply the interface theme github": "theme github",
     "List available colour themes": "theme list",
     'What subdirectories are inside "My Reports"': 'folders "My Reports"',
     'Display the directory hierarchy under "My Reports"': 'tree "My Reports"',
@@ -122,5 +122,5 @@ NEGATIVES = (
     "Stop process notepad.exe after saving my work", "Fetch https://[broken",
     "Check out the Git branch", "Delete my command history", "Apply a colour theme",
     "Wipe the terminal, no need to execute", "Clear the terminal, don\u2019t execute",
-    "Apply the theme banana", "Apply the interface theme midnight",
+    "Apply the theme banana", "Apply the interface theme cosmic",
 )

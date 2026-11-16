@@ -77,6 +77,8 @@ class AgentAction:
     paths: list[str] = field(default_factory=list)
     objective: str = ""
     continue_after_result: bool = False
+    tool: str = ""
+    tool_args: dict = field(default_factory=dict)
 
     @classmethod
     def from_payload(cls, payload: dict) -> "AgentAction":
@@ -101,8 +103,12 @@ class AgentAction:
 
         objective = str(payload.get("objective", "")).strip()
         continue_after_result = payload.get("continue_after_result") is True
+        tool = str(payload.get("tool", "")).strip().lower()
+        tool_args = payload.get("args", {})
+        if not isinstance(tool_args, dict):
+            tool_args = {}
 
-        if action not in {"respond", "shell", "screenshot", "code_write", "inspect", "browser"}:
+        if action not in {"respond", "shell", "screenshot", "code_write", "inspect", "browser", "tool"}:
             action = "respond"
             message = message or "I could not map that safely."
 
@@ -114,5 +120,7 @@ class AgentAction:
             paths=paths,
             objective=objective,
             continue_after_result=continue_after_result,
+            tool=tool,
+            tool_args=tool_args,
         )
 

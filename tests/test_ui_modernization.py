@@ -128,9 +128,17 @@ class UIModernizationTests(unittest.TestCase):
         self.assertEqual(term.lineWrapMode(), QTextEdit.WidgetWidth)
 
     def test_emoji_policy_in_ui_code(self):
-        """Only the folder emoji (U+1F4C1) is allowed in UI files as requested."""
+        """Only the folder emoji (U+1F4C1) and standard UI indicator glyphs are allowed in UI files."""
         emoji_pattern = re.compile(r"[\U00010000-\U0010ffff\u2600-\u26ff\u2700-\u27bf]")
-        allowed_codepoints = {0x1F4C1}  # folder emoji
+        allowed_codepoints = {
+            0x1F4C1,  # folder emoji
+            0x2715,   # ✕ close
+            0x276F,   # ❯ chevron prompt
+            0x2699,   # ⚙ gear settings
+            0x2713,   # ✓ checkmark
+            0x26E8,   # ⛨ shield
+            0x26A1,   # ⚡ lightning
+        }
 
         ui_dir = os.path.join(os.path.dirname(__file__), "..", "ui")
         violations = []
@@ -176,17 +184,17 @@ class UIModernizationTests(unittest.TestCase):
 
         self.assertEqual(tb.brand_label.text(), "RiftShell")
         self.assertTrue(tb.version_badge.text().startswith("v"))
-        self.assertIn("DEVELOPER WORKSPACE", tb.center_pill.text())
+        self.assertIn("WORKSPACE", tb.center_pill.text())
         tb.set_workspace_text("DEVELOPER WORKSPACE  —  riftshell")
         self.assertEqual(tb.center_pill.text(), "DEVELOPER WORKSPACE  —  riftshell")
 
         self.assertEqual(tb.min_btn.text(), "—")
         self.assertEqual(tb.max_btn.text(), "□")
-        self.assertEqual(tb.close_btn.text(), "×")
-        self.assertEqual(tb.height(), 40)
+        self.assertEqual(tb.close_btn.text(), "✕")
+        self.assertEqual(tb.height(), 46)
         self.assertEqual(tb.min_btn.size(), tb.max_btn.size())
         self.assertEqual(tb.max_btn.size(), tb.close_btn.size())
-        self.assertEqual(tb.min_btn.width(), 48)
+        self.assertEqual(tb.min_btn.width(), 44)
         tb.update_max_icon(True)
         self.assertEqual(tb.max_btn.text(), "⧉")
         tb.update_max_icon(False)

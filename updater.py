@@ -94,7 +94,14 @@ def download_update(
 
         expected_sha = manifest.get("sha256", "").strip().lower()
         actual_sha = hasher.hexdigest().lower()
-        if expected_sha and actual_sha != expected_sha:
+        if not expected_sha:
+            if os.path.exists(dest):
+                try:
+                    os.remove(dest)
+                except OSError:
+                    pass
+            raise RuntimeError("Update manifest is missing required SHA-256 checksum.")
+        if actual_sha != expected_sha:
             if os.path.exists(dest):
                 try:
                     os.remove(dest)
@@ -121,10 +128,22 @@ def apply_update(new_exe: str) -> None:
     if not getattr(sys, "frozen", False):
         raise RuntimeError("Updates work only in the built exe.")
 
+    current_exe = os.path.abspath(sys.executable)
+
+    # Check if running from a temporary unextracted archive folder (e.g. Windows Explorer zip view)
+    exe_lower = current_exe.lower()
+    if any(sub in exe_lower for sub in ("temp1_", "temp2_", "temp3_", "temp\\zip", "\\temp\\rar")):
+        raise RuntimeError(
+            "RiftShell cannot update while running directly inside a ZIP file.\n"
+            "Please extract the RiftShell folder to your computer first."
+        )
+
     bat_path = os.path.join(tempfile.gettempdir(), "riftshell_update.bat")
-    current_exe = sys.executable
 
     bat_content = f"""@echo off
+set "_MEIPASS2="
+set "PYTHONPATH="
+set "PYTHONHOME="
 set "TARGET={current_exe}"
 set "NEW={new_exe}"
 set "COUNT=0"
@@ -134,7 +153,7 @@ timeout /t 1 /nobreak >nul 2>&1 || ping 127.0.0.1 -n 2 >nul 2>&1
 move /y "%NEW%" "%TARGET%" >nul 2>&1
 if errorlevel 1 (
     set /a COUNT+=1
-    if %COUNT% lss 15 goto retry
+    if %COUNT% lss 20 goto retry
     del "%~f0"
     exit /b 1
 )
@@ -146,5 +165,10 @@ del "%~f0"
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
+    clean_env = dict(os.environ)
+    clean_env.pop("_MEIPASS2", None)
+    clean_env.pop("PYTHONPATH", None)
+    clean_env.pop("PYTHONHOME", None)
+
     flags = 0x08000000  # CREATE_NO_WINDOW
-    subprocess.Popen(["cmd", "/c", bat_path], creationflags=flags)
+    subprocess.Popen(["cmd", "/c", bat_path], env=clean_env, creationflags=flags)

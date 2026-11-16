@@ -97,6 +97,8 @@ def _slot_value(raw: str, kind: str) -> str | None:
         return value if value.isascii() and value.isdigit() and 0 < int(value) <= 10000 else None
     if kind == "host":
         return value if value.casefold() not in _RESERVED and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}", value) else None
+    if kind in {"app_name", "app_or_path", "target", "query", "text"}:
+        return value
     if kind not in {"path", "file_path"}:
         return None
     if not quoted and (value.casefold() in _RESERVED or any(ch.isspace() for ch in value)):

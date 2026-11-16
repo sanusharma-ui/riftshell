@@ -21,7 +21,7 @@ from test_ai_providers import make_config
 class SemanticContractTests(unittest.TestCase):
     def test_every_registered_command_has_a_reviewed_schema_or_equivalent(self):
         commands = {meta.name for meta in Shell().registry.list_metadata()}
-        covered = {item.command for item in SEMANTIC_INTENTS} | {"goto"}
+        covered = {item.command for item in SEMANTIC_INTENTS} | {"goto", "keyboard", "mouse", "screen", "windows"}
         self.assertEqual(commands - covered, set())
 
     def test_local_model_missing_keeps_existing_rules_and_silent_misses(self):

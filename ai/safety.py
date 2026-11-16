@@ -84,11 +84,16 @@ class SafetyPolicy:
             # The planner only emits this action for an explicit screenshot
             # request, so a second confirmation would add needless friction.
             return SafetyDecision(False, "Explicit screenshot request.", "low")
+        if action == "tool":
+            from ai.risk_classifier import classify_risk
+            decision = classify_risk("tool", command, source="local")
+            level = "low" if decision.tier == 0 else "medium" if decision.tier == 1 else "critical"
+            return SafetyDecision(decision.requires_approval, decision.reason, level)
         if action == "browser":
-            cmd = command.strip().lower()
-            if cmd.startswith("fill ") and any(k in cmd for k in ("password", "pass", "credit", "card", "token", "key")):
-                return self._approval("Browser form fill with sensitive credentials requires approval.", level="high")
-            return SafetyDecision(False, "Browser action.", "low")
+            from ai.risk_classifier import classify_risk
+            decision = classify_risk("browser", command, source="local")
+            level = "low" if decision.tier == 0 else "medium" if decision.tier == 1 else "critical"
+            return SafetyDecision(decision.requires_approval, decision.reason, level)
         if action != "shell":
             return SafetyDecision(False, "Conversational response.", "low")
         return self.check_shell_command(command)

@@ -18,6 +18,7 @@ from .custom_commands import (
     UnsetVarCommand, VarsCommand, AliasCommand, UnaliasCommand, FilterCommand,
     SortCommand, UniqueCommand, TakeCommand, SkipCommand, CountCommand, SaveCommand,
     LastCommand, UpdateCommand, BrowserCommand, NoteCommand,
+    WindowsCommand, MouseCommand, KeyboardCommand, ScreenCommand,
 )
 
 def build_registry() -> CommandRegistry:
@@ -98,6 +99,10 @@ def build_registry() -> CommandRegistry:
         UpdateCommand(),
         BrowserCommand(),
         NoteCommand(),
+        WindowsCommand(),
+        MouseCommand(),
+        KeyboardCommand(),
+        ScreenCommand(),
     ]:
         reg.register(cmd)
 

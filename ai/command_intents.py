@@ -193,15 +193,94 @@ BUILTIN_INTENTS = (
         rf"(?:delete|remove)\s+(?:the\s+)?(?:file|folder|directory)\s+{TARGET}",
         rf"{TARGET}\s+(?:file|folder)\s+(?:delete\s+karo|delete\s+kar\s+do|hata\s+do)",
     ), arguments=("confirm", "{target}")),
-    *(
-        IntentRule(intent, command, message, patterns=(rf"{verb}\s+{TARGET}",),
-                   starts=starts, arguments=arguments, slots=(("target", "file_path"),))
-        for intent, command, verb, starts, arguments, message in (
-            ("delete_named_path", "delete", r"(?:delete|remove)", ("delete", "remove"), ("confirm", "{target}"),
-             "I will delete the requested item after your approval."),
-            ("open_named_path", "open", r"(?:open|launch)", ("open", "launch"), ("{target}",),
-             "I will open the requested file or folder."),
-        )
+    IntentRule("delete_named_path", "delete", "I will delete the requested item after your approval.",
+               patterns=(rf"(?:delete|remove)\s+{TARGET}",), starts=("delete", "remove"),
+               arguments=("confirm", "{target}"), slots=(("target", "file_path"),)),
+    IntentRule("open_named_path", "open", "I will open the requested app, URL, or file.",
+               patterns=(rf"(?:open|launch)\s+{TARGET}",), starts=("open", "launch"),
+               arguments=("{target}",), slots=(("target", "app_or_path"),)),
+    fixed("windows", "I will show the list of active windows.", (
+        "active windows", "windows list", "list windows", "open windows", "running apps",
+        "show active windows", "show open windows", "show me active windows",
+        "show me open windows", "show me the list of active windows",
+        "show the list of active windows", "list of active windows",
+        "active windows dikhao", "running apps batao", "open windows dikhao",
+    ), (
+        r"(?:show|list|display)(?:\s+me)?(?:\s+the\s+list\s+of)?\s+(?:active|open|running)?\s*windows[?!.]?",
+        r"(?:active|open|running)\s+windows(?:\s+(?:dikhao|batao|list\s+karo))?[?!.]?",
+    ), ("show", "list", "display", "windows", "*")),
+    fixed("mouse", "I will click the mouse.", (
+        "click on the centre of screen", "click on the center of screen",
+        "click center", "click centre", "click middle", "click screen",
+        "screen ke center pe click karo", "center click karo",
+    ), (
+        r"(?:mouse\s+)?click(?:\s+on)?(?:\s+the)?\s+(?:center|centre|middle)(?:\s+of\s+(?:the\s+)?screen)?[?!.]?",
+    ), ("click", "mouse", "*")),
+    fixed("keyboard", "I will press the requested key.", (
+        "press enter", "hit enter", "enter dabao", "enter press karo",
+        "press space", "press tab", "press escape",
+    ), (
+        r"(?:please\s+)?(?:press|hit)\s+(?:the\s+)?(?P<key>enter|tab|space|escape|esc|backspace)(?:\s+key)?[?!.]?",
+    ), ("press", "hit", "*")),
+    IntentRule(
+        "browser_dom",
+        "browser",
+        "I will fetch the current browser page DOM structure and interactive elements.",
+        phrases=(
+            "dom", "browser dom", "show dom", "page dom", "show page dom",
+            "page elements", "show page elements", "inspect page",
+            "page ka dom dikhao", "dom dikhao", "dom access", "page ka dom",
+            "show dom elements", "dom elements", "show buttons", "list buttons",
+            "page ke buttons", "page ke buttons dikhao", "buttons dikhao", "buttons dikha do",
+        ),
+        patterns=(
+            r"(?:show|get|display|read|inspect|list)(?:\s+me)?\s+(?:the\s+)?(?:page\s+)?(?:dom\s+)?(?:structure|elements|buttons|controls)[?!.]?",
+            r"(?:page\s+)?(?:dom|buttons|elements)\s+(?:dikhao|batao|access)[?!.]?",
+            r"(?:page\s+ke\s+)?(?:dom|buttons|elements)(?:\s+dikha\s+do|\s+dikhao)[?!.]?",
+            r"(?:show|get|display|list)\s+(?:the\s+)?(?:interactive\s+)?page\s+elements[?!.]?",
+        ),
+        starts=("dom", "browser", "show", "page", "buttons", "list", "*"),
+        arguments=("dom",),
+    ),
+    IntentRule(
+        "browser_new_tab",
+        "browser",
+        "I will open a new browser tab.",
+        phrases=(
+            "new tab", "open new tab", "open a new tab", "naya tab", "naya tab kholo",
+            "new tab kholo", "new tab open karo", "create new tab", "browser new tab",
+        ),
+        patterns=(
+            r"(?:open|start|create)(?:\s+a)?\s+new\s+tab[?!.]?",
+            r"new\s+tab(?:\s+(?:kholo|open\s+karo))?[?!.]?",
+            r"naya\s+tab(?:\s+kholo)?[?!.]?",
+        ),
+        starts=("new", "open", "naya", "create", "browser", "*"),
+        arguments=("new_tab",),
+    ),
+    IntentRule(
+        "browser_click_button",
+        "browser",
+        "I will click the matching button or element on the browser page.",
+        patterns=(
+            r"(?:please\s+)?(?:click|tap)\s+(?:on\s+)?(?:the\s+)?(?P<target>(?!center|centre|middle|screen)[a-zA-Z0-9_\-\.]+)(?:\s+button|\s+link)?[?!.]?",
+            r"(?P<target>(?!center|centre|middle|screen)[a-zA-Z0-9_\-\.]+)\s+(?:button|link)?\s*(?:pe|par)\s+click\s*(?:karo|kar\s+do)?[?!.]?",
+        ),
+        starts=("click", "tap", "*"),
+        arguments=("click", "{target}"),
+        slots=(("target", "text"),),
+    ),
+    IntentRule(
+        "browser_search",
+        "browser",
+        "I will search the web.",
+        patterns=(
+            rf"(?:search|google|find)\s+(?:for\s+)?(?P<query>{ATOM})",
+            rf"(?P<query>{ATOM})\s+(?:search\s+karo|ko\s+search\s+karo)",
+        ),
+        starts=("search", "google", "find", "*"),
+        arguments=("search", "{query}"),
+        slots=(("query", "text"),),
     ),
     *(
         IntentRule(intent, command, message, patterns=(

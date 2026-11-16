@@ -28,7 +28,8 @@ class AgentRun:
             self.stopped = True
             return action
         signature = repr((action.action, action.command, action.paths,
-                          [(f.path, f.content) for f in action.files]))
+                          [(f.path, f.content) for f in action.files],
+                          action.tool, action.tool_args))
         key = hashlib.sha256(signature.encode()).hexdigest()
         if self.steps >= self.max_steps or key in self._seen:
             self.stopped = True
@@ -96,7 +97,8 @@ class AgentLoop:
                 return self._finish(action.message)
 
             signature = repr((action.action, action.command, action.paths,
-                              [(f.path, f.content) for f in action.files]))
+                              [(f.path, f.content) for f in action.files],
+                              action.tool, action.tool_args))
             key = hashlib.sha256(signature.encode()).hexdigest()
             if key in self._seen:
                 return self._finish("Task paused: the same action came up twice. Review the results before continuing.")

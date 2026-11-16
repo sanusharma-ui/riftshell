@@ -697,11 +697,99 @@ class MeCommand(BaseCommand):
 class PcCommand(BaseCommand):
     name = "pc"
     aliases = ["hostname"]
-    description = "Show PC name."
-    usage = "pc"
+    description = "Show PC name or control windows, mouse, keyboard, and screen."
+    usage = "pc [windows|mouse|keyboard|screen] ..."
 
     def execute(self, ctx, args):
+        if not args:
+            return CommandResult(output=socket.gethostname())
+        sub = str(args[0]).lower().strip()
+        if sub in {"windows", "mouse", "keyboard", "screen"}:
+            from utils.pc_control import execute_pc_command, PCControlError
+            try:
+                out = execute_pc_command(sub, args[1:])
+                return CommandResult(output=str(out), success=True)
+            except PCControlError as exc:
+                return CommandResult(output=f"PC control error: {exc}", success=False)
+            except Exception as exc:
+                return CommandResult(output=f"Error: {exc}", success=False)
         return CommandResult(output=socket.gethostname())
+
+
+class WindowsCommand(BaseCommand):
+    name = "windows"
+    aliases = ["window", "win"]
+    description = "List, focus, minimize, maximize, or close application windows."
+    usage = "windows <list|focus|minimize|maximize|close> [title]"
+
+    def execute(self, ctx, args):
+        from utils.pc_control import execute_pc_command, PCControlError
+        try:
+            sub = args[0] if args else "list"
+            sub_args = args[1:] if args else []
+            out = execute_pc_command("windows", [sub] + list(sub_args))
+            return CommandResult(output=str(out), success=True)
+        except PCControlError as exc:
+            return CommandResult(output=f"Windows command error: {exc}", success=False)
+        except Exception as exc:
+            return CommandResult(output=f"Error: {exc}", success=False)
+
+
+class MouseCommand(BaseCommand):
+    name = "mouse"
+    aliases = []
+    description = "Move mouse, click, right-click, double-click, or scroll."
+    usage = "mouse <move|click|right_click|double_click|scroll> [args]"
+
+    def execute(self, ctx, args):
+        from utils.pc_control import execute_pc_command, PCControlError
+        try:
+            sub = args[0] if args else "click"
+            sub_args = args[1:] if args else []
+            out = execute_pc_command("mouse", [sub] + list(sub_args))
+            return CommandResult(output=str(out), success=True)
+        except PCControlError as exc:
+            return CommandResult(output=f"Mouse command error: {exc}", success=False)
+        except Exception as exc:
+            return CommandResult(output=f"Error: {exc}", success=False)
+
+
+class KeyboardCommand(BaseCommand):
+    name = "keyboard"
+    aliases = ["keys", "key"]
+    description = "Type text, press keys (enter, tab, esc), or hotkeys (ctrl c)."
+    usage = "keyboard <type|press|hotkey> [args]"
+
+    def execute(self, ctx, args):
+        from utils.pc_control import execute_pc_command, PCControlError
+        try:
+            sub = args[0] if args else "press"
+            sub_args = args[1:] if args else ["enter"]
+            out = execute_pc_command("keyboard", [sub] + list(sub_args))
+            return CommandResult(output=str(out), success=True)
+        except PCControlError as exc:
+            return CommandResult(output=f"Keyboard command error: {exc}", success=False)
+        except Exception as exc:
+            return CommandResult(output=f"Error: {exc}", success=False)
+
+
+class ScreenCommand(BaseCommand):
+    name = "screen"
+    aliases = []
+    description = "Get screen resolution or capture desktop screenshot."
+    usage = "screen <size|capture> [path]"
+
+    def execute(self, ctx, args):
+        from utils.pc_control import execute_pc_command, PCControlError
+        try:
+            sub = args[0] if args else "size"
+            sub_args = args[1:] if args else []
+            out = execute_pc_command("screen", [sub] + list(sub_args))
+            return CommandResult(output=str(out), success=True)
+        except PCControlError as exc:
+            return CommandResult(output=f"Screen command error: {exc}", success=False)
+        except Exception as exc:
+            return CommandResult(output=f"Error: {exc}", success=False)
 
 
 class TodayCommand(BaseCommand):
@@ -1772,18 +1860,22 @@ class BrowserCommand(BaseCommand):
                 res = ctrl.control("pause")
                 return CommandResult(output=res)
 
+            elif sub in {"new_tab", "newtab", "tab_new"} or (sub == "new" and len(args) > 1 and args[1].lower() in {"tab", "tabs"}):
+                res = ctrl.control("new_tab")
+                return CommandResult(output=res)
+
             elif sub in {"back", "forward", "refresh", "scroll_up", "scroll_down", "top", "bottom", "new_tab", "close_tab"}:
                 res = ctrl.control(sub)
                 return CommandResult(output=res)
 
-            elif sub == "click":
+            elif sub in {"click", "tap"}:
                 if len(args) < 2:
-                    return CommandResult(output="Usage: browser click <button/link text>", success=False)
+                    return CommandResult(output="Usage: browser click <button/link text or ref e.g. e1>", success=False)
                 target = " ".join(args[1:]).strip()
                 res = ctrl.click_matching(target)
                 return CommandResult(output=res)
 
-            elif sub == "fill":
+            elif sub in {"fill", "type"}:
                 if len(args) < 3:
                     return CommandResult(output="Usage: browser fill <ref> <text>", success=False)
                 ref = args[1]
@@ -1791,8 +1883,47 @@ class BrowserCommand(BaseCommand):
                 res = ctrl.fill_element(ref, val)
                 return CommandResult(output=res)
 
-            elif sub in {"context", "snapshot"}:
+            elif sub in {"dom", "context", "snapshot", "buttons", "elements"}:
+                if len(args) > 1 and (args[1].startswith("http") or args[1] in WEB_SHORTCUTS):
+                    target_url = WEB_SHORTCUTS.get(args[1], args[1])
+                    ctrl.open_url(target_url)
                 res = ctrl.page_context()
+                return CommandResult(output=res)
+
+            elif sub in {"clickxy", "click_xy"}:
+                if len(args) < 3:
+                    return CommandResult(output="Usage: browser clickxy <x> <y>", success=False)
+                try:
+                    res = ctrl.click_at_coordinates(int(args[1]), int(args[2]))
+                    return CommandResult(output=res)
+                except ValueError:
+                    return CommandResult(output="Coordinates must be integers.", success=False)
+
+            elif sub in {"scrollpx", "scroll_px"}:
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser scrollpx <pixels>", success=False)
+                try:
+                    res = ctrl.scroll_by_pixels(int(args[1]))
+                    return CommandResult(output=res)
+                except ValueError:
+                    return CommandResult(output="Pixels must be an integer.", success=False)
+
+            elif sub in {"scrollto", "scroll_to"}:
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser scrollto <ref e.g. e1>", success=False)
+                res = ctrl.scroll_to_element(args[1])
+                return CommandResult(output=res)
+
+            elif sub in {"element", "element_info", "info"}:
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser element <ref e.g. e1>", success=False)
+                info = ctrl.get_element_info(args[1])
+                return CommandResult(output=str(info) if info else "Element not found.")
+
+            elif sub in {"youtube", "yt"}:
+                if len(args) < 2:
+                    return CommandResult(output="Usage: browser youtube <play|pause|mute|fullscreen>", success=False)
+                res = ctrl.control_youtube(args[1])
                 return CommandResult(output=res)
 
             elif sub in {"close", "quit", "exit"}:
