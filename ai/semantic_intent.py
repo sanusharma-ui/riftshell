@@ -36,7 +36,7 @@ BLOCK = re.compile(
 )
 REQUEST_START = re.compile(
     r"^(?:show|list|display|give|tell|let|what|which|where|how\s+(?:much|many|long)|"
-    r"get|check|inspect|report|find|locate|search|look|view|see|print|echo|"
+    r"get|check|inspect|report|find|locate|search|look|view|see|print|echo|help|"
     r"go|navigate|switch|change|take|return|move|relocate|copy|duplicate|rename|"
     r"make|create|build|generate|delete|remove|erase|wipe|clear|close|exit|quit|"
     r"open|launch|start|stop|terminate|kill|run|execute|invoke|test|ping|"
@@ -44,8 +44,9 @@ REQUEST_START = re.compile(
     r"hash|encode|decode|convert|download|fetch|compress|zip|unzip|extract|unpack|package|"
     r"sort|order|filter|keep|omit|skip|drop|count|save|write|redisplay|"
     r"set|assign|unset|define|use|apply|stage|add|commit|pull|push|upload|bring|"
-    r"today|current|date|time|now|uptime|system|ram|memory|disk|drives|ip|network|"
-    r"netstat|processes|active|who|pc|hostname|calc|random)\b",
+    r"today|current|date|time|now|uptime|system|ram|memory|disk|disks|drive|drives|storage|hardware|specs|cpu|processor|ip|network|"
+    r"netstat|processes|active|who|pc|hostname|calc|random|theme|themes|note|notes|"
+    r"mujhe|mera|meri|hum|hume|kaha|kya|kaun|kaise|kitna|kitne|sab|saare|saari|sare|batao|dikhao|badlo|kholo|chalao|band|hatao|likho|banao)\b",
     re.I,
 )
 RESERVED_TARGETS = frozenset((

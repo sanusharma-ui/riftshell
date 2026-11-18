@@ -25,8 +25,10 @@ def conversation_action(text: str, *, truncated: bool = False) -> AgentAction | 
         r"```(?:shell|bash|cmd|powershell|sh|bat)\b|"
         r"^\s*cd\s+(?:/d\s+)?[a-zA-Z]:|"
         r"\b(?:command prompt|terminal)\b.*?\b(?:run|use|type)\b|"
-        r"I don't have access to the (?:current )?system clock|"
-        r"cannot provide the exact (?:current )?date|"
+        r"I don't have access to (?:the\s+)?(?:current\s+)?(?:system\s+)?(?:clock|hardware|hardware details|disks?|drives?)|"
+        r"cannot (?:provide|determine) (?:the\s+)?(?:exact\s+)?(?:current\s+)?(?:date|time|how many disks?|how many drives?)|"
+        r"run a command such as `(?:lsblk|diskutil|wmic|df|fdisk|Get-Disk|Get-PhysicalDisk)|"
+        r"Microsoft Store\s*->\s*[\"']?Themes[\"']?|"
         r"by running (?:date|time|[a-zA-Z0-9_\-]+) in a terminal",
         answer,
         re.MULTILINE | re.IGNORECASE,

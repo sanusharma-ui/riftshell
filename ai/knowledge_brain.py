@@ -455,6 +455,113 @@ SEED_PROFILES: dict[str, dict[str, Any]] = {
         "notes": "Provides file integrity verification.",
         "tags": ("hash", "sha256", "checksum", "integrity"),
     },
+    "theme": {
+        "category": "environment_and_shell",
+        "capabilities": (
+            "List, show, or switch RiftShell UI themes (vscode-dark-plus / Rift Horizon, github-dark, midnight-aurora, ember-grove)",
+            "Discover new themes and inspect active color theme",
+            "Switch the terminal interface theme dynamically",
+        ),
+        "controls": (
+            "theme list (or theme) -> list all available RiftShell themes",
+            "theme current -> show the active theme",
+            "theme <name> -> switch to theme (e.g. theme midnight-aurora, theme ember-grove, theme github-dark)",
+        ),
+        "examples": (
+            ("show themes", "theme"),
+            ("list themes", "theme list"),
+            ("help me to find new themes", "theme"),
+            ("change theme to midnight-aurora", "theme midnight-aurora"),
+        ),
+        "notes": "RiftShell themes are vscode-dark-plus (Rift Horizon), github-dark, midnight-aurora, and ember-grove.",
+        "tags": ("theme", "themes", "color", "appearance", "ui", "look", "dark", "aurora", "midnight", "ember", "horizon", "badlo"),
+    },
+    "drives": {
+        "category": "system_and_hardware",
+        "capabilities": (
+            "List all installed storage drives, disks, partitions, and volumes on the computer",
+            "Display drive letters (C:, D:), volume names, drive types, total storage, and free space",
+            "Determine how many physical and logical disks are installed on the system",
+        ),
+        "controls": (
+            "drives -> list all system drives and storage disks",
+        ),
+        "examples": (
+            ("how many disks are installed on my computer", "drives"),
+            ("list all drives", "drives"),
+            ("show installed disks", "drives"),
+            ("kitne disk hai", "drives"),
+        ),
+        "notes": "Always use `drives` to inspect how many disks/drives are installed and their storage breakdown.",
+        "tags": ("drives", "drive", "disks", "disk", "storage", "harddrive", "hdd", "ssd", "partitions", "volumes", "hardware", "installed"),
+    },
+    "disk": {
+        "category": "system_and_hardware",
+        "capabilities": (
+            "Check disk space and usage for the current directory or a specified folder/drive",
+            "Display total, used, and free storage space in human-readable format",
+        ),
+        "controls": (
+            "disk -> display disk usage of current directory",
+            "disk <path> -> display disk usage of specified path or drive",
+        ),
+        "examples": (
+            ("check disk space", "disk"),
+            ("disk space of D:", "disk D:"),
+        ),
+        "notes": "For all installed disks across the system, use `drives`. For a folder/drive space, use `disk`.",
+        "tags": ("disk", "space", "usage", "free", "storage"),
+    },
+    "system": {
+        "category": "system_and_hardware",
+        "capabilities": (
+            "Display comprehensive system specifications and hardware details",
+            "Show OS name and version, computer name, processor / CPU model, core count, architecture, and total physical RAM",
+        ),
+        "controls": (
+            "system -> display complete system hardware and OS information",
+        ),
+        "examples": (
+            ("system info", "system"),
+            ("hardware details", "system"),
+            ("pc specs", "system"),
+        ),
+        "notes": "Provides complete hardware and operating system details without external scripts.",
+        "tags": ("system", "specs", "hardware", "cpu", "processor", "os", "specifications", "computer", "machine"),
+    },
+    "memory": {
+        "category": "system_and_hardware",
+        "capabilities": (
+            "Inspect computer RAM and memory usage",
+            "Display total physical RAM, used RAM, free RAM, and swap memory statistics",
+        ),
+        "controls": (
+            "memory -> display current RAM consumption and availability",
+        ),
+        "examples": (
+            ("check ram", "memory"),
+            ("ram usage", "memory"),
+            ("ram kitni hai", "memory"),
+        ),
+        "notes": "Instant memory diagnostics.",
+        "tags": ("ram", "memory", "usage", "free", "swap"),
+    },
+    "ip": {
+        "category": "network_and_connectivity",
+        "capabilities": (
+            "Display the computer's IP address and network configuration",
+            "Show network adapter names, IPv4/IPv6 addresses, subnet masks, and gateways",
+        ),
+        "controls": (
+            "ip -> display IP configuration",
+        ),
+        "examples": (
+            ("what is my ip address", "ip"),
+            ("mera ip kya hai", "ip"),
+        ),
+        "notes": "Instant network IP identification.",
+        "tags": ("ip", "ipconfig", "address", "network", "adapter", "internet"),
+    },
 }
 
 # Hindi / Hinglish translation map for natural task inquiries
@@ -489,10 +596,23 @@ HINDI_TASK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "waqt": ("now",),
     "chal raha": ("processes",),
     "kitna": ("memory", "disk", "uptime"),
+    "kitne": ("drives", "files", "folders"),
     "internet": ("network", "ping", "browser", "download"),
     "net": ("network", "ping", "browser"),
     "zip": ("zip", "unzip"),
     "unzip": ("unzip",),
+    "theme": ("theme",),
+    "themes": ("theme",),
+    "badlo": ("theme", "rename", "shift", "cd"),
+    "badal": ("theme", "rename", "shift", "cd"),
+    "disk": ("drives", "disk"),
+    "disks": ("drives", "disk"),
+    "drive": ("drives",),
+    "drives": ("drives",),
+    "hardware": ("system", "drives", "memory"),
+    "specs": ("system", "drives", "memory"),
+    "ram": ("memory",),
+    "ip": ("ip",),
 }
 
 

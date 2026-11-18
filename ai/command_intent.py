@@ -65,12 +65,18 @@ _RESERVED = frozenset((
     "kya kaise kyun kyu how why when if unless and then aur phir kar karo kardo do"
 ).split())
 _PREFIX = re.compile(
-    r"^(?:(?:hey\s+)?orbit[, ]+)?(?:please\s+|kindly\s+|plz\s+)?"
-    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|"
-    r"i(?:'d| would)\s+like\s+you\s+to\s+|i\s+want\s+you\s+to\s+)?",
+    r"^(?:(?:bhai|bro|yaar|hey|hi|hello)\s+)?(?:(?:hey\s+)?orbit[,:\s]+)?"
+    r"(?:(?:bhai|bro|yaar)\s+)?"
+    r"(?:please\s+|kindly\s+|plz\s+|zara\s+)?"
+    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:help\s+me\s+(?:to\s+)?)?|"
+    r"help\s+me\s+(?:to\s+)?(?=\S)|"
+    r"i(?:'d|\s+would)\s+like\s+(?:you\s+)?to\s+|"
+    r"i\s+(?:want|need)\s+(?:you\s+)?to\s+|"
+    r"i\s+(?:want|need)\s+to\s+|"
+    r"just\s+)?",
     re.IGNORECASE,
 )
-_SUFFIX = re.compile(r",?\s+(?:please|plz|thanks|thank you)[.!?]?$", re.IGNORECASE)
+_SUFFIX = re.compile(r",?\s*(?:please|plz|thanks|thank you|bhai|bro|yaar)[.!?]?$", re.IGNORECASE)
 
 
 def normalize_request(text: str) -> str:
@@ -97,7 +103,16 @@ def _slot_value(raw: str, kind: str) -> str | None:
         return value if value.isascii() and value.isdigit() and 0 < int(value) <= 10000 else None
     if kind == "host":
         return value if value.casefold() not in _RESERVED and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}", value) else None
-    if kind in {"app_name", "app_or_path", "target", "query", "text"}:
+    if kind == "url":
+        if re.search(r"[\[\]<>\s]", value):
+            return None
+        try:
+            from urllib.parse import urlsplit
+            parsed = urlsplit(value)
+            return value if parsed.scheme in ("http", "https") and parsed.netloc else None
+        except Exception:
+            return None
+    if kind in {"app_name", "app_or_path", "target", "query", "text", "theme", "expression"}:
         return value
     if kind not in {"path", "file_path"}:
         return None

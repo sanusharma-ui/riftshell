@@ -24,6 +24,9 @@ HLIST = r"(?:mujhe\s+)?(?:(?:is|current)\s+(?:folder|directory)\s+(?:ki|ke)\s+)?
 HLIST_TARGET = rf"(?!is\s){TARGET}"
 
 
+THEMES_REGEX = r"(?:vscode-dark-plus|github-dark|midnight-aurora|ember-grove|default|horizon|violet|dark\+|dark-plus|vscode|vs-code|gh-dark|modern-dark|aurora|midnight|cyan-dark|neon|ember|grove|forest|orange-dark|warm|list|current)"
+
+
 def fixed(command, message, phrases=(), patterns=(), starts=()):
     return IntentRule(command, command, message, tuple(phrases), tuple(patterns), tuple(starts))
 
@@ -91,6 +94,123 @@ BUILTIN_INTENTS = (
         "show directory tree", "show the directory tree", "show folder tree",
         "show the folder tree", "folder tree dikhao",
     )),
+    fixed("theme", "I will show the available RiftShell themes.", (
+        "find new themes", "help me to find new themes", "help me find new themes", "new themes",
+        "themes", "theme", "show themes", "list themes", "available themes", "what themes are available",
+        "which themes are available", "all themes", "show all themes", "list all themes",
+        "riftshell themes", "riftshell theme", "terminal themes", "terminal theme", "shell themes", "shell theme",
+        "theme list", "themes list", "themes dikhao", "theme dikhao", "saare themes dikhao",
+        "mujhe themes dikhao", "theme batao", "konsi theme hai", "konsi themes hai",
+        "current theme", "what is the current theme", "theme current", "active theme",
+        "theme badlo", "theme badal do", "theme change karo", "change theme", "switch theme", "change the theme", "switch the theme",
+    ), (
+        r"(?:find|show|list|display|get|see|discover|check)(?:\s+(?:me|us))?(?:\s+(?:all\s+the|all|the))?\s+(?:new\s+|available\s+|riftshell\s+)?themes?[?!.]?",
+        r"(?:what|which)\s+(?:riftshell\s+)?themes?(?:\s+(?:are\s+available|exist|do\s+we\s+have|can\s+i\s+use))[?!.]?",
+        r"(?:riftshell|terminal|shell)\s+themes?[?!.]?",
+        r"themes?(?:\s+(?:dikhao|batao|list\s+karo|badlo|change\s+karo))[?!.]?",
+        r"(?:change|switch)\s+(?:the\s+)?theme[?!.]?",
+    ), ("find", "show", "list", "display", "get", "see", "themes", "theme", "riftshell", "what", "which", "change", "switch", "*")),
+    IntentRule(
+        "theme_set",
+        "theme",
+        "I will switch to the requested theme.",
+        patterns=(
+            rf"(?:change|switch|set|apply)\s+(?:the\s+)?theme\s+(?:to\s+)?(?P<target>{THEMES_REGEX})",
+            rf"theme\s+(?P<target>{THEMES_REGEX})",
+            rf"(?P<target>{THEMES_REGEX})\s+theme(?:\s+(?:lagao|set\s+karo|apply\s+karo|badlo))?",
+        ),
+        starts=("change", "switch", "set", "apply", "theme", "*"),
+        arguments=("{target}",),
+        slots=(("target", "theme"),),
+    ),
+    fixed("drives", "I will show the available drives and storage disks.", (
+        "list all drives", "show drives", "all drives", "available drives", "which drives are available",
+        "show all drives", "list all drives", "check drives", "drives list", "drives",
+        "how many disks are installed on my computer", "how many disks are installed on your computer",
+        "how many disks are installed on this computer", "how many disks are installed",
+        "how many disks do i have", "how many disks are there", "how many hard drives are installed",
+        "how many drives are installed", "how many drives do i have", "how many drives are there",
+        "installed disks", "installed drives", "connected disks", "connected drives",
+        "storage drives", "storage devices", "disk drives", "hard drives", "hard disks",
+        "show disks", "list disks", "show all disks", "list all disks", "check disks",
+        "show connected disks", "how many storage drives", "show storage devices", "storage drives list",
+        "kitne disk hai", "kitne disks hai", "kitne disk hain", "kitne disks hain",
+        "kitne drive hai", "kitne drives hai", "kitne drives hain",
+        "computer me kitne disk hai", "pc me kitne disk hai", "is pc me kitne disk hai", "laptop me kitne disk hai",
+        "disks dikhao", "drives dikhao", "saare disks dikhao", "saare drives dikhao", "sab disks dikhao", "sab drives dikhao",
+        "kaun kaun si drives hai", "kaun kaun se disk hai", "disk batao", "drives batao", "hard disk batao",
+        "is pc me kaun kaun si drives lagi hain",
+    ), (
+        r"(?:how\s+many\s+)?(?:disks?|drives?|hard\s*drives?)\s+(?:are\s+)?(?:installed|connected|available|there)(?:\s+(?:on|in)\s+(?:my|this|the|your)?\s*(?:pc|computer|system|machine|laptop))?[?!.]?",
+        r"(?:show|list|display|check|get|tell|view)(?:\s+me)?\s+(?:all\s+(?:the\s+)?|the\s+)?(?:available\s+|installed\s+|connected\s+)?(?:drives?|disks?|volumes?|storage\s+devices?|hard\s*drives?)[?!.]?",
+        r"(?:(?:is|my|this|apne)?\s*(?:pc|computer|system|laptop)\s*(?:me|mein)\s+)?(?:kitn[ei]\s+)?(?:disks?|drives?|hard\s*disks?)\s+(?:hai|hain|lage\s+hai|lagi\s+hai|installed\s+hai)[?!.]?",
+        r"(?:saar[ei]|sab|all)\s+(?:disks?|drives?|storage\s+devices?)\s+(?:dikhao|batao|list\s+karo)[?!.]?",
+        r"(?:disks?|drives?|storage\s+devices?)\s+(?:dikhao|batao|list\s+karo|check\s+karo)[?!.]?",
+    ), ("show", "list", "display", "check", "get", "tell", "view", "how", "kitne", "disks", "drives", "storage", "*")),
+    fixed("disk", "I will show disk space for the current directory.", (
+        "disk space", "disk usage", "free disk space", "how much disk space is left", "check disk space",
+        "free storage", "available storage", "storage space", "how much storage is left", "free space",
+        "remaining space", "check storage", "storage kitni bachi hai", "disk space kitna hai",
+        "free space kitna hai", "disk space batao", "space kitna hai", "disk space check karo",
+    ), (
+        r"(?:check|show|tell|display|get)(?:\s+me)?\s+(?:the\s+)?(?:free\s+|available\s+)?(?:disk\s+space|disk\s+usage|storage\s+space|storage\s+usage)[?!.]?",
+        r"how\s+much\s+(?:disk\s+space|storage|free\s+space)\s+(?:is\s+)?(?:left|free|available)[?!.]?",
+        r"(?:disk|storage)\s+(?:space|usage|kitna\s+hai)\s*(?:batao|dikhao|check\s+karo)?[?!.]?",
+        r"(?:disk|free\s+disk)\s+(?:space|usage)[?!.]?",
+    ), ("show", "list", "display", "check", "disk", "storage", "how", "free", "*")),
+    target_rule("disk_path", "disk", "I will show disk space for the requested path.", (
+        rf"(?:check\s+)?(?:disk|storage)\s+(?:space|usage)\s+(?:of|for|on|in)\s+{TARGET}",
+    ), starts=("check", "disk", "storage", "*")),
+    fixed("system", "I will show system and hardware information.", (
+        "system info", "system information", "full system info", "computer specifications", "system specs",
+        "computer specs", "pc specifications", "pc specs", "hardware specs", "hardware details",
+        "system hardware", "pc hardware", "hardware information", "tell me about this computer",
+        "tell me about my pc", "pc info", "pc ki detail", "pc ki poori detail bata", "computer ki detail",
+        "system ki detail", "system details batao", "hardware details dikhao", "hardware batao",
+        "system info dikha do", "system info dikhao",
+        "cpu info", "processor info", "cpu details", "what processor do i have",
+    ), (
+        r"(?:show|display|get|tell|view)(?:\s+me)?\s+(?:the\s+)?(?:system|computer|pc|machine|hardware)\s+(?:info|information|specs|specifications|details)[?!.]?",
+        r"(?:hardware|system|pc)\s+(?:specs|specifications|details|info|information)[?!.]?",
+        rf"(?:system|pc|computer|hardware)\s+(?:ki\s+)?(?:detail|details|info|specs)(?:\s+{HSHOW})?[?!.]?",
+        r"(?:processor|cpu)\s+(?:info|details|specs)[?!.]?",
+    ), ("show", "list", "display", "get", "tell", "view", "system", "hardware", "pc", "computer", "cpu", "*")),
+    fixed("memory", "I will show current memory and RAM usage.", (
+        "ram usage", "memory usage", "ram kitni bachi hai", "check ram", "how much ram is being used",
+        "total ram", "available ram", "how much ram do i have", "how much memory is free",
+        "ram kitni hai", "ram check karo", "memory check karo", "kitna ram use ho raha hai",
+        "ram batao", "memory batao",
+    ), (
+        r"(?:check|show|tell|display|get)(?:\s+me)?\s+(?:current\s+)?(?:ram|memory)\s+(?:usage|consumption|status|info)?[?!.]?",
+        r"how\s+much\s+(?:ram|memory)\s+(?:is\s+)?(?:being\s+used|used|free|available|installed|left)[?!.]?",
+        r"(?:ram|memory)\s+(?:usage|kitni\s+hai|kitna\s+hai)\s*(?:batao|dikhao|check\s+karo)?[?!.]?",
+    ), ("show", "list", "display", "check", "ram", "memory", "how", "*")),
+    fixed("ip", "I will show the IP address and configuration.", (
+        "what is my ip address", "my ip", "what is my ip", "ip address", "ip config", "show ip",
+        "mera ip address kya hai", "ip address batao", "ip dikhao", "my ip address", "show my ip",
+        "ip address check karo", "check ip", "what is ip",
+    ), (
+        r"(?:what\s+is|show|tell|get|display|check)(?:\s+me)?\s+(?:my\s+)?ip(?:\s+(?:address|config|configuration))?[?!.]?",
+        r"(?:mera\s+)?ip(?:\s+address)?\s+(?:kya\s+hai|batao|dikhao)[?!.]?",
+    ), ("show", "list", "display", "what", "my", "ip", "check", "*")),
+    fixed("uptime", "I will show the system uptime.", (
+        "how long has the computer been on", "system uptime", "uptime", "how long has the machine been up",
+        "pc kab se chalu hai", "system kab se on hai", "uptime batao", "kitni der se chalu hai",
+    ), (
+        rf"(?:{SHOW})?(?:system\s+)?uptime[?!.]?",
+        r"(?:how\s+long\s+(?:has\s+)?(?:the\s+)?(?:computer|pc|system|machine)\s+been\s+(?:on|up|running)|(?:system\s+)?uptime)[?!.]?",
+        r"(?:pc|system|computer)\s+kab\s+se\s+(?:chalu|on)\s+hai[?!.]?",
+    ), ("show", "list", "display", "how", "system", "uptime", "pc", "*")),
+    fixed("env", "I will show the environment variables.", (
+        "show env", "show environment variables", "list env", "list environment variables",
+        "environment variables", "env variables",
+    )),
+    fixed("vars", "I will show the shell variables.", (
+        "show vars", "show variables", "list vars", "list variables", "shell variables",
+    )),
+    fixed("path", "I will show the PATH environment variable.", (
+        "show path", "display path", "path variable", "path dikhao",
+    )),
     *(
         fixed(command, message, phrases,
               (rf"(?:{SHOW})?(?:{english})[?!.]?", rf"(?:{hinglish})\s+{HSHOW}[?!.]?"), (*starts, "*"))
@@ -99,23 +219,6 @@ BUILTIN_INTENTS = (
                 "what is running", "running processes", "list running processes", "running tasks",
                 "active processes", "abhi kaun kaun se programs chal rahe hain",
             ), r"(?:running\s+)?(?:processes|tasks)", r"(?:running\s+)?processes", ("show", "list", "display", "processes", "running")),
-            ("system", "I will show system information.", (
-                "system info", "system information", "full system info", "computer specifications",
-                "pc info", "pc ki poori detail bata",
-            ), r"system\s+(?:info|information|details)", r"system\s+(?:info|details)", ("show", "list", "display", "system")),
-            ("memory", "I will show current memory usage.", (
-                "ram usage", "memory usage", "ram kitni bachi hai", "check ram", "how much ram is being used",
-            ), r"(?:ram|memory)\s+usage", r"(?:ram|memory)(?:\s+usage)?", ("show", "list", "display", "ram", "memory")),
-            ("disk", "I will show disk space for the current directory.", (
-                "disk space", "disk usage", "free disk space", "how much disk space is left",
-            ), r"(?:disk|free\s+disk)\s+(?:space|usage)", r"disk\s+(?:space|usage)", ("show", "list", "display", "disk")),
-            ("drives", "I will show the available drives.", (
-                "list all drives", "show drives", "all drives", "available drives", "which drives are available",
-                "is pc me kaun kaun si drives lagi hain",
-            ), r"(?:available\s+)?drives", r"drives", ("show", "list", "display", "drives")),
-            ("ip", "I will show the IP configuration.", (
-                "what is my ip address", "my ip", "what is my ip", "ip address", "ip config", "show ip", "mera ip address kya hai",
-            ), r"(?:my\s+)?ip(?:\s+(?:address|configuration))?", r"ip(?:\s+address)?", ("show", "list", "display", "ip")),
             ("network", "I will show network information.", (
                 "network info", "network details", "network ki detail dikha",
             ), r"network\s+(?:info|information)", r"network\s+info", ("show", "list", "display", "network")),
@@ -138,9 +241,6 @@ BUILTIN_INTENTS = (
             ("pc", "I will show the computer name.", (
                 "pc name", "computer name", "machine name", "hostname", "is computer ka naam kya hai",
             ), r"(?:computer|pc|machine)\s+name", r"(?:computer|pc)\s+name", ("show", "list", "display", "computer", "pc")),
-            ("uptime", "I will show the system uptime.", (
-                "how long has the computer been on", "system uptime", "uptime", "how long has the machine been up", "pc kab se chalu hai",
-            ), r"(?:system\s+)?uptime", r"uptime", ("show", "list", "display", "uptime")),
             ("plugins", "I will show the installed plugin status.", (), r"(?:installed\s+)?plugins", r"plugins", ("show", "list", "display", "plugins")),
             ("version", "I will show the RiftShell version.", (), r"(?:shell\s+|riftshell\s+)?version", r"(?:shell\s+)?version", ("show", "list", "display", "shell", "version")),
         )
@@ -312,5 +412,111 @@ BUILTIN_INTENTS = (
     ), starts=("which", "whereis", "where", "full", "*"), arguments=("{target}",), slots=(("target", "path"),)),
     fixed("random", "I will pick a random number.", (
         "roll a dice", "roll dice", "pick a random number", "ek lucky number do",
+    )),
+    IntentRule(
+        "calc",
+        "calc",
+        "I will calculate the requested expression.",
+        patterns=(
+            rf"(?:calculate|compute|solve|evaluate|what\s+is|math)\s+(?P<expr>[0-9\.\+\-\*\/\(\)\^\%\s]+)",
+            rf"(?P<expr>[0-9\.\+\-\*\/\(\)\^\%\s]+)\s+(?:calculate\s+karo|solve\s+karo|hisab\s+karo)",
+        ),
+        starts=("calculate", "compute", "solve", "evaluate", "what", "math", "*"),
+        arguments=("{expr}",),
+        slots=(("expr", "expression"),),
+    ),
+    IntentRule(
+        "note",
+        "note",
+        "I will record the requested note.",
+        patterns=(
+            rf"(?:take\s+(?:a\s+)?note|make\s+(?:a\s+)?note|write\s+(?:a\s+)?note|note\s+down|add\s+note|save\s+note|note)\s+(?P<text>[^\r\n]+)",
+            rf"(?P<text>[^\r\n]+)\s+(?:note\s+kar\s+lo|note\s+likho|likh\s+lo)",
+        ),
+        starts=("take", "make", "write", "note", "add", "save", "*"),
+        arguments=("{text}",),
+        slots=(("text", "text"),),
+    ),
+    IntentRule(
+        "kill_process",
+        "kill",
+        "I will terminate the requested process.",
+        patterns=(
+            rf"(?:kill|terminate|stop)\s+(?:process|task|app|program)?\s*(?P<target>[a-zA-Z0-9_\-\.]+)",
+            rf"(?P<target>[a-zA-Z0-9_\-\.]+)\s+(?:process|task|program)?\s*(?:ko\s+)?(?:kill\s+karo|band\s+karo|stop\s+karo)",
+        ),
+        starts=("kill", "terminate", "stop", "*"),
+        arguments=("{target}",),
+        slots=(("target", "app_or_path"),),
+    ),
+    target_rule("search_files", "search", "I will search for matching filenames.", (
+        rf"(?:search|find)\s+(?:for\s+)?(?:files?\s+(?:named|called)\s+)?{TARGET}",
+        rf"{TARGET}\s+(?:naam\s+ki\s+)?files?\s+(?:dhundho|khojo|search\s+karo)",
+    ), starts=("search", "find", "*")),
+    target_rule("find_text", "findtext", "I will search for matching text inside files.", (
+        rf"(?:find|search)\s+text\s+{TARGET}(?:\s+in\s+files)?",
+        rf"grep\s+{TARGET}",
+        rf"files\s+(?:me|mein)\s+{TARGET}\s+(?:dhundho|search\s+karo)",
+    ), starts=("find", "search", "grep", "files", "*")),
+    IntentRule(
+        "download_file",
+        "download",
+        "I will download the requested file.",
+        patterns=(
+            rf"(?:download|fetch)\s+(?P<url>https?://[^\s]+)",
+            rf"(?P<url>https?://[^\s]+)\s+(?:download\s+karo|fetch\s+karo)",
+        ),
+        starts=("download", "fetch", "*"),
+        arguments=("{url}",),
+        slots=(("url", "url"),),
+    ),
+    IntentRule(
+        "zip_folder",
+        "zip",
+        "I will compress the folder into a zip archive.",
+        patterns=(
+            rf"(?:zip|compress)\s+(?:folder\s+)?{SOURCE}\s+(?:to|into|as)\s+{DEST}",
+        ),
+        starts=("zip", "compress", "*"),
+        arguments=("{source}", "{destination}"),
+        slots=(("source", "path"), ("destination", "path")),
+    ),
+    target_rule("unzip_file", "unzip", "I will extract the zip archive.", (
+        rf"(?:unzip|extract|unpack)\s+(?:archive\s+|file\s+)?{TARGET}",
+        rf"{TARGET}\s+(?:unzip|extract)\s+karo",
+    ), starts=("unzip", "extract", "unpack", "*")),
+    IntentRule(
+        "git_add",
+        "gadd",
+        "I will stage the requested files in Git.",
+        patterns=(
+            rf"git\s+add\s+(?P<target>[^\r\n]+)",
+            rf"stage\s+(?:the\s+)?(?:files?\s+)?(?P<target>[^\r\n]+)",
+        ),
+        starts=("git", "stage", "*"),
+        arguments=("{target}",),
+        slots=(("target", "text"),),
+    ),
+    IntentRule(
+        "git_commit",
+        "gcommit",
+        "I will commit the staged changes in Git.",
+        patterns=(
+            rf"git\s+commit(?:\s+-m)?\s+(?P<msg>[^\r\n]+)",
+            rf"commit\s+(?:staged\s+changes\s+)?(?:with\s+message\s+)?(?P<msg>[^\r\n]+)",
+        ),
+        starts=("git", "commit", "*"),
+        arguments=("-m", "{msg}"),
+        slots=(("msg", "text"),),
+    ),
+    target_rule("git_checkout", "gcheckout", "I will switch to the requested Git branch.", (
+        rf"git\s+checkout\s+{TARGET}",
+        rf"(?:switch|change)\s+(?:to\s+)?(?:git\s+)?branch\s+{TARGET}",
+    ), starts=("git", "switch", "change", "*")),
+    fixed("gpull", "I will pull updates from the Git remote.", (
+        "git pull", "pull from git", "pull git changes", "pull remote changes",
+    )),
+    fixed("gpush", "I will push commits to the Git remote.", (
+        "git push", "push to git", "push git changes", "push remote changes",
     )),
 )
